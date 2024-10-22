@@ -21,10 +21,13 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "22.6.0"
+          node-version: "20" # Sử dụng phiên bản Node.js đã ổn định (Node.js 22 có thể gặp vấn đề không tương thích)
 
       - name: Install dependencies
         run: npm install
+
+      - name: Build TailwindCSS
+        run: npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify
 
       - name: Build the Ezinn Admin app
         run: npm run build

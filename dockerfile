@@ -14,7 +14,7 @@ RUN npm install --include=dev
 COPY . .
 
 # Build TailwindCSS styles
-RUN npx tailwindcss -i ./src/App.css -o ./dist/output.css --minify
+RUN npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify
 
 # Build the application
 RUN npm run build --verbose
