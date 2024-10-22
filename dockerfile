@@ -13,6 +13,9 @@ RUN npm install --include=dev
 # Copy all the source code into the container
 COPY . .
 
+# Build TailwindCSS styles
+RUN npx tailwindcss -i ./src/App.css -o ./dist/output.css --minify
+
 # Build the application
 RUN npm run build --verbose
 
@@ -21,4 +24,3 @@ EXPOSE 3001
 
 # Start the app using Vite's preview mode
 CMD ["npm", "run", "preview", "--", "--host", "--port", "3001"]
-
