@@ -3,6 +3,7 @@ name: Deploy to Staging
 on:
   push:
     branches:
+      - main
       - develop
 
 permissions:
@@ -20,7 +21,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: '22.6.0'
+          node-version: "22.6.0"
 
       - name: Install dependencies
         run: npm install
@@ -56,6 +57,6 @@ jobs:
       - name: Run deployment action in Jira
         uses: chrnorm/deployment-action@releases/v1
         with:
-          environment: 'staging'
+          environment: "staging"
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: 'Deploying ezinn-admin to staging via Docker'
+          description: "Deploying ezinn-admin to staging via Docker"
