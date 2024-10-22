@@ -27,7 +27,7 @@ jobs:
         run: npm install
 
       - name: Build TailwindCSS
-        run: npx tailwindcss -i ./src/input.css -o ./dist/output.css --minify
+        run: npx tailwindcss -i ./src/index.css -o ./dist/output.css --minify
 
       - name: Build the Ezinn Admin app
         run: npm run build
