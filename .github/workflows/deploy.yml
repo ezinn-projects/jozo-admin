@@ -7,8 +7,8 @@ on:
       - develop
 
 permissions:
-  contents: write # Cấp quyền write cho việc quản lý file và nội dung trong repo
-  deployments: write # Cấp quyền write để thực hiện deployment
+  contents: write
+  deployments: write
 
 jobs:
   build-and-deploy:
@@ -21,16 +21,17 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v2
         with:
-          node-version: "20" # Sử dụng phiên bản Node.js đã ổn định (Node.js 22 có thể gặp vấn đề không tương thích)
+          node-version: "20"
 
       - name: Install dependencies
         run: npm install
 
-      - name: Build TailwindCSS
-        run: npx tailwindcss -i ./src/index.css -o ./dist/output.css --minify
-
       - name: Build the Ezinn Admin app
         run: npm run build
+
+      - name: Get commit SHA
+        id: vars
+        run: echo "::set-output name=sha_short::$(git rev-parse --short HEAD)"
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -39,23 +40,23 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:staging .
+        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }} .
 
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:staging
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }}
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v0.1.3
         with:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
-          password: ${{ secrets.VPS_PASSWORD }} # Sử dụng mật khẩu để đăng nhập
+          password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
             docker stop ezinn-admin || true
             docker rm ezinn-admin || true
-            docker pull ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:staging
-            docker run -d --name ezinn-admin -p 3001:3001 ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:staging
+            docker pull ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }}
+            docker run -d --name ezinn-admin -p 3001:3001 ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }}
 
       - name: Run deployment action in Jira
         uses: chrnorm/deployment-action@releases/v1
@@ -63,3 +64,30 @@ jobs:
           environment: "staging"
           token: ${{ secrets.GITHUB_TOKEN }}
           description: "Deploying ezinn-admin to staging via Docker"
+
+  cleanup:
+    runs-on: ubuntu-latest
+    if: always() # Run this job even if the build fails
+    steps:
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Remove old Docker images from VPS
+        uses: appleboy/ssh-action@v0.1.3
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          password: ${{ secrets.VPS_PASSWORD }}
+          port: 22
+          script: |
+            docker image prune -f --filter "until=24h"
+
+      - name: Remove old images from Docker Hub
+        run: |
+          images=$(docker images -q --filter "dangling=true")
+          if [ -n "$images" ]; then
+            docker rmi $images
+          fi
