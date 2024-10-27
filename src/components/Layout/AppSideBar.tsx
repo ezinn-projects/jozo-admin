@@ -1,66 +1,109 @@
-import { Calendar, Home, Inbox, Search, Settings } from "lucide-react";
-
 import {
   Sidebar,
   SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
   SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-
-// Menu items.
-const items = [
-  {
-    title: "Home",
-    url: "#",
-    icon: Home,
-  },
-  {
-    title: "Inbox",
-    url: "#",
-    icon: Inbox,
-  },
-  {
-    title: "Calendar",
-    url: "#",
-    icon: Calendar,
-  },
-  {
-    title: "Search",
-    url: "#",
-    icon: Search,
-  },
-  {
-    title: "Settings",
-    url: "#",
-    icon: Settings,
-  },
-];
+import {
+  Accordion,
+  AccordionItem,
+  AccordionTrigger,
+  AccordionContent,
+} from "@/components/ui/accordion";
+import { MENU_ITEMS, MenuItem } from "@/constants/menuItems";
+import { NavLink } from "react-router-dom";
+import { ChevronDown, ChevronRight } from "lucide-react";
+import { useState } from "react";
 
 export function AppSidebar() {
+  const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(
+    {}
+  );
+
+  const toggleExpand = (title: string) => {
+    setExpandedItems((prev) => ({
+      ...prev,
+      [title]: !prev[title],
+    }));
+  };
+
+  const renderMenuItems = (items: MenuItem[]) => {
+    return items.map((item) => {
+      const isExpanded = expandedItems[item.title] || false;
+      const hasChildren = !!item.children;
+
+      return (
+        <SidebarMenuItem key={item.title}>
+          {hasChildren ? (
+            <>
+              <SidebarMenuButton
+                onClick={() => toggleExpand(item.title)}
+                className="flex justify-between items-center"
+              >
+                <div className="flex items-center">
+                  <item.icon />
+                  <span className="ml-2">{item.title}</span>
+                </div>
+                <span>
+                  {isExpanded ? (
+                    <ChevronDown size={16} />
+                  ) : (
+                    <ChevronRight size={16} />
+                  )}
+                </span>
+              </SidebarMenuButton>
+              {isExpanded && (
+                <SidebarMenu className="pl-4">
+                  {renderMenuItems(item?.children || [])}
+                </SidebarMenu>
+              )}
+            </>
+          ) : (
+            <SidebarMenuButton asChild>
+              <NavLink to={item?.url || ""} className="flex items-center">
+                <item.icon />
+                <span className="ml-2">{item.title}</span>
+              </NavLink>
+            </SidebarMenuButton>
+          )}
+        </SidebarMenuItem>
+      );
+    });
+  };
+
   return (
     <Sidebar>
       <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupLabel>Application</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {items.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild>
-                    <a href={item.url}>
-                      <item.icon />
-                      <span>{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="generalManagement">
+            <AccordionTrigger>
+              <SidebarGroupLabel>Quản lý chung</SidebarGroupLabel>
+            </AccordionTrigger>
+            <AccordionContent>
+              <SidebarMenu className="list-none">
+                {renderMenuItems(
+                  MENU_ITEMS.find((item) => item.title === "Quản lý chung")
+                    ?.children || []
+                )}
+              </SidebarMenu>
+            </AccordionContent>
+          </AccordionItem>
+
+          {MENU_ITEMS.filter((item) => item.title !== "Quản lý chung").map(
+            (item) => (
+              <SidebarMenuItem key={item.title}>
+                <SidebarMenuButton asChild>
+                  <NavLink to={item?.url || ""} className="flex items-center">
+                    <item.icon />
+                    <span className="ml-2">{item.title}</span>
+                  </NavLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+            )
+          )}
+        </Accordion>
       </SidebarContent>
     </Sidebar>
   );
