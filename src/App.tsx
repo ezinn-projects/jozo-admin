@@ -1,34 +1,46 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import { Layout } from "@/components/Layout";
+import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
+import { Suspense, lazy } from "react";
+import PrivateRoute from "@/components/PrivateRoute";
+import { AuthProvider } from "./context/Authorization.context";
+import { Role } from "./constants/enum";
+
+// Sử dụng lazy load
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const StaffPage = lazy(() => import("@/pages/StaffPage"));
+const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 
 function App() {
-  const [count, setCount] = useState(0);
-
   return (
-    <>
-      <div>
-        <h1 className="text-red-700">Hello Quat</h1>
-        <a href="https://vitejs.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>hello</h1>
-      <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
-      </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
+    <AuthProvider>
+      <Router>
+        <Layout>
+          <Suspense fallback={<div>Loading...</div>}>
+            <Routes>
+              <Route path="/" element={<HomePage />} />
+              <Route
+                path="/admin"
+                element={
+                  <PrivateRoute requiredRoles={[Role.Admin]}>
+                    <AdminPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route
+                path="/staff"
+                element={
+                  <PrivateRoute requiredRoles={[Role.Staff]}>
+                    <StaffPage />
+                  </PrivateRoute>
+                }
+              />
+              <Route path="/unauthorized" element={<UnauthorizedPage />} />
+            </Routes>
+          </Suspense>
+        </Layout>
+      </Router>
+    </AuthProvider>
   );
 }
 
