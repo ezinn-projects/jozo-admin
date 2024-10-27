@@ -21,4 +21,3 @@ EXPOSE 3001
 
 # Start the app using Vite's preview mode
 CMD ["npm", "run", "preview", "--", "--host", "--port", "3001"]
-
