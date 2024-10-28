@@ -18,8 +18,19 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import {
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { RoomType } from "@/constants/enum";
+import { Select } from "@radix-ui/react-select";
 import { useForm } from "react-hook-form";
+import { roomTypeOptions } from "../../constants";
+import Typography from "@/components/ui/typography";
+import { Textarea } from "@/components/ui/textarea";
+import AutocompleteTags from "@/components/ui/autocomplete-tags";
 
 type Props = {
   id?: string;
@@ -32,7 +43,26 @@ type FormValues = {
   description: string;
   originalPrice: number;
   discountedPrice?: number;
+  amenities: string[];
 };
+
+export const amenitiesOptions = [
+  { value: "wifi", label: "Wi-Fi" },
+  { value: "ac", label: "Air Conditioning" },
+  { value: "tv", label: "Television" },
+  { value: "minibar", label: "Minibar" },
+  { value: "safe", label: "Safe" },
+  { value: "coffee_maker", label: "Coffee Maker" },
+  { value: "gym", label: "Gym Access" },
+  { value: "pool", label: "Swimming Pool" },
+  { value: "parking", label: "Parking" },
+  { value: "spa", label: "Spa Services" },
+  { value: "projector", label: "Projector" },
+  { value: "sofa", label: "Sofa" },
+  { value: "refrigerator", label: "Mini Fridge" },
+  { value: "decor_lighting", label: "Decor Lighting" },
+  { value: "marshall_speaker", label: "Marshall Speaker" },
+];
 
 function UpsertRoomModal(props: Props) {
   const { id = "" } = props;
@@ -44,7 +74,7 @@ function UpsertRoomModal(props: Props) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button>{title}</Button>
+        <Button className="my-3">{title}</Button>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
@@ -55,20 +85,139 @@ function UpsertRoomModal(props: Props) {
         </DialogHeader>
         <div className="grid gap-4">
           <Form {...form}>
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="Name's room" {...field} />
-                  </FormControl>
+            <form action="" className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Name <Typography variant="span">(*)</Typography>{" "}
+                    </FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter room name" {...field} />
+                    </FormControl>
 
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="type"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Type</FormLabel>
+                    <Select
+                      onValueChange={field.onChange}
+                      defaultValue={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a room type" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {roomTypeOptions.map((option) => (
+                          <SelectItem value={option.value} key={option.label}>
+                            {option.value}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxOccupancy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>
+                      Max Occupancy <Typography variant="span">(*)</Typography>{" "}
+                    </FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter max occupancy"
+                        {...field}
+                        type="number"
+                        max={99}
+                        min={1}
+                      />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxOccupancy"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Description</FormLabel>
+                    <FormControl>
+                      <Textarea placeholder="Enter description" {...field} />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="originalPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Original price</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter original price" {...field} />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="discountedPrice"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Discounted price</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter original price" {...field} />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="amenities"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Amenities</FormLabel>
+                    <FormControl>
+                      <AutocompleteTags
+                        suggestions={amenitiesOptions}
+                        placeholder="Enter amenities"
+                        {...field}
+                      />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </form>
           </Form>
         </div>
         <DialogFooter>

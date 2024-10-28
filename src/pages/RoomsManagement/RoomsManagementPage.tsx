@@ -6,7 +6,7 @@ function RoomsManagementPage() {
     <div className="mt-3">
       <Typography variant="h1">Rooms management</Typography>
 
-      <UpsertRoomModal id="2347632784632487362" />
+      <UpsertRoomModal />
     </div>
   );
 }
