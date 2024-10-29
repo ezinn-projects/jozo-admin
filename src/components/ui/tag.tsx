@@ -15,7 +15,11 @@ const Tag = (props: Props) => {
         {label}
       </Typography>
 
-      <button onClick={onRemove} className="ml-1 text-sm" type="button">
+      <button
+        onClick={onRemove}
+        className="ml-1 text-sm opacity-70 hover:opacity-100"
+        type="button"
+      >
         {<X width={12} height={12} />}
       </button>
     </div>

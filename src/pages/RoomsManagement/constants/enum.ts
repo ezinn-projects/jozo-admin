@@ -17,3 +17,15 @@ export enum RoomType {
   KING = "KING",
   TWIN = "TWIN",
 }
+
+/**
+ * Enum for room statuses in the Ezinn system.
+ * Includes statuses: Available, Booked, Needs Cleaning, and Preparing.
+ * @enum {string}
+ */
+export enum RoomStatus {
+  AVAILABLE = "Available",
+  BOOKED = "Booked",
+  NEEDS_CLEANING = "Needs Cleaning",
+  PREPARING = "Preparing",
+}

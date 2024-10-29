@@ -41,7 +41,7 @@ const AutocompleteTags = (props: AutocompleteTagsProps) => {
   return (
     <>
       <div
-        className={`relative w-full text-sm outline-none rounded-md shadow-sm flex flex-wrap gap-x-1 items-center px-3 ${
+        className={`relative w-full text-sm outline-none rounded-md max-h-32 overflow-y-auto shadow-sm flex flex-wrap gap-1 items-center px-3 ${
           isFocused ? "border-black border" : "border"
         }`}
       >
@@ -60,7 +60,7 @@ const AutocompleteTags = (props: AutocompleteTagsProps) => {
       </div>
 
       {!!inputValue && filteredSuggestions.length > 0 && (
-        <div className="bg-white w-full rounded shadow-md max-h-32 overflow-y-auto p-2 flex flex-col z-10 absolute">
+        <div className="bg-white w-full rounded shadow-md max-h-32 overflow-y-auto p-2 flex flex-col">
           {filteredSuggestions.map((suggestion, index) => {
             const isSelected = tags.includes(suggestion);
 
@@ -70,9 +70,12 @@ const AutocompleteTags = (props: AutocompleteTagsProps) => {
                 key={index}
                 onMouseDown={(e) => {
                   e.preventDefault(); // Ngăn `onBlur` của input
-                  isSelected ? removeTag(suggestion.value) : addTag(suggestion);
+
+                  void (isSelected
+                    ? removeTag({ value: suggestion.value })
+                    : addTag(suggestion));
                 }}
-                className={`px-2 py-1 hover:bg-gray-100 cursor-pointer text-left rounded-sm w-full flex items-center justify-between ${
+                className={`px-2 py-1 hover:bg-gray-100 cursor-pointer text-left rounded-sm flex items-center justify-between ${
                   isSelected ? "bg-gray-100" : ""
                 }`}
               >

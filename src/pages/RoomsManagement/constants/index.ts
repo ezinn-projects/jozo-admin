@@ -1,11 +1,11 @@
 // import { RoomType } from './Type';
 
-import { RoomType } from "./enum";
+import { RoomStatus, RoomType } from "./enum";
 
 /**
  * Options for RoomType with short, descriptive labels.
  */
-export const roomTypeOptions = [
+const roomTypeOptions = [
   { value: RoomType.SINGLE, label: "Single Room" },
   { value: RoomType.DOUBLE, label: "Double Room" },
   { value: RoomType.TRIPLE, label: "Triple Room" },
@@ -13,3 +13,15 @@ export const roomTypeOptions = [
   { value: RoomType.KING, label: "King Room" },
   { value: RoomType.TWIN, label: "Twin Room" },
 ];
+
+/**
+ * Using RoomStatus enum in system options
+ */
+const roomStatusOptions = [
+  { label: "Available", value: RoomStatus.AVAILABLE },
+  { label: "Booked", value: RoomStatus.BOOKED },
+  { label: "Needs Cleaning", value: RoomStatus.NEEDS_CLEANING },
+  { label: "Preparing", value: RoomStatus.PREPARING },
+];
+
+export { roomTypeOptions, roomStatusOptions };
