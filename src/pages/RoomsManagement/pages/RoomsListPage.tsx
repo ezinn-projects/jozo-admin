@@ -3,9 +3,9 @@ import Typography from "@/components/ui/typography";
 import PATHS from "@/constants/paths";
 import { Link } from "react-router-dom";
 
-function RoomsManagementPage() {
+function RoomsListPage() {
   return (
-    <div className="mt-3">
+    <div>
       <Typography variant="h1">Rooms management</Typography>
 
       <Link to={PATHS.NEW_ROOM}>
@@ -15,4 +15,4 @@ function RoomsManagementPage() {
   );
 }
 
-export default RoomsManagementPage;
+export default RoomsListPage;
