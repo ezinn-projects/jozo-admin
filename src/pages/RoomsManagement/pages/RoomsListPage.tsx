@@ -1,15 +1,15 @@
+import Header from "@/components/Layout/Header";
 import { Button } from "@/components/ui/button";
-import Typography from "@/components/ui/typography";
 import PATHS from "@/constants/paths";
 import { Link } from "react-router-dom";
 
 function RoomsListPage() {
   return (
     <div>
-      <Typography variant="h1">Rooms management</Typography>
+      <Header title="Rooms management" subtitle="List of rooms" />
 
       <Link to={PATHS.NEW_ROOM}>
-        <Button>New room</Button>
+        <Button className="mt-3">New room</Button>
       </Link>
     </div>
   );

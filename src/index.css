@@ -79,4 +79,21 @@
   body {
     @apply bg-background text-foreground;
   }
+  input {
+    @apply outline-none;
+  }
+   input::placeholder {
+    @apply text-muted-foreground;
+  }
+}
+
+@layer utilities {
+  .main-image::after {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-full border-2 border-blue-500 box-border pointer-events-none rounded-md;
+  }
+  .selected-image::after {
+    content: "";
+    @apply absolute top-0 left-0 w-full h-full border-2 border-blue-300 box-border pointer-events-none rounded-md;
+  }
 }
