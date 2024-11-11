@@ -24,6 +24,7 @@ const ImagePicker = forwardRef(({ onChange }: Props, ref) => {
 
       <input
         type="file"
+        accept="image/*"
         className="hidden"
         ref={inputRef}
         onChange={(e) => e.target.files && onChange(e)}

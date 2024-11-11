@@ -17,14 +17,14 @@ const AutocompleteTags = forwardRef<HTMLInputElement, AutocompleteTagsProps>(
 
     useEffect(() => {
       const handleBackspace = (event: KeyboardEvent) => {
-        if (event.key === "Backspace" && inputValue === "") {
+        if (event.key === "Backspace" && inputValue === "" && isFocused) {
           setTags((prevTag) => prevTag.slice(0, -1));
         }
       };
       document.addEventListener("keydown", handleBackspace);
 
       return () => document.removeEventListener("keydown", handleBackspace);
-    }, [inputValue]);
+    }, [inputValue, isFocused]);
 
     const addTag = (tag: { value: string; label: string }) => {
       setTags([...tags, tag]);

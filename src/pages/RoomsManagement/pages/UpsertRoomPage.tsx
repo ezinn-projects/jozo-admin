@@ -47,6 +47,8 @@ type FormValues = {
   tags: string[];
   images: string[];
   status: RoomStatus;
+  area: string;
+  houseRules: string[];
 };
 
 export const amenitiesOptions = [
@@ -71,6 +73,34 @@ const tagsOptions = [
   { value: "single", label: "Single" },
   { value: "double", label: "Double" },
   { value: "twin", label: "Twin" },
+];
+
+const houseRules = [
+  {
+    id: "1",
+    rule: "Không hút thuốc",
+    description:
+      "Cấm hút thuốc trong phòng và các khu vực công cộng của homestay.",
+    status: "active",
+  },
+  {
+    id: "2",
+    rule: "Không thú cưng",
+    description: "Không được mang thú cưng vào phòng.",
+    status: "active",
+  },
+  {
+    id: "3",
+    rule: "Không tổ chức tiệc",
+    description: "Không tổ chức tiệc, tiệc tùng ồn ào trong phòng.",
+    status: "active",
+  },
+  {
+    id: "4",
+    rule: "Giữ yên lặng sau 10 giờ tối",
+    description: "Giữ yên lặng từ 10 giờ tối trở đi.",
+    status: "active",
+  },
 ];
 
 function UpsertRoomPage(props: Props) {
@@ -235,6 +265,28 @@ function UpsertRoomPage(props: Props) {
 
                 <FormField
                   control={form.control}
+                  name="houseRules"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>House rules</FormLabel>
+                      <FormControl>
+                        <AutocompleteTags
+                          suggestions={houseRules.map((rule) => ({
+                            value: rule.id,
+                            label: rule.rule,
+                          }))}
+                          placeholder="Enter house rules"
+                          {...field}
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
                   name="tags"
                   render={({ field }) => (
                     <FormItem>
@@ -244,6 +296,26 @@ function UpsertRoomPage(props: Props) {
                           suggestions={tagsOptions}
                           placeholder="Enter tags"
                           {...field}
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="area"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Area</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter area"
+                          {...field}
+                          type="number"
+                          prefix="m²"
                         />
                       </FormControl>
 
