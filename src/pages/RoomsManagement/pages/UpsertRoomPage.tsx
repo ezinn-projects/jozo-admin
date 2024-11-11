@@ -1,15 +1,4 @@
 import AutocompleteTags from "@/components/ui/autocomplete-tags";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -19,7 +8,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   SelectContent,
   SelectItem,
@@ -31,8 +19,18 @@ import Typography from "@/components/ui/typography";
 import { RoomType } from "@/constants/enum";
 import { Select } from "@radix-ui/react-select";
 import { useForm } from "react-hook-form";
-import { roomStatusOptions, roomTypeOptions } from "../../constants";
-import { RoomStatus } from "../../constants/enum";
+import { RoomStatus } from "../constants/enum";
+import { roomStatusOptions, roomTypeOptions } from "../constants";
+import Header from "@/components/Layout/Header";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import ImagesList from "../components/ui/ImagesList";
+
+// import { roomStatusOptions, roomTypeOptions } from "../../constants";
 
 type Props = {
   id?: string;
@@ -46,7 +44,11 @@ type FormValues = {
   originalPrice: number;
   discountedPrice?: number;
   amenities: string[];
+  tags: string[];
+  images: string[];
   status: RoomStatus;
+  area: string;
+  houseRules: string[];
 };
 
 export const amenitiesOptions = [
@@ -67,30 +69,57 @@ export const amenitiesOptions = [
   { value: "marshall_speaker", label: "Marshall Speaker" },
 ];
 
-function UpsertRoomModal(props: Props) {
+const tagsOptions = [
+  { value: "single", label: "Single" },
+  { value: "double", label: "Double" },
+  { value: "twin", label: "Twin" },
+];
+
+const houseRules = [
+  {
+    id: "1",
+    rule: "Không hút thuốc",
+    description:
+      "Cấm hút thuốc trong phòng và các khu vực công cộng của homestay.",
+    status: "active",
+  },
+  {
+    id: "2",
+    rule: "Không thú cưng",
+    description: "Không được mang thú cưng vào phòng.",
+    status: "active",
+  },
+  {
+    id: "3",
+    rule: "Không tổ chức tiệc",
+    description: "Không tổ chức tiệc, tiệc tùng ồn ào trong phòng.",
+    status: "active",
+  },
+  {
+    id: "4",
+    rule: "Giữ yên lặng sau 10 giờ tối",
+    description: "Giữ yên lặng từ 10 giờ tối trở đi.",
+    status: "active",
+  },
+];
+
+function UpsertRoomPage(props: Props) {
   const { id = "" } = props;
 
-  const title = id ? "Edit room" : "Add room";
+  const title = id ? "Edit room" : "New room";
 
   const form = useForm<FormValues>();
 
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        <Button className="my-3">{title}</Button>
-      </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>
-            {id ? "Edit a room here." : "Add a new room here."}
-          </DialogDescription>
-        </DialogHeader>
+    <div className="max-w-3xl">
+      <Header title={title} />
 
-        <ScrollArea className="h-[(100svh-theme(spacing.8)]">
-          <div className="grid gap-4">
-            <Form {...form}>
-              <form className="space-y-2">
+      <Form {...form}>
+        <form className="space-y-2 mt-3">
+          <Accordion type="multiple">
+            <AccordionItem value="item-1">
+              <AccordionTrigger>Basic Information</AccordionTrigger>
+              <AccordionContent>
                 <FormField
                   control={form.control}
                   name="name"
@@ -174,7 +203,12 @@ function UpsertRoomModal(props: Props) {
                     </FormItem>
                   )}
                 />
+              </AccordionContent>
+            </AccordionItem>
 
+            <AccordionItem value="item-2">
+              <AccordionTrigger>Pricing</AccordionTrigger>
+              <AccordionContent>
                 <FormField
                   control={form.control}
                   name="originalPrice"
@@ -204,7 +238,12 @@ function UpsertRoomModal(props: Props) {
                     </FormItem>
                   )}
                 />
+              </AccordionContent>
+            </AccordionItem>
 
+            <AccordionItem value="item-3">
+              <AccordionTrigger>Room details</AccordionTrigger>
+              <AccordionContent>
                 <FormField
                   control={form.control}
                   name="amenities"
@@ -224,6 +263,96 @@ function UpsertRoomModal(props: Props) {
                   )}
                 />
 
+                <FormField
+                  control={form.control}
+                  name="houseRules"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>House rules</FormLabel>
+                      <FormControl>
+                        <AutocompleteTags
+                          suggestions={houseRules.map((rule) => ({
+                            value: rule.id,
+                            label: rule.rule,
+                          }))}
+                          placeholder="Enter house rules"
+                          {...field}
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="tags"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Tags</FormLabel>
+                      <FormControl>
+                        <AutocompleteTags
+                          suggestions={tagsOptions}
+                          placeholder="Enter tags"
+                          {...field}
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="area"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Area</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter area"
+                          {...field}
+                          type="number"
+                          prefix="m²"
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4">
+              <AccordionTrigger>Images</AccordionTrigger>
+              <AccordionContent>
+                <FormField
+                  control={form.control}
+                  name="images"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Image</FormLabel>
+                      <FormControl>
+                        <ImagesList
+                          onChange={field.onChange}
+                          images={field.value}
+                          max={10}
+                        />
+                      </FormControl>
+
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="item-4">
+              <AccordionTrigger>Status</AccordionTrigger>
+              <AccordionContent>
                 <FormField
                   control={form.control}
                   name="status"
@@ -251,20 +380,13 @@ function UpsertRoomModal(props: Props) {
                     </FormItem>
                   )}
                 />
-              </form>
-            </Form>
-          </div>
-        </ScrollArea>
-        <DialogFooter>
-          <DialogClose asChild>
-            <Button type="button" variant="secondary">
-              Save changes
-            </Button>
-          </DialogClose>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
+        </form>
+      </Form>
+    </div>
   );
 }
 
-export default UpsertRoomModal;
+export default UpsertRoomPage;

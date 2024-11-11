@@ -79,19 +79,19 @@ export function AppSidebar() {
         <Accordion type="single" collapsible>
           <AccordionItem value="generalManagement">
             <AccordionTrigger>
-              <SidebarGroupLabel>Quản lý chung</SidebarGroupLabel>
+              <SidebarGroupLabel>General Management</SidebarGroupLabel>
             </AccordionTrigger>
             <AccordionContent>
               <SidebarMenu className="list-none">
                 {renderMenuItems(
-                  MENU_ITEMS.find((item) => item.title === "Quản lý chung")
+                  MENU_ITEMS.find((item) => item.title === "General Management")
                     ?.children || []
                 )}
               </SidebarMenu>
             </AccordionContent>
           </AccordionItem>
 
-          {MENU_ITEMS.filter((item) => item.title !== "Quản lý chung").map(
+          {MENU_ITEMS.filter((item) => item.title !== "General Management").map(
             (item) => (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton asChild>

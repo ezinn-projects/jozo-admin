@@ -20,7 +20,7 @@ const MENU_ITEMS: MenuItem[] = [
     icon: BedDouble,
   },
   {
-    title: "Quản lý chung",
+    title: "Gerenral management",
     icon: BedDouble,
     children: [
       {
