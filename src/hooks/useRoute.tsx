@@ -1,75 +1,60 @@
 import { Layout } from "@/components/Layout";
-import PrivateRoute from "@/components/PrivateRoute";
-import { Suspense } from "react";
-import { Route, BrowserRouter as Router, Routes } from "react-router-dom";
+import ProtectedLayout from "@/components/Layout/ProjectedLayout";
+import { lazy, Suspense } from "react";
+import {
+  Outlet,
+  Route,
+  BrowserRouter as Router,
+  Routes,
+} from "react-router-dom";
 
 import { Role } from "@/constants/enum";
-
 import PATHS from "@/constants/paths";
-import AdminPage from "@/pages/AdminPage";
-import HomePage from "@/pages/HomePage";
-import { RoomsListPage, UpsertRoomPage } from "@/pages/RoomsManagement";
-import StaffPage from "@/pages/StaffPage";
-import UnauthorizedPage from "@/pages/UnauthorizedPage";
+
+const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const RoomsListPage = lazy(
+  () => import("@/pages/RoomsManagement/pages/RoomsListPage")
+);
+const UpsertRoomPage = lazy(
+  () => import("@/pages/RoomsManagement/pages/UpsertRoomPage")
+);
+const StaffPage = lazy(() => import("@/pages/StaffPage"));
+const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
+const LoginPage = lazy(() => import("@/pages/LoginPage"));
 
 function useRoute() {
   return (
     <Router>
-      <Layout>
-        <Suspense fallback={<div>Loading...</div>}>
-          <Routes>
+      <Suspense fallback={<div>Loading...</div>}>
+        <Routes>
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+
+          <Route
+            element={
+              <Layout>
+                <Outlet />
+              </Layout>
+            }
+          >
             <Route path="/" element={<HomePage />} />
 
-            <Route
-              path={PATHS.HOME}
-              element={
-                <PrivateRoute requiredRoles={[Role.Admin]}>
-                  <AdminPage />
-                </PrivateRoute>
-              }
-            />
-
-            <Route path={PATHS.ROOMS}>
-              <Route
-                index
-                element={
-                  <PrivateRoute requiredRoles={[Role.Admin]}>
-                    <RoomsListPage />
-                  </PrivateRoute>
-                }
-              />
-
-              <Route
-                path={PATHS.NEW_ROOM}
-                element={
-                  <PrivateRoute requiredRoles={[Role.Admin]}>
-                    <UpsertRoomPage />
-                  </PrivateRoute>
-                }
-              />
-
-              <Route
-                path={PATHS.EDIT_ROOM}
-                element={
-                  <PrivateRoute requiredRoles={[Role.Admin]}>
-                    <UpsertRoomPage />
-                  </PrivateRoute>
-                }
-              />
+            <Route element={<ProtectedLayout requiredRoles={[Role.Admin]} />}>
+              <Route path={PATHS.HOME} element={<AdminPage />} />
+              <Route path={PATHS.ROOMS}>
+                <Route index element={<RoomsListPage />} />
+                <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+              </Route>
             </Route>
 
-            <Route
-              path="/staff"
-              element={
-                <PrivateRoute requiredRoles={[Role.Staff]}>
-                  <StaffPage />
-                </PrivateRoute>
-              }
-            />
-            <Route path="/unauthorized" element={<UnauthorizedPage />} />
-          </Routes>
-        </Suspense>
-      </Layout>
+            <Route element={<ProtectedLayout requiredRoles={[Role.Staff]} />}>
+              <Route path="/staff" element={<StaffPage />} />
+            </Route>
+          </Route>
+        </Routes>
+      </Suspense>
     </Router>
   );
 }

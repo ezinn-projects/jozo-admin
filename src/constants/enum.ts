@@ -5,8 +5,8 @@
  * @property {string} Staff - Staff member with limited access
  */
 export enum Role {
-    Admin = "admin",
-    Staff = "staff",
+  Admin = "admin",
+  Staff = "staff",
 }
 
 /**
@@ -20,10 +20,10 @@ export enum Role {
  * @property {string} Dormitory - A shared room with multiple beds
  */
 export enum RoomType {
-  Single = 'Single Room',
-  Double = 'Double Room',
-  Twin = 'Twin Room',
-  Family = 'Family Room',
-  Suite = 'Suite Room',
-  Dormitory = 'Dormitory Room',
+  Single = "Single Room",
+  Double = "Double Room",
+  Twin = "Twin Room",
+  Family = "Family Room",
+  Suite = "Suite Room",
+  Dormitory = "Dormitory Room",
 }
