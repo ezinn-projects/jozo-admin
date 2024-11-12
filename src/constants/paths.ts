@@ -19,6 +19,10 @@ const PATHS = {
   ROOM_TYPES: "/room-types",
   PRICING: "/pricing",
   CALENDAR: "/calendar",
+
+  // room types management
+  ROOM_TYPES_LISTS: "/room-types",
+  ROOM_TYPES_UPSERT: "/room-types/upsert",
 } as const;
 
 export default PATHS;

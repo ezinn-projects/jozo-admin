@@ -7,6 +7,7 @@ const http = axios.create({
   timeout: 1500,
   headers: {
     "Content-Type": "application/json",
+    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
   },
 });
 

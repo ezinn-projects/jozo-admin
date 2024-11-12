@@ -25,7 +25,7 @@ interface TypographyProps {
 function Typography({
   variant = "p",
   children,
-  className = "",
+  className,
   ...props
 }: TypographyProps) {
   // Xác định thẻ HTML tương ứng dựa trên variant
@@ -33,7 +33,7 @@ function Typography({
   const variantClass = variantClasses[variant]; // Lấy lớp CSS theo variant
 
   return (
-    <Component className={`${variantClass} ${className}`} {...props}>
+    <Component className={`${variantClass} ${className} !mt-0`} {...props}>
       {children}
     </Component>
   );

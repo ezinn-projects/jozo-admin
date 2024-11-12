@@ -1,5 +1,8 @@
+import AuthGuard from "@/components/guards/AuthGuard";
+import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
-import ProtectedLayout from "@/components/Layout/ProjectedLayout";
+import { Role } from "@/constants/enum";
+import PATHS from "@/constants/paths";
 import { lazy, Suspense } from "react";
 import {
   Outlet,
@@ -8,11 +11,7 @@ import {
   Routes,
 } from "react-router-dom";
 
-import { Role } from "@/constants/enum";
-import PATHS from "@/constants/paths";
-
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
-const HomePage = lazy(() => import("@/pages/HomePage"));
 const RoomsListPage = lazy(
   () => import("@/pages/RoomsManagement/pages/RoomsListPage")
 );
@@ -22,35 +21,49 @@ const UpsertRoomPage = lazy(
 const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const RoomTypesLists = lazy(
+  () => import("@/pages/RoomTypesPage/pages/RoomTypesLists")
+);
+const UpsertRoomType = lazy(
+  () => import("@/pages/RoomTypesPage/pages/UpsertRoomType")
+);
 
 function useRoute() {
   return (
     <Router>
       <Suspense fallback={<div>Loading...</div>}>
         <Routes>
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path={PATHS.LOGIN} element={<LoginPage />} />
+          <Route path={PATHS.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
-          <Route
-            element={
-              <Layout>
-                <Outlet />
-              </Layout>
-            }
-          >
-            <Route path="/" element={<HomePage />} />
+          <Route element={<AuthGuard />}>
+            <Route
+              element={
+                <Layout>
+                  <Outlet />
+                </Layout>
+              }
+            >
+              <Route element={<RoleGuard requiredRoles={[Role.Admin]} />}>
+                <Route path={PATHS.HOME} element={<AdminPage />} />
+                <Route path={PATHS.ROOMS}>
+                  <Route index element={<RoomsListPage />} />
+                  <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
+                  <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+                </Route>
 
-            <Route element={<ProtectedLayout requiredRoles={[Role.Admin]} />}>
-              <Route path={PATHS.HOME} element={<AdminPage />} />
-              <Route path={PATHS.ROOMS}>
-                <Route index element={<RoomsListPage />} />
-                <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
-                <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.ROOM_TYPES}>
+                  <Route index element={<RoomTypesLists />} />
+                  <Route
+                    path={PATHS.ROOM_TYPES_UPSERT}
+                    element={<UpsertRoomType />}
+                  />
+                </Route>
               </Route>
-            </Route>
 
-            <Route element={<ProtectedLayout requiredRoles={[Role.Staff]} />}>
-              <Route path="/staff" element={<StaffPage />} />
+              <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>
+                <Route path="/staff" element={<StaffPage />} />
+              </Route>
             </Route>
           </Route>
         </Routes>

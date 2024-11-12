@@ -47,6 +47,8 @@ export default function LoginPage() {
       });
 
       navigate(PATHS.HOME);
+
+      localStorage.setItem("access_token", data.result?.access_token || "");
     },
   });
 
