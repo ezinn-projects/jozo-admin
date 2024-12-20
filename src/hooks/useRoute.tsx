@@ -3,6 +3,7 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
+import PricingPage from "@/pages/PricingPage";
 import { lazy, Suspense } from "react";
 import {
   Outlet,
@@ -59,6 +60,8 @@ function useRoute() {
                     element={<UpsertRoomType />}
                   />
                 </Route>
+
+                <Route path={PATHS.PRICING} element={<PricingPage />} />
               </Route>
 
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>

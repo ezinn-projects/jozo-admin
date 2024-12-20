@@ -27,3 +27,29 @@ export enum RoomType {
   Suite = "Suite Room",
   Dormitory = "Dormitory Room",
 }
+
+/**
+ * Enum for types of day.
+ * @enum {string}
+ * @property {string} Weekday - A weekday
+ * @property {string} Weekend - A weekend
+ * @property {string} Holiday - A holiday
+ */
+export enum DayType {
+  Weekday = "weekday",
+  Weekend = "weekend",
+  Holiday = "holiday",
+}
+
+/**
+ * Enum for types of room size.
+ * @enum {string}
+ * @property {string} Small - A small room
+ * @property {string} Medium - A medium room
+ * @property {string} Large - A large room
+ */
+export enum RoomSize {
+  Small = "small",
+  Medium = "medium",
+  Large = "large",
+}
