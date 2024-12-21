@@ -5,14 +5,17 @@ type RoomType = {
 };
 
 type Pricing = {
-  _id: string;
+  _id?: string;
   room_size: string;
   day_type: string;
-  time_range: string | null;
+  time_range: {
+    start: string;
+    end: string;
+  };
   price: number;
   effective_date: string;
-  end_date: string | null;
-  note: string | null;
+  end_date?: string;
+  note?: string;
 };
 
 type RoomTypeResponse = HTTPResponse<RoomType>;

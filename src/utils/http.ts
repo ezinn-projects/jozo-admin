@@ -14,7 +14,7 @@ const http = axios.create({
 // Thêm một bộ đón chặn request
 http.interceptors.request.use(
   function (config) {
-    // Làm gì đó trước khi request dược gửi đi
+    // Làm gì đó trước khi request dựoc gửi đi
     return config;
   },
   function (error) {

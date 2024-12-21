@@ -6,11 +6,8 @@ const pricingApis = {
   getPricingLists: () => {
     return http.get<PricingResponse>(`${PRICING_CONTROLLER}`);
   },
-  addPricing: (payload: Omit<Pricing, "id">) => {
-    return http.post<HTTPResponse<Pricing>>(
-      `${PRICING_CONTROLLER}/add-pricing`,
-      payload
-    );
+  createPricing: (payload: Omit<Pricing, "_id">) => {
+    return http.post<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}`, payload);
   },
   updatePricing: (payload: Pricing) => {
     return http.put<HTTPResponse<Pricing>>(

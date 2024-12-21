@@ -5,12 +5,67 @@ import { cn } from "@/lib/utils";
 export type InputProps = React.InputHTMLAttributes<HTMLInputElement> & {
   prefix?: React.ReactNode;
   suffix?: React.ReactNode;
+  currency?: boolean;
+  as?: React.ElementType;
 };
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, prefix, suffix, ...props }, ref) => {
+  (
+    {
+      className,
+      type,
+      prefix,
+      suffix,
+      currency,
+      maxLength,
+      as: Component = "input",
+      onChange,
+      ...props
+    },
+    ref
+  ) => {
     const hasPrefix = !!prefix;
     const hasSuffix = !!suffix;
+
+    // Handle number input with maxLength and currency formatting
+    const handleNumberInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+      let value = e.target.value.replace(/[^\d]/g, ""); // Remove non-digits
+
+      // Apply maxLength if specified
+      if (maxLength && value.length > maxLength) {
+        value = value.slice(0, maxLength);
+      }
+
+      // Format with thousand separators if currency is true
+      if (currency) {
+        value = value
+          ? parseInt(value).toLocaleString("en-US").replace(/,/g, ".")
+          : "";
+      }
+
+      // Create new synthetic event
+      const syntheticEvent = {
+        ...e,
+        target: {
+          ...e.target,
+          value: value,
+        },
+      };
+
+      onChange?.(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
+    };
+
+    // Use modified props for number input
+    const inputProps =
+      type === "number"
+        ? {
+            ...props,
+            onChange: handleNumberInput,
+            type: "text", // Change to text to handle custom formatting
+            inputMode:
+              "numeric" as React.InputHTMLAttributes<HTMLInputElement>["inputMode"],
+          }
+        : props;
 
     return (
       <div className="relative flex items-center">
@@ -20,8 +75,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           </div>
         )}
 
-        <input
-          type={type}
+        <Component
           className={cn(
             "flex h-9 w-full rounded-md border border-input bg-transparent px-3 py-1 text-sm shadow-sm transition-colors file:border-0 file:bg-transparent file:text-sm file:font-medium file:text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50",
             hasPrefix ? "pl-10" : "pl-3",
@@ -29,7 +83,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className
           )}
           ref={ref}
-          {...props}
+          {...inputProps}
         />
 
         {hasSuffix && (
