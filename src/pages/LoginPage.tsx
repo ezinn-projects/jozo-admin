@@ -1,3 +1,4 @@
+import authorizationApis from "@/apis/authorization.apis";
 import { Button } from "@/components/ui/button";
 import {
   Form,
@@ -9,15 +10,14 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import Typography from "@/components/ui/typography";
+import PATHS from "@/constants/paths";
+import { useToast } from "@/hooks/use-toast";
 import { loginSchema } from "@/utils/schema";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation } from "@tanstack/react-query";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import authorizationApis from "@/apis/authorization.apis";
-import { useToast } from "@/hooks/use-toast";
-import PATHS from "@/constants/paths";
 import { useNavigate } from "react-router-dom";
 
 type FormValues = {
@@ -42,13 +42,21 @@ export default function LoginPage() {
   const { mutate } = useMutation({
     mutationFn: authorizationApis.login,
     onSuccess: ({ data }) => {
+      console.log("Login success:", data);
+      console.log("Navigating to:", PATHS.HOME);
+
+      localStorage.setItem("access_token", data.result?.access_token || "");
       toast({
         title: data.message,
       });
 
-      navigate(PATHS.HOME);
-
-      localStorage.setItem("access_token", data.result?.access_token || "");
+      navigate(PATHS.HOME, { replace: true });
+    },
+    onError: (error) => {
+      toast({
+        title: error.message,
+        className: "bg-red-500 text-white",
+      });
     },
   });
 

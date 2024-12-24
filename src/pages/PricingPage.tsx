@@ -1,15 +1,17 @@
 import Header from "@/components/Layout/Header";
-import UpdatePricingModal from "@/components/modules/UpdatePricingModal";
-import { Button } from "@/components/ui/button";
+import DeletePricingModal from "@/components/modules/Pricing/DeletePricingModal";
+import {
+  default as UpdatePricingModal,
+  default as UpsertPricingModal,
+} from "@/components/modules/Pricing/UpsertPricingModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import { useGetPricingLists } from "@/hooks/pricing";
 import { ColumnDef } from "@tanstack/react-table";
+import { PencilIcon } from "lucide-react";
 
 function PricingPage() {
   const { data, isLoading } = useGetPricingLists();
-
-  console.log(data);
 
   const columns: ColumnDef<Pricing>[] = [
     {
@@ -38,11 +40,38 @@ function PricingPage() {
       header: "Room Size",
       accessorKey: "room_size",
     },
-    { header: "Price", accessorKey: "price" },
+    {
+      header: "Day Type",
+      accessorKey: "day_type",
+    },
+    {
+      header: "Price",
+      accessorKey: "price",
+    },
+    {
+      header: "Time Range",
+      accessorKey: "time_range",
+      cell: ({ row }) => {
+        const timeRange = row.original.time_range;
+        return `${timeRange?.start} - ${timeRange?.end}`;
+      },
+    },
+    {
+      header: "Note",
+      accessorKey: "note",
+    },
     {
       header: "",
       accessorKey: "price",
-      cell: ({ row }) => <Button>Edit</Button>,
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center gap-2">
+          <UpdatePricingModal
+            id={row.original._id}
+            icon={<PencilIcon size={12} />}
+          />
+          <DeletePricingModal id={row.original._id} />
+        </div>
+      ),
     },
   ];
 
@@ -50,13 +79,16 @@ function PricingPage() {
     <div>
       <Header title="Pricing" subtitle="List of pricing" />
 
-      <UpdatePricingModal />
+      <UpsertPricingModal />
 
       <DataTable
-        className="mt-4"
+        rowKey="_id"
         loading={isLoading}
         data={data?.data.result || []}
         columns={columns}
+        scroll={{
+          y: 750,
+        }}
       />
     </div>
   );

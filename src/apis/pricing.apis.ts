@@ -6,6 +6,9 @@ const pricingApis = {
   getPricingLists: () => {
     return http.get<PricingResponse>(`${PRICING_CONTROLLER}`);
   },
+  getPricingById: (id: string) => {
+    return http.get<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}/${id}`);
+  },
   createPricing: (payload: Omit<Pricing, "_id">) => {
     return http.post<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}`, payload);
   },

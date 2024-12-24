@@ -22,8 +22,7 @@ export const addPricingSchema = z.object({
   dayType: z.enum([DayType.Weekday, DayType.Weekend, DayType.Holiday], {
     errorMap: () => ({ message: "Day type is invalid" }),
   }),
-  effectiveDate: z.string().min(1, { message: "Effective date is required" }),
-  timeRange: z.object({
+  time_range: z.object({
     start: z.string().min(1, { message: "Start time is required" }),
     end: z.string().min(1, { message: "End time is required" }),
   }),

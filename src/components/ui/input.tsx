@@ -13,7 +13,7 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
   (
     {
       className,
-      type,
+      type = "text",
       prefix,
       suffix,
       currency,
@@ -55,22 +55,26 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
       onChange?.(syntheticEvent as React.ChangeEvent<HTMLInputElement>);
     };
 
-    // Use modified props for number input
+    // Use modified props for number input only
     const inputProps =
       type === "number"
         ? {
             ...props,
             onChange: handleNumberInput,
-            type: "text", // Change to text to handle custom formatting
+            type: "text",
             inputMode:
               "numeric" as React.InputHTMLAttributes<HTMLInputElement>["inputMode"],
           }
-        : props;
+        : {
+            ...props,
+            onChange, // Pass through original onChange for non-number types
+            type,
+          };
 
     return (
       <div className="relative flex items-center">
         {hasPrefix && (
-          <div className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center rounded-l-md">
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center rounded-l-md pointer-events-none">
             {prefix}
           </div>
         )}
@@ -87,8 +91,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
         />
 
         {hasSuffix && (
-          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center rounded-r-md">
-            {suffix}
+          <div className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-full flex items-center justify-center rounded-r-md pointer-events-none">
+            {React.cloneElement(suffix as React.ReactElement, {
+              className: "pointer-events-auto",
+            })}
           </div>
         )}
       </div>

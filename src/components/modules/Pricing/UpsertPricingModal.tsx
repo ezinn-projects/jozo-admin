@@ -1,7 +1,7 @@
-import pricingApis from "@/apis/pricing.apis";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -21,36 +21,39 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DayType, RoomSize } from "@/constants/enum";
 import { DAY_TYPE_OPTIONS, ROOM_SIZE_OPTIONS } from "@/constants/options";
+import { useAddPricing, useGetPricingById } from "@/hooks/pricing";
 import { cn } from "@/lib/utils";
 import { addPricingSchema } from "@/utils/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Portal } from "@radix-ui/react-portal";
-import { useMutation } from "@tanstack/react-query";
+import { AxiosError } from "axios";
 import { format } from "date-fns";
 import { CalendarIcon, CircleXIcon } from "lucide-react";
+import { ReactNode, useRef } from "react";
 import { useForm } from "react-hook-form";
-import { Calendar } from "../ui/calendar";
-import { Input } from "../ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import { Calendar } from "../../ui/calendar";
+import { Input } from "../../ui/input";
+import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../ui/select";
-import { Spin } from "../ui/spin";
-import Typography from "../ui/typography";
+} from "../../ui/select";
+import { Spin } from "../../ui/spin";
+import Typography from "../../ui/typography";
 
 type Props = {
   id?: string;
+  icon?: ReactNode;
 };
 
 type FormValues = {
   roomSize: RoomSize;
   dayType: DayType;
   effectiveDate: string;
-  timeRange: {
+  time_range: {
     start: string;
     end: string;
   };
@@ -59,45 +62,63 @@ type FormValues = {
   note?: string;
 };
 
-function UpdatePricingModal(props: Props) {
-  const { id = "" } = props;
+function UpsertPricingModal(props: Props) {
+  const { id = "", icon } = props;
+  const closeRef = useRef<HTMLButtonElement>(null);
 
   const title = id ? "Edit pricing" : "Add pricing";
 
-  const { mutate, isPending } = useMutation({
-    mutationFn: pricingApis.createPricing,
-  });
+  const { data: pricingData } = useGetPricingById(id);
+
+  const { mutate, isPending } = useAddPricing();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(addPricingSchema),
+    defaultValues: pricingData?.data.result || {},
   });
 
-  const { control, handleSubmit } = form;
+  const { control, handleSubmit, setError } = form;
 
-  const onSubmit = handleSubmit(
-    (values: FormValues) => {
-      const payload = {
-        ...values,
-        time_range: {
-          start: values.timeRange.start,
-          end: values.timeRange.end,
-        },
-        room_size: values.roomSize,
-        day_type: values.dayType,
-        effective_date: values.effectiveDate,
-      };
+  const onSubmit = handleSubmit((values: FormValues) => {
+    const payload = {
+      price: values.price,
+      note: values.note,
+      end_date: values.endDate,
+      time_range: {
+        start: values.time_range.start,
+        end: values.time_range.end,
+      },
+      room_size: values.roomSize,
+      day_type: values.dayType,
+      effective_date: values.effectiveDate,
+    };
 
-      mutate(payload);
-    },
-    (errors) => {
-      console.log(errors);
-    }
-  );
+    mutate(payload, {
+      onSuccess: () => {
+        closeRef.current?.click();
+        form.reset();
+      },
+      onError: (error) => {
+        const axiosError = error as AxiosError<{
+          errors: Record<string, ErrorField>;
+        }>;
+
+        if (axiosError.response?.data) {
+          const errors = axiosError.response.data.errors;
+          for (const key in errors) {
+            setError(key as keyof FormValues, { message: errors[key].msg });
+          }
+        }
+      },
+    });
+  });
 
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button className="my-3">{title}</Button>
+        <Button className="my-3" icon={icon}>
+          {title}
+        </Button>
       </DialogTrigger>
 
       <DialogPortal>
@@ -244,7 +265,7 @@ function UpdatePricingModal(props: Props) {
 
                     <FormField
                       control={control}
-                      name="timeRange"
+                      name="time_range"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
                           <FormLabel>Time range</FormLabel>
@@ -388,7 +409,12 @@ function UpdatePricingModal(props: Props) {
                     />
 
                     <DialogFooter>
-                      <Button type="submit" variant="secondary">
+                      <DialogClose ref={closeRef} asChild>
+                        <Button type="button" variant="secondary">
+                          Close
+                        </Button>
+                      </DialogClose>
+                      <Button type="submit" loading={isPending}>
                         Save changes
                       </Button>
                     </DialogFooter>
@@ -403,4 +429,4 @@ function UpdatePricingModal(props: Props) {
   );
 }
 
-export default UpdatePricingModal;
+export default UpsertPricingModal;

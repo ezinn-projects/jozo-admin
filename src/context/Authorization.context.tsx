@@ -31,11 +31,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     enabled: !!localStorage.getItem("access_token"), // Chỉ chạy query nếu có token
   });
 
-  console.log(
-    'localStorage.getItem("access_token")',
-    localStorage.getItem("access_token")
-  );
-
   const value = {
     user: userData?.data.result || null,
     isAuthenticated: !!userData?.data.result,
