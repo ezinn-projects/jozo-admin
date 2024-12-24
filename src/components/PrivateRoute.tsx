@@ -1,6 +1,7 @@
 // components/PrivateRoute.js
 import { Role } from "@/constants/enum";
-import { useAuth } from "@/hooks/useAuth";
+import useAuth from "@/hooks/useAuth";
+// import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
 // import { useAuth } from "../AuthContext";
 
@@ -11,9 +12,9 @@ function PrivateRoute({
   children: React.ReactNode;
   requiredRoles: Role[];
 }) {
-  const { role } = useAuth();
+  const { user } = useAuth();
 
-  if (!requiredRoles.includes(role)) {
+  if (!requiredRoles.includes(user?.role as Role)) {
     return <Navigate to="/unauthorized" replace />;
   }
 
