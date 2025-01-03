@@ -1,30 +1,32 @@
+import { PriceResponse } from "@/@types/general-management";
+import { Price } from "@/@types/general-management";
 import http from "@/utils/http";
 
 const PRICING_CONTROLLER = "/pricing";
 
 const pricingApis = {
   getPricingLists: () => {
-    return http.get<PricingResponse>(`${PRICING_CONTROLLER}`);
+    return http.get<PriceResponse>(`${PRICING_CONTROLLER}`);
   },
   getPricingById: (id: string) => {
-    return http.get<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}/${id}`);
+    return http.get<HTTPResponse<Price>>(`${PRICING_CONTROLLER}/${id}`);
   },
-  createPricing: (payload: Omit<Pricing, "_id">) => {
-    return http.post<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}`, payload);
+  createPricing: (payload: Omit<Price, "_id">) => {
+    return http.post<HTTPResponse<Price>>(`${PRICING_CONTROLLER}`, payload);
   },
-  updatePricing: (payload: Pricing) => {
-    return http.put<HTTPResponse<Pricing>>(
+  updatePricing: (payload: Price) => {
+    return http.put<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/${payload._id}`,
       payload
     );
   },
   deletePricing: (payload: { _id: string }) => {
-    return http.delete<HTTPResponse<Pricing>>(
+    return http.delete<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/${payload._id}`
     );
   },
   deletePricingByIds: (payload: { ids: string[] }) => {
-    return http.delete<HTTPResponse<Pricing>>(
+    return http.delete<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/delete-pricing-by-ids`,
       { data: payload }
     );

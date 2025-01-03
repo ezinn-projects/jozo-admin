@@ -17,7 +17,7 @@ const PATHS = {
   UNAUTHORIZED: "/unauthorized",
   NOT_FOUND: "/not-found",
   ROOM_TYPES: "/room-types",
-  PRICING: "/pricing",
+  PRICE: "/price",
   CALENDAR: "/calendar",
 
   // room types management

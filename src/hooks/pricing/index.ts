@@ -1,3 +1,4 @@
+import { Price } from "@/@types/general-management";
 import pricingApis from "@/apis/pricing.apis";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -13,7 +14,7 @@ export const useGetPricingLists = () => {
 export const useAddPricing = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Omit<Pricing, "id">) =>
+    mutationFn: (payload: Omit<Price, "_id">) =>
       pricingApis.createPricing(payload),
     onSuccess: (data, payload) => {
       toast({
@@ -23,7 +24,7 @@ export const useAddPricing = () => {
 
       queryClient.setQueryData(
         ["pricing"],
-        (oldData: AxiosResponse<HTTPResponse<Pricing[]>>) => {
+        (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
           if (!oldData.data.result) return oldData;
           const newPricing = {
             ...payload,
@@ -55,7 +56,7 @@ export const useUpsertPricing = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: Pricing) => pricingApis.updatePricing(payload),
+    mutationFn: (payload: Price) => pricingApis.updatePricing(payload),
     onSuccess: (data) => {
       toast({
         title: "Pricing updated successfully",
@@ -64,7 +65,7 @@ export const useUpsertPricing = () => {
 
       queryClient.setQueryData(
         ["pricing"],
-        (oldData: AxiosResponse<HTTPResponse<Pricing[]>>) => {
+        (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
           return {
             ...oldData,
             data: {
@@ -92,7 +93,7 @@ export const useDeletePricing = () => {
 
       queryClient.setQueryData(
         ["pricing"],
-        (oldData: AxiosResponse<HTTPResponse<Pricing[]>>) => {
+        (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
           if (!oldData.data.result) return oldData;
           return {
             ...oldData,

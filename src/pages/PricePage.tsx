@@ -1,3 +1,4 @@
+import { Price } from "@/@types/general-management";
 import Header from "@/components/Layout/Header";
 import DeletePricingModal from "@/components/modules/Pricing/DeletePricingModal";
 import {
@@ -10,10 +11,10 @@ import { useGetPricingLists } from "@/hooks/pricing";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon } from "lucide-react";
 
-function PricingPage() {
+function PricePage() {
   const { data, isLoading } = useGetPricingLists();
 
-  const columns: ColumnDef<Pricing>[] = [
+  const columns: ColumnDef<Price>[] = [
     {
       id: "select",
       header: ({ table }) => (
@@ -50,7 +51,7 @@ function PricingPage() {
     },
     {
       header: "Time Range",
-      accessorKey: "time_range",
+      accessorKey: "timeRange",
       cell: ({ row }) => {
         const timeRange = row.original.time_range;
         return `${timeRange?.start} - ${timeRange?.end}`;
@@ -94,4 +95,4 @@ function PricingPage() {
   );
 }
 
-export default PricingPage;
+export default PricePage;

@@ -3,7 +3,7 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
-import PricingPage from "@/pages/PricingPage";
+
 import { lazy, Suspense } from "react";
 import {
   Outlet,
@@ -22,12 +22,7 @@ const UpsertRoomPage = lazy(
 const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
-const RoomTypesLists = lazy(
-  () => import("@/pages/RoomTypesPage/pages/RoomTypesLists")
-);
-const UpsertRoomType = lazy(
-  () => import("@/pages/RoomTypesPage/pages/UpsertRoomType")
-);
+const PricePage = lazy(() => import("@/pages/PricePage"));
 
 function useRoute() {
   return (
@@ -53,15 +48,7 @@ function useRoute() {
                   <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
                 </Route>
 
-                <Route path={PATHS.ROOM_TYPES}>
-                  <Route index element={<RoomTypesLists />} />
-                  <Route
-                    path={PATHS.ROOM_TYPES_UPSERT}
-                    element={<UpsertRoomType />}
-                  />
-                </Route>
-
-                <Route path={PATHS.PRICING} element={<PricingPage />} />
+                <Route path={PATHS.PRICE} element={<PricePage />} />
               </Route>
 
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>

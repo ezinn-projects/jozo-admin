@@ -19,7 +19,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DayType, RoomSize } from "@/constants/enum";
+import { DayType, RoomSize, RoomType } from "@/constants/enum";
 import { DAY_TYPE_OPTIONS, ROOM_SIZE_OPTIONS } from "@/constants/options";
 import { useAddPricing, useGetPricingById } from "@/hooks/pricing";
 import { cn } from "@/lib/utils";
@@ -50,14 +50,17 @@ type Props = {
 };
 
 type FormValues = {
-  roomSize: RoomSize;
+  roomType: RoomType;
   dayType: DayType;
   effectiveDate: string;
   time_range: {
     start: string;
     end: string;
   };
-  price: number;
+  prices: {
+    price: number;
+    roomType: RoomType;
+  }[];
   endDate?: string;
   note?: string;
 };
@@ -81,14 +84,14 @@ function UpsertPricingModal(props: Props) {
 
   const onSubmit = handleSubmit((values: FormValues) => {
     const payload = {
-      price: values.price,
+      prices: values.prices,
       note: values.note,
       end_date: values.endDate,
       time_range: {
         start: values.time_range.start,
         end: values.time_range.end,
       },
-      room_size: values.roomSize,
+      room_type: values.roomType,
       day_type: values.dayType,
       effective_date: values.effectiveDate,
     };
