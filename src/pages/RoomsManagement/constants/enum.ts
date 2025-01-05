@@ -19,7 +19,7 @@ export enum RoomType {
 }
 
 /**
- * Enum for room statuses in the Ezinn system.
+ * Enum for room statuses in the jozo system.
  * Includes statuses: Available, Booked, Needs Cleaning, and Preparing.
  * @enum {string}
  */

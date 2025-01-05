@@ -26,7 +26,7 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-      - name: Build the Ezinn Admin app
+      - name: Build the jozo Admin app
         run: npm run build
 
       - name: Get commit SHA
@@ -40,10 +40,10 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }} .
+        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ steps.vars.outputs.sha_short }} .
 
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ steps.vars.outputs.sha_short }}
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ steps.vars.outputs.sha_short }}
 
       - name: Upload commit SHA as artifact
         uses: actions/upload-artifact@v3
@@ -73,17 +73,17 @@ jobs:
           password: ${{ secrets.VPS_PASSWORD }}
           port: 22
           script: |
-            docker stop ezinn-admin || true
-            docker rm ezinn-admin || true
-            docker pull ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ env.sha }}
-            docker run -d --name ezinn-admin -p 3001:3001 ${{ secrets.DOCKER_USERNAME }}/ezinn-admin:${{ env.sha }}
+            docker stop jozo-admin || true
+            docker rm jozo-admin || true
+            docker pull ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha }}
+            docker run -d --name jozo-admin -p 3001:3001 ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha }}
 
       - name: Run deployment action in Jira
         uses: chrnorm/deployment-action@releases/v1
         with:
           environment: "staging"
           token: ${{ secrets.GITHUB_TOKEN }}
-          description: "Deploying ezinn-admin to staging via Docker"
+          description: "Deploying jozo-admin to staging via Docker"
 
   cleanup:
     runs-on: ubuntu-latest
