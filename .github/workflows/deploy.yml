@@ -31,7 +31,7 @@ jobs:
 
       - name: Get commit SHA
         id: vars
-        run: echo "${{ steps.vars.outputs.sha_short }}" > commit-sha.txt
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
@@ -40,10 +40,17 @@ jobs:
           password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build Docker image
-        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ steps.vars.outputs.sha_short }} .
+        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha_short }} .
 
       - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ steps.vars.outputs.sha_short }}
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha_short }}
+
+      - name: Get commit SHA
+        id: get-sha
+        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
+
+      - name: Create commit SHA file
+        run: echo "${{ env.sha_short }}" > commit-sha.txt
 
       - name: Upload commit SHA as artifact
         uses: actions/upload-artifact@v3
