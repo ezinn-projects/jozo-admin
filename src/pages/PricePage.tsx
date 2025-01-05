@@ -4,10 +4,11 @@ import DeletePricingModal from "@/components/modules/Pricing/DeletePricingModal"
 import {
   default as UpdatePricingModal,
   default as UpsertPricingModal,
-} from "@/components/modules/Pricing/UpsertPricingModal";
+} from "@/components/modules/Pricing/UpsertPriceModal";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import { useGetPricingLists } from "@/hooks/pricing";
+import { formatCurrency } from "@/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon } from "lucide-react";
 
@@ -38,16 +39,17 @@ function PricePage() {
       enableHiding: false,
     },
     {
-      header: "Room Size",
-      accessorKey: "room_size",
-    },
-    {
-      header: "Day Type",
+      header: "Day type",
       accessorKey: "day_type",
     },
     {
-      header: "Price",
-      accessorKey: "price",
+      header: "Prices",
+      accessorKey: "prices",
+      cell: ({ row }) => {
+        return row.original.prices
+          .map((price) => `${price.room_type}: ${formatCurrency(price.price)}`)
+          .join(", ");
+      },
     },
     {
       header: "Time Range",

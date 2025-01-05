@@ -1,9 +1,9 @@
-import { DayType, RoomSize } from "./enum";
+import { DayType, RoomType } from "./enum";
 
 export const ROOM_SIZE_OPTIONS = [
-  { value: RoomSize.Small, label: "Small" },
-  { value: RoomSize.Medium, label: "Medium" },
-  { value: RoomSize.Large, label: "Large" },
+  { value: RoomType.Small, label: "Small" },
+  { value: RoomType.Medium, label: "Medium" },
+  { value: RoomType.Large, label: "Large" },
 ];
 
 export const DAY_TYPE_OPTIONS = [

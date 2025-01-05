@@ -19,6 +19,8 @@ import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
+import { AUTH_EVENTS } from "@/constants/events";
+import useAuth from "@/hooks/useAuth";
 
 type FormValues = {
   email: string;
@@ -28,6 +30,11 @@ type FormValues = {
 export default function LoginPage() {
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { isAuthenticated } = useAuth();
+
+  if (isAuthenticated) {
+    navigate(PATHS.HOME, { replace: true });
+  }
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -42,10 +49,11 @@ export default function LoginPage() {
   const { mutate } = useMutation({
     mutationFn: authorizationApis.login,
     onSuccess: ({ data }) => {
-      console.log("Login success:", data);
-      console.log("Navigating to:", PATHS.HOME);
-
       localStorage.setItem("access_token", data.result?.access_token || "");
+
+      // Dispatch event sau khi lưu token
+      window.dispatchEvent(new Event(AUTH_EVENTS.LOGIN_SUCCESS));
+
       toast({
         title: data.message,
       });

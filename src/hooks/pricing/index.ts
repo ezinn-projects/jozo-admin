@@ -14,32 +14,38 @@ export const useGetPricingLists = () => {
 export const useAddPricing = () => {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (payload: Omit<Price, "_id">) =>
-      pricingApis.createPricing(payload),
+    mutationFn: pricingApis.createPricing,
     onSuccess: (data, payload) => {
       toast({
         title: "Pricing created successfully",
         description: "Pricing has been created successfully",
       });
 
-      queryClient.setQueryData(
-        ["pricing"],
-        (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
-          if (!oldData.data.result) return oldData;
-          const newPricing = {
-            ...payload,
-            _id: data?.data.result?._id,
-          };
+      console.log("payload", payload);
 
-          return {
-            ...oldData,
-            data: {
-              ...oldData.data,
-              result: [...oldData.data.result, newPricing],
-            },
-          };
-        }
-      );
+      // queryClient.setQueryData(
+      //   ["pricing"],
+      //   (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
+      //     if (!oldData.data.result) return oldData;
+
+      //     const newPricing = {
+      //       ...payload,
+      //       _id: data?.data.result?._id,
+      //       prices: payload.prices.map((price) => ({
+      //         ...price,
+      //         price: +price.price?.replace(/\./g, ""),
+      //       })),
+      //     };
+
+      //     return {
+      //       ...oldData,
+      //       data: {
+      //         ...oldData.data,
+      //         result: [...oldData.data.result, newPricing],
+      //       },
+      //     };
+      //   }
+      // );
     },
   });
 };
@@ -56,7 +62,7 @@ export const useUpsertPricing = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (payload: Price) => pricingApis.updatePricing(payload),
+    mutationFn: pricingApis.updatePricing,
     onSuccess: (data) => {
       toast({
         title: "Pricing updated successfully",

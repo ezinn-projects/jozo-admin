@@ -1,3 +1,4 @@
+import { type Price } from "@/@types/general-management";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -19,8 +20,8 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { DayType, RoomSize, RoomType } from "@/constants/enum";
-import { DAY_TYPE_OPTIONS, ROOM_SIZE_OPTIONS } from "@/constants/options";
+import { DayType, RoomType } from "@/constants/enum";
+import { DAY_TYPE_OPTIONS } from "@/constants/options";
 import { useAddPricing, useGetPricingById } from "@/hooks/pricing";
 import { cn } from "@/lib/utils";
 import { addPricingSchema } from "@/utils/schema";
@@ -43,6 +44,7 @@ import {
 } from "../../ui/select";
 import { Spin } from "../../ui/spin";
 import Typography from "../../ui/typography";
+import { formatCurrency } from "@/utils";
 
 type Props = {
   id?: string;
@@ -50,71 +52,88 @@ type Props = {
 };
 
 type FormValues = {
-  roomType: RoomType;
   dayType: DayType;
-  effectiveDate: string;
-  time_range: {
-    start: string;
-    end: string;
+  timeRange: {
+    start: string; // e.g., "17:00"
+    end: string; // e.g., "24:00"
   };
   prices: {
-    price: number;
     roomType: RoomType;
+    price: string;
   }[];
+  effectiveDate: string;
   endDate?: string;
   note?: string;
 };
+
+const roomTypes = Object.values(RoomType).filter((type) => type);
 
 function UpsertPricingModal(props: Props) {
   const { id = "", icon } = props;
   const closeRef = useRef<HTMLButtonElement>(null);
 
-  const title = id ? "Edit pricing" : "Add pricing";
+  const title = id ? "Edit price" : "Add price";
 
-  const { data: pricingData } = useGetPricingById(id);
+  const { data: priceData } = useGetPricingById(id);
+
+  const price = priceData?.data.result || ({} as Price);
+
+  // console.log("roomTypes", roomTypes);
 
   const { mutate, isPending } = useAddPricing();
 
   const form = useForm<FormValues>({
     resolver: zodResolver(addPricingSchema),
-    defaultValues: pricingData?.data.result || {},
+    defaultValues: {
+      dayType: price.day_type,
+      timeRange: price.time_range,
+      prices: price?.prices?.map((price) => ({
+        roomType: price.room_type,
+        price: formatCurrency(price.price),
+      })),
+      effectiveDate: price.effective_date,
+      endDate: price.end_date || undefined,
+      note: price.note || undefined,
+    },
   });
 
   const { control, handleSubmit, setError } = form;
 
-  const onSubmit = handleSubmit((values: FormValues) => {
-    const payload = {
-      prices: values.prices,
-      note: values.note,
-      end_date: values.endDate,
-      time_range: {
-        start: values.time_range.start,
-        end: values.time_range.end,
-      },
-      room_type: values.roomType,
-      day_type: values.dayType,
-      effective_date: values.effectiveDate,
-    };
+  const onSubmit = handleSubmit(
+    (values: FormValues) => {
+      const payload = {
+        ...values,
+        prices: values.prices.map((price) => ({
+          roomType: price.roomType,
+          price: +price.price.replace(/\./g, ""),
+        })),
+        dayType: values.dayType,
+        effectiveDate: values.effectiveDate,
+        endDate: values.endDate,
+        note: values.note,
+      };
 
-    mutate(payload, {
-      onSuccess: () => {
-        closeRef.current?.click();
-        form.reset();
-      },
-      onError: (error) => {
-        const axiosError = error as AxiosError<{
-          errors: Record<string, ErrorField>;
-        }>;
+      mutate(payload, {
+        onSuccess: () => {
+          closeRef.current?.click();
+          form.reset();
+        },
+        onError: (error) => {
+          const axiosError = error as AxiosError<{
+            errors: Record<string, ErrorField>;
+          }>;
 
-        if (axiosError.response?.data) {
-          const errors = axiosError.response.data.errors;
-          for (const key in errors) {
-            setError(key as keyof FormValues, { message: errors[key].msg });
+          if (axiosError.response?.data) {
+            const errors = axiosError.response.data.errors;
+            for (const key in errors) {
+              setError(key as keyof FormValues, { message: errors[key].msg });
+            }
           }
-        }
-      },
-    });
-  });
+        },
+      });
+    },
+    (error) => console.log("error", error)
+  );
 
   return (
     <Dialog>
@@ -138,68 +157,6 @@ function UpsertPricingModal(props: Props) {
               <div className="grid gap-4">
                 <Form {...form}>
                   <form className="space-y-2" onSubmit={onSubmit}>
-                    <FormField
-                      control={control}
-                      name="roomSize"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Room size</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a room size" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {ROOM_SIZE_OPTIONS.map((option) => (
-                                <SelectItem
-                                  value={option.value}
-                                  key={option.label}
-                                >
-                                  {option.value}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={control}
-                      name="dayType"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Day type</FormLabel>
-                          <Select
-                            onValueChange={field.onChange}
-                            defaultValue={field.value}
-                          >
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select a day type" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              {DAY_TYPE_OPTIONS.map((option) => (
-                                <SelectItem
-                                  value={option.value}
-                                  key={option.label}
-                                >
-                                  {option.value}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
                     <FormField
                       control={control}
                       name="effectiveDate"
@@ -268,7 +225,38 @@ function UpsertPricingModal(props: Props) {
 
                     <FormField
                       control={control}
-                      name="time_range"
+                      name="dayType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Day type</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            defaultValue={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select a day type" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {DAY_TYPE_OPTIONS.map((option) => (
+                                <SelectItem
+                                  value={option.value}
+                                  key={option.label}
+                                >
+                                  {option.value}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={control}
+                      name="timeRange"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
                           <FormLabel>Time range</FormLabel>
@@ -305,22 +293,54 @@ function UpsertPricingModal(props: Props) {
                     />
 
                     <FormField
-                      control={form.control}
-                      name="price"
+                      control={control}
+                      name="prices"
                       render={({ field }) => (
                         <FormItem className="flex flex-col">
-                          <FormLabel>Price</FormLabel>
+                          <FormLabel>Prices</FormLabel>
+                          <div className="grid gap-2">
+                            {roomTypes.map((roomType) => (
+                              <div
+                                key={roomType}
+                                className="grid grid-cols-2 gap-4 items-center"
+                              >
+                                <div className="text-sm font-medium">
+                                  {roomType}
+                                </div>
+                                <FormControl>
+                                  <Input
+                                    {...field}
+                                    type="number"
+                                    currency
+                                    placeholder="Enter price"
+                                    value={
+                                      field.value?.find(
+                                        (p) => p.roomType === roomType
+                                      )?.price || ""
+                                    }
+                                    onChange={(e) => {
+                                      const newValue = [...(field.value || [])];
+                                      const index = newValue.findIndex(
+                                        (p) => p.roomType === roomType
+                                      );
+                                      const price = e.target.value;
 
-                          <FormControl>
-                            <Input
-                              placeholder="Enter price"
-                              type="number"
-                              {...field}
-                              currency
-                              maxLength={9}
-                            />
-                          </FormControl>
+                                      if (index >= 0) {
+                                        newValue[index] = {
+                                          ...newValue[index],
+                                          price,
+                                        };
+                                      } else {
+                                        newValue.push({ roomType, price });
+                                      }
 
+                                      field.onChange(newValue);
+                                    }}
+                                  />
+                                </FormControl>
+                              </div>
+                            ))}
+                          </div>
                           <FormMessage />
                         </FormItem>
                       )}
@@ -375,7 +395,9 @@ function UpsertPricingModal(props: Props) {
                                       ? new Date(field.value)
                                       : undefined
                                   }
-                                  onSelect={field.onChange}
+                                  onSelect={(date) =>
+                                    field.onChange(date?.toISOString())
+                                  }
                                   disabled={(date) =>
                                     date > new Date() ||
                                     date < new Date("1900-01-01")

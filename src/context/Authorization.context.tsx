@@ -2,7 +2,8 @@
 import { User } from "@/@types/user";
 import authorizationApis from "@/apis/authorization.apis";
 import { useQuery } from "@tanstack/react-query";
-import { createContext, ReactNode } from "react";
+import { createContext, ReactNode, useEffect } from "react";
+import { AUTH_EVENTS } from "@/constants/events";
 
 type AuthContextValues = {
   user: User | null;
@@ -25,11 +26,28 @@ export const AuthContext = createContext<AuthContextValues>(
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Giả lập một role, trong thực tế bạn sẽ lấy role từ API hoặc authentication state
 
-  const { data: userData, isLoading } = useQuery({
-    queryKey: ["user", !!localStorage.getItem("access_token")],
+  const {
+    data: userData,
+    isLoading,
+    refetch,
+  } = useQuery({
+    queryKey: ["user", localStorage.getItem("access_token")],
     queryFn: authorizationApis.getMe,
     enabled: !!localStorage.getItem("access_token"), // Chỉ chạy query nếu có token
   });
+
+  // Thêm effect để lắng nghe sự kiện đăng nhập
+  useEffect(() => {
+    const handleLoginSuccess = () => {
+      refetch();
+    };
+
+    window.addEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+
+    return () => {
+      window.removeEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+    };
+  }, [refetch, localStorage.getItem("access_token")]);
 
   const value = {
     user: userData?.data.result || null,
