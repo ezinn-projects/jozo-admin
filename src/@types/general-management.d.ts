@@ -1,22 +1,20 @@
-type RoomType = {
-  _id: string;
-  name: string;
-  description?: string;
-};
+import { DayType, RoomType } from "@/constants/enum";
 
-type Pricing = {
-  _id?: string;
-  room_size: string;
-  day_type: string;
+export type Price = {
+  _id: string;
+  day_type: DayType;
   time_range: {
     start: string;
     end: string;
   };
-  price: number;
+  prices: Array<{
+    room_type: RoomType;
+    price: number;
+  }>;
   effective_date: string;
-  end_date?: string;
-  note?: string;
+  end_date: string | null;
+  note: string | null;
 };
 
-type RoomTypeResponse = HTTPResponse<RoomType>;
-type PricingResponse = HTTPResponse<Pricing[]>;
+type RoomTypeResponse = HTTPResponse<RoomType[]>;
+type PriceResponse = HTTPResponse<Price[]>;

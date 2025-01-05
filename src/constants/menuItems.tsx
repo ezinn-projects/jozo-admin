@@ -37,7 +37,7 @@ const MENU_ITEMS: MenuItem[] = [
       },
       {
         title: "Pricing",
-        url: PATHS.PRICING,
+        url: PATHS.PRICE,
         icon: BedDouble,
       },
     ],

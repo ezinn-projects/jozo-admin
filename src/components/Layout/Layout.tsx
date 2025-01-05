@@ -44,7 +44,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       <main className="p-3 w-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <SidebarTrigger /> |{" "}
+            <SidebarTrigger />
             <Breadcrumb>
               <BreadcrumbList>
                 <BreadcrumbItem>

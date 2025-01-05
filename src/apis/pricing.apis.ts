@@ -1,27 +1,47 @@
+import { PriceResponse } from "@/@types/general-management";
+import { Price } from "@/@types/general-management";
+import { DayType, RoomType } from "@/constants/enum";
 import http from "@/utils/http";
 
-const PRICING_CONTROLLER = "/pricing";
+const PRICING_CONTROLLER = "/price";
+
+export type PricePayload = {
+  _id?: string;
+  dayType: DayType;
+  effectiveDate: string;
+  timeRange: {
+    start: string;
+    end: string;
+  };
+  prices: Array<{
+    roomType: RoomType;
+    price: number;
+  }>;
+};
 
 const pricingApis = {
   getPricingLists: () => {
-    return http.get<PricingResponse>(`${PRICING_CONTROLLER}`);
+    return http.get<PriceResponse>(`${PRICING_CONTROLLER}`);
   },
-  createPricing: (payload: Omit<Pricing, "_id">) => {
-    return http.post<HTTPResponse<Pricing>>(`${PRICING_CONTROLLER}`, payload);
+  getPricingById: (id: string) => {
+    return http.get<HTTPResponse<Price>>(`${PRICING_CONTROLLER}/${id}`);
   },
-  updatePricing: (payload: Pricing) => {
-    return http.put<HTTPResponse<Pricing>>(
+  createPricing: (payload: PricePayload) => {
+    return http.post<HTTPResponse<Price>>(`${PRICING_CONTROLLER}`, payload);
+  },
+  updatePricing: (payload: PricePayload) => {
+    return http.put<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/${payload._id}`,
       payload
     );
   },
   deletePricing: (payload: { _id: string }) => {
-    return http.delete<HTTPResponse<Pricing>>(
+    return http.delete<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/${payload._id}`
     );
   },
   deletePricingByIds: (payload: { ids: string[] }) => {
-    return http.delete<HTTPResponse<Pricing>>(
+    return http.delete<HTTPResponse<Price>>(
       `${PRICING_CONTROLLER}/delete-pricing-by-ids`,
       { data: payload }
     );

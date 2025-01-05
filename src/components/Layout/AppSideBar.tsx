@@ -33,7 +33,7 @@ export function AppSidebar() {
     <Sidebar className="overflow-x-hidden">
       {/* Sidebar Header */}
       <SidebarHeader>
-        <h2 className="text-lg font-semibold">Ezinn - Admin</h2>
+        <h2 className="text-lg font-semibold">Jozo - Admin</h2>
       </SidebarHeader>
 
       {/* Sidebar Content */}
