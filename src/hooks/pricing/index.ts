@@ -12,7 +12,7 @@ export const useGetPricingLists = () => {
 };
 
 export const useAddPricing = () => {
-  const queryClient = useQueryClient();
+  // const queryClient = useQueryClient();
   return useMutation({
     mutationFn: pricingApis.createPricing,
     onSuccess: (data, payload) => {
@@ -20,6 +20,8 @@ export const useAddPricing = () => {
         title: "Pricing created successfully",
         description: "Pricing has been created successfully",
       });
+
+      console.log("data", data);
 
       console.log("payload", payload);
 
