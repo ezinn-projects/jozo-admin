@@ -1,5 +1,5 @@
 import { Price } from "@/@types/general-management";
-import pricingApis from "@/apis/pricing.apis";
+import pricingApis, { PricePayload } from "@/apis/pricing.apis";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
@@ -7,56 +7,59 @@ import { AxiosResponse } from "axios";
 export const useGetPricingLists = () => {
   return useQuery({
     queryKey: ["pricing"],
-    queryFn: () => pricingApis.getPricingLists(),
+    queryFn: pricingApis.getPricingLists,
   });
 };
 
 export const useAddPricing = () => {
-  // const queryClient = useQueryClient();
+  const queryClient = useQueryClient();
   return useMutation({
     mutationFn: pricingApis.createPricing,
-    onSuccess: (data, payload) => {
+    onSuccess: (data, payload: PricePayload) => {
       toast({
         title: "Pricing created successfully",
         description: "Pricing has been created successfully",
       });
 
-      console.log("data", data);
+      queryClient.setQueryData(
+        ["pricing"],
+        (oldData: AxiosResponse<HTTPResponse<Price[]>> | undefined) => {
+          if (!oldData?.data?.result) return oldData;
 
-      console.log("payload", payload);
+          const newPricing = {
+            _id: data?.data?.result?._id,
+            day_type: payload.dayType,
+            time_slots: payload.timeSlots.map((slot) => ({
+              start: slot.start,
+              end: slot.end,
+              prices: slot.prices.map((price) => ({
+                room_type: price.roomType,
+                price: +price.price,
+              })),
+            })),
+            effective_date: payload.effectiveDate,
+            end_date: payload.endDate || null,
+            note: payload.note || null,
+          };
 
-      // queryClient.setQueryData(
-      //   ["pricing"],
-      //   (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
-      //     if (!oldData.data.result) return oldData;
-
-      //     const newPricing = {
-      //       ...payload,
-      //       _id: data?.data.result?._id,
-      //       prices: payload.prices.map((price) => ({
-      //         ...price,
-      //         price: +price.price?.replace(/\./g, ""),
-      //       })),
-      //     };
-
-      //     return {
-      //       ...oldData,
-      //       data: {
-      //         ...oldData.data,
-      //         result: [...oldData.data.result, newPricing],
-      //       },
-      //     };
-      //   }
-      // );
+          return {
+            ...oldData,
+            data: {
+              ...oldData.data,
+              result: [...oldData.data.result, newPricing],
+            },
+          };
+        }
+      );
     },
   });
 };
 
-export const useGetPricingById = (id: string) => {
+export const useGetPricingById = (id: string, enabled?: boolean) => {
   return useQuery({
     queryKey: ["pricing", id],
     queryFn: () => pricingApis.getPricingById(id),
-    enabled: !!id,
+    enabled,
   });
 };
 

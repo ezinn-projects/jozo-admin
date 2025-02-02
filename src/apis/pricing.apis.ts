@@ -9,14 +9,16 @@ export type PricePayload = {
   _id?: string;
   dayType: DayType;
   effectiveDate: string;
-  timeRange: {
+  timeSlots: Array<{
     start: string;
     end: string;
-  };
-  prices: Array<{
-    roomType: RoomType;
-    price: number;
+    prices: Array<{
+      roomType: RoomType;
+      price: number;
+    }>;
   }>;
+  endDate?: string;
+  note?: string;
 };
 
 const pricingApis = {
