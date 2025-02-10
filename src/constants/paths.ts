@@ -16,13 +16,13 @@ const PATHS = {
   ADMIN: "/admin",
   UNAUTHORIZED: "/unauthorized",
   NOT_FOUND: "/not-found",
-  ROOM_TYPES: "/room-types",
   PRICE: "/price",
   CALENDAR: "/calendar",
 
   // room types management
   ROOM_TYPES_LISTS: "/room-types",
-  ROOM_TYPES_UPSERT: "/room-types/upsert",
+  ROOM_TYPES_NEW: "/room-types/new",
+  ROOM_TYPES_EDIT: "/room-types/:id/edit",
 } as const;
 
 export default PATHS;

@@ -81,14 +81,14 @@ function UpsertRoomPage({ id = "" }: Props) {
 
   const { mutate: createRoom, isPending: isCreating } = useMutation({
     mutationFn: roomApis.createRoom,
-    onSuccess: ({ data }) => {
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Room created successfully",
       });
       navigate(PATHS.ROOMS);
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: error.message || "Something went wrong",
@@ -99,14 +99,14 @@ function UpsertRoomPage({ id = "" }: Props) {
 
   const { mutate: updateRoom, isPending: isUpdating } = useMutation({
     mutationFn: roomApis.updateRoom,
-    onSuccess: ({ data }) => {
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Room updated successfully",
       });
       navigate(PATHS.ROOMS);
     },
-    onError: (error: any) => {
+    onError: (error) => {
       toast({
         title: "Error",
         description: error.message || "Something went wrong",
@@ -244,6 +244,7 @@ function UpsertRoomPage({ id = "" }: Props) {
                   )}
                 />
               </AccordionContent>
+              x
             </AccordionItem>
 
             {/* Images */}

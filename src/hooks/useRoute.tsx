@@ -23,6 +23,12 @@ const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const PricePage = lazy(() => import("@/pages/PricePage"));
+const RoomTypesListPage = lazy(
+  () => import("@/pages/RoomTypes/RoomTypesListPage")
+);
+const UpsertRoomTypePage = lazy(
+  () => import("@/pages/RoomTypes/UpsertRoomTypePage")
+);
 
 function useRoute() {
   return (
@@ -46,6 +52,18 @@ function useRoute() {
                   <Route index element={<RoomsListPage />} />
                   <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
                   <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+                </Route>
+
+                <Route path={PATHS.ROOM_TYPES_LISTS}>
+                  <Route index element={<RoomTypesListPage />} />
+                  <Route
+                    path={PATHS.ROOM_TYPES_NEW}
+                    element={<UpsertRoomTypePage />}
+                  />
+                  <Route
+                    path={PATHS.ROOM_TYPES_EDIT}
+                    element={<UpsertRoomTypePage />}
+                  />
                 </Route>
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />

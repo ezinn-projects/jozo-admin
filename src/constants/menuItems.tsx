@@ -32,7 +32,7 @@ const MENU_ITEMS: MenuItem[] = [
       },
       {
         title: "Room Types",
-        url: PATHS.ROOM_TYPES,
+        url: PATHS.ROOM_TYPES_LISTS,
         icon: BedDouble,
       },
       {
