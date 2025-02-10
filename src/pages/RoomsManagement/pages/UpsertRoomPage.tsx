@@ -1,4 +1,12 @@
-import AutocompleteTags from "@/components/ui/autocomplete-tags";
+import roomApis from "@/apis/room.apis";
+import Header from "@/components/Layout/Header";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -17,132 +25,165 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import Typography from "@/components/ui/typography";
 import { RoomType } from "@/constants/enum";
+import PATHS from "@/constants/paths";
+import { useToast } from "@/hooks/use-toast";
 import { Select } from "@radix-ui/react-select";
+import { useMutation } from "@tanstack/react-query";
 import { useForm } from "react-hook-form";
-import { RoomStatus } from "../constants/enum";
-import { roomStatusOptions, roomTypeOptions } from "../constants";
-import Header from "@/components/Layout/Header";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
+import { useNavigate } from "react-router-dom";
 import ImagesList from "../components/ui/ImagesList";
+import { roomStatusOptions, roomTypeOptions } from "../constants";
+import { RoomStatus } from "../constants/enum";
 
-// import { roomStatusOptions, roomTypeOptions } from "../../constants";
+// IRoom chỉ còn các trường cơ bản:
+// {
+//   _id?: ObjectId;
+//   roomName: string;
+//   roomType: string; // SMALL, MEDIUM, LARGE
+//   maxCapacity: number;
+//   status: string; // AVAILABLE, UNAVAILABLE
+//   images: string[]; // Cloudinary URLs
+//   description?: string;
+//   createdAt: Date;
+//   updatedAt?: Date;
+// }
 
 type Props = {
   id?: string;
 };
 
+// FormValues đồng bộ với IRoom tối giản
 type FormValues = {
-  name: string;
-  type: RoomType;
-  maxOccupancy: number;
-  description: string;
-  originalPrice: number;
-  discountedPrice?: number;
-  amenities: string[];
-  tags: string[];
+  roomName: string;
+  roomType: RoomType;
+  maxCapacity: number;
+  description?: string;
   images: string[];
   status: RoomStatus;
-  area: string;
-  houseRules: string[];
 };
 
-export const amenitiesOptions = [
-  { value: "wifi", label: "Wi-Fi" },
-  { value: "ac", label: "Air Conditioning" },
-  { value: "tv", label: "Television" },
-  { value: "minibar", label: "Minibar" },
-  { value: "safe", label: "Safe" },
-  { value: "coffee_maker", label: "Coffee Maker" },
-  { value: "gym", label: "Gym Access" },
-  { value: "pool", label: "Swimming Pool" },
-  { value: "parking", label: "Parking" },
-  { value: "spa", label: "Spa Services" },
-  { value: "projector", label: "Projector" },
-  { value: "sofa", label: "Sofa" },
-  { value: "refrigerator", label: "Mini Fridge" },
-  { value: "decor_lighting", label: "Decor Lighting" },
-  { value: "marshall_speaker", label: "Marshall Speaker" },
-];
-
-const tagsOptions = [
-  { value: "single", label: "Single" },
-  { value: "double", label: "Double" },
-  { value: "twin", label: "Twin" },
-];
-
-const houseRules = [
-  {
-    id: "1",
-    rule: "Không hút thuốc",
-    description:
-      "Cấm hút thuốc trong phòng và các khu vực công cộng của homestay.",
-    status: "active",
-  },
-  {
-    id: "2",
-    rule: "Không thú cưng",
-    description: "Không được mang thú cưng vào phòng.",
-    status: "active",
-  },
-  {
-    id: "3",
-    rule: "Không tổ chức tiệc",
-    description: "Không tổ chức tiệc, tiệc tùng ồn ào trong phòng.",
-    status: "active",
-  },
-  {
-    id: "4",
-    rule: "Giữ yên lặng sau 10 giờ tối",
-    description: "Giữ yên lặng từ 10 giờ tối trở đi.",
-    status: "active",
-  },
-];
-
-function UpsertRoomPage(props: Props) {
-  const { id = "" } = props;
+function UpsertRoomPage({ id = "" }: Props) {
+  const { toast } = useToast();
+  const navigate = useNavigate();
 
   const title = id ? "Edit room" : "New room";
 
-  const form = useForm<FormValues>();
+  const form = useForm<FormValues>({
+    defaultValues: {
+      roomName: "",
+      roomType: RoomType.Small,
+      maxCapacity: 1,
+      description: "",
+      images: [],
+      status: RoomStatus.Available,
+    },
+  });
+
+  const { mutate: createRoom, isPending: isCreating } = useMutation({
+    mutationFn: roomApis.createRoom,
+    onSuccess: ({ data }) => {
+      toast({
+        title: "Success",
+        description: "Room created successfully",
+      });
+      navigate(PATHS.ROOMS);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { mutate: updateRoom, isPending: isUpdating } = useMutation({
+    mutationFn: roomApis.updateRoom,
+    onSuccess: ({ data }) => {
+      toast({
+        title: "Success",
+        description: "Room updated successfully",
+      });
+      navigate(PATHS.ROOMS);
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const onSubmit = async (values: FormValues) => {
+    const formData = new FormData();
+    formData.append("roomName", values.roomName);
+    formData.append("roomType", values.roomType);
+    formData.append("maxCapacity", values.maxCapacity.toString());
+    formData.append("description", values.description || "");
+
+    // Chuyển đổi blob URL thành File
+    const imageFiles = await Promise.all(
+      values.images.map(async (blobUrl) => {
+        const response = await fetch(blobUrl);
+        const blob = await response.blob();
+        // Tạo tên file từ blob URL hoặc dùng timestamp
+        const fileName = blobUrl.split("/").pop() || `image-${Date.now()}.jpg`;
+        return new File([blob], fileName, { type: blob.type });
+      })
+    );
+
+    // Append các file ảnh
+    imageFiles.forEach((file) => {
+      formData.append("images", file);
+    });
+
+    formData.append("status", values.status);
+
+    if (id) {
+      formData.append("_id", id);
+      updateRoom(formData);
+    } else {
+      console.log("formData", formData.get("images"));
+      createRoom(formData);
+    }
+  };
 
   return (
     <div className="max-w-3xl">
       <Header title={title} />
 
       <Form {...form}>
-        <form className="space-y-2 mt-3">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-2 mt-3">
           <Accordion type="multiple">
+            {/* Basic Information */}
             <AccordionItem value="item-1">
               <AccordionTrigger>Basic Information</AccordionTrigger>
               <AccordionContent>
+                {/* Room Name */}
                 <FormField
                   control={form.control}
-                  name="name"
+                  name="roomName"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Name <Typography variant="span">(*)</Typography>{" "}
+                        Room Name <Typography variant="span">(*)</Typography>
                       </FormLabel>
                       <FormControl>
                         <Input placeholder="Enter room name" {...field} />
                       </FormControl>
-
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Room Type */}
                 <FormField
                   control={form.control}
-                  name="type"
+                  name="roomType"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Type</FormLabel>
+                      <FormLabel>Room Type</FormLabel>
                       <Select
                         onValueChange={field.onChange}
                         defaultValue={field.value}
@@ -155,7 +196,7 @@ function UpsertRoomPage(props: Props) {
                         <SelectContent>
                           {roomTypeOptions.map((option) => (
                             <SelectItem value={option.value} key={option.label}>
-                              {option.value}
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -165,30 +206,30 @@ function UpsertRoomPage(props: Props) {
                   )}
                 />
 
+                {/* Max Capacity */}
                 <FormField
                   control={form.control}
-                  name="maxOccupancy"
+                  name="maxCapacity"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        Max Occupancy{" "}
-                        <Typography variant="span">(*)</Typography>{" "}
+                        Max Capacity <Typography variant="span">(*)</Typography>
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder="Enter max occupancy"
-                          {...field}
                           type="number"
-                          max={99}
+                          placeholder="Enter max capacity"
+                          {...field}
                           min={1}
+                          max={99}
                         />
                       </FormControl>
-
                       <FormMessage />
                     </FormItem>
                   )}
                 />
 
+                {/* Description */}
                 <FormField
                   control={form.control}
                   name="description"
@@ -198,7 +239,6 @@ function UpsertRoomPage(props: Props) {
                       <FormControl>
                         <Textarea placeholder="Enter description" {...field} />
                       </FormControl>
-
                       <FormMessage />
                     </FormItem>
                   )}
@@ -206,127 +246,8 @@ function UpsertRoomPage(props: Props) {
               </AccordionContent>
             </AccordionItem>
 
+            {/* Images */}
             <AccordionItem value="item-2">
-              <AccordionTrigger>Pricing</AccordionTrigger>
-              <AccordionContent>
-                <FormField
-                  control={form.control}
-                  name="originalPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Original price</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter original price" {...field} />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="discountedPrice"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Discounted price</FormLabel>
-                      <FormControl>
-                        <Input placeholder="Enter original price" {...field} />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-3">
-              <AccordionTrigger>Room details</AccordionTrigger>
-              <AccordionContent>
-                <FormField
-                  control={form.control}
-                  name="amenities"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Amenities</FormLabel>
-                      <FormControl>
-                        <AutocompleteTags
-                          suggestions={amenitiesOptions}
-                          placeholder="Enter amenities"
-                          {...field}
-                        />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="houseRules"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>House rules</FormLabel>
-                      <FormControl>
-                        <AutocompleteTags
-                          suggestions={houseRules.map((rule) => ({
-                            value: rule.id,
-                            label: rule.rule,
-                          }))}
-                          placeholder="Enter house rules"
-                          {...field}
-                        />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="tags"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Tags</FormLabel>
-                      <FormControl>
-                        <AutocompleteTags
-                          suggestions={tagsOptions}
-                          placeholder="Enter tags"
-                          {...field}
-                        />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="area"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Area</FormLabel>
-                      <FormControl>
-                        <Input
-                          placeholder="Enter area"
-                          {...field}
-                          type="number"
-                          prefix="m²"
-                        />
-                      </FormControl>
-
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-              </AccordionContent>
-            </AccordionItem>
-
-            <AccordionItem value="item-4">
               <AccordionTrigger>Images</AccordionTrigger>
               <AccordionContent>
                 <FormField
@@ -334,15 +255,14 @@ function UpsertRoomPage(props: Props) {
                   name="images"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Image</FormLabel>
+                      <FormLabel>Images</FormLabel>
                       <FormControl>
                         <ImagesList
                           onChange={field.onChange}
                           images={field.value}
-                          max={10}
+                          max={5}
                         />
                       </FormControl>
-
                       <FormMessage />
                     </FormItem>
                   )}
@@ -350,7 +270,8 @@ function UpsertRoomPage(props: Props) {
               </AccordionContent>
             </AccordionItem>
 
-            <AccordionItem value="item-4">
+            {/* Status */}
+            <AccordionItem value="item-3">
               <AccordionTrigger>Status</AccordionTrigger>
               <AccordionContent>
                 <FormField
@@ -365,13 +286,13 @@ function UpsertRoomPage(props: Props) {
                       >
                         <FormControl>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select a room status" />
+                            <SelectValue placeholder="Select room status" />
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
                           {roomStatusOptions.map((option) => (
                             <SelectItem value={option.value} key={option.label}>
-                              {option.value}
+                              {option.label}
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -383,6 +304,17 @@ function UpsertRoomPage(props: Props) {
               </AccordionContent>
             </AccordionItem>
           </Accordion>
+
+          {/* Thêm nút Submit ở cuối form */}
+          <div className="flex justify-end mt-4">
+            <Button type="submit" disabled={isCreating || isUpdating}>
+              {isCreating || isUpdating
+                ? "Loading..."
+                : id
+                ? "Update Room"
+                : "Create Room"}
+            </Button>
+          </div>
         </form>
       </Form>
     </div>

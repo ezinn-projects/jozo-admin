@@ -9,13 +9,14 @@ import { ChangeEvent, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 type Props = {
-  onChange: (images: string[]) => void;
+  onChange: (images: string[], files: File[]) => void;
   images: string[];
   max?: number;
 };
 
 function ImagesList({ onChange, images, max = 10 }: Props) {
   const [imagesList, setImagesList] = useState<string[]>(images || []);
+  const [filesList, setFilesList] = useState<File[]>([]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [mainImageIndex, setMainImageIndex] = useState<number | null>(null);
 
@@ -23,9 +24,8 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      const newImages = Array.from(e.target.files).map((file) =>
-        URL.createObjectURL(file)
-      );
+      const files = Array.from(e.target.files);
+      const newImages = files.map((file) => URL.createObjectURL(file));
 
       if (!imagesList.length) {
         setMainImageIndex(0);
@@ -38,12 +38,22 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
           }
           return image;
         });
+        const updatedFilesList = filesList.map((file, index) => {
+          if (index === openPopoverIndex) {
+            return files[0];
+          }
+          return file;
+        });
 
         setImagesList(updatedImagesList);
+        setFilesList(updatedFilesList);
+        onChange(updatedImagesList, updatedFilesList);
       } else {
         const updatedImagesList = [...imagesList, ...newImages];
+        const updatedFilesList = [...filesList, ...files];
         setImagesList(updatedImagesList);
-        onChange(updatedImagesList);
+        setFilesList(updatedFilesList);
+        onChange(updatedImagesList, updatedFilesList);
       }
     }
 
@@ -54,8 +64,10 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
 
   const handleRemoveImage = (index: number) => {
     const updatedImagesList = imagesList.filter((_, i) => i !== index);
+    const updatedFilesList = filesList.filter((_, i) => i !== index);
     setImagesList(updatedImagesList);
-    onChange(updatedImagesList);
+    setFilesList(updatedFilesList);
+    onChange(updatedImagesList, updatedFilesList);
     setOpenPopoverIndex(null);
 
     if (index === mainImageIndex) {

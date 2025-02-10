@@ -39,6 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Thêm effect để lắng nghe sự kiện đăng nhập
   useEffect(() => {
     const handleLoginSuccess = () => {
+      console.log("Login success event received");
       refetch();
     };
 
@@ -47,13 +48,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => {
       window.removeEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
     };
-  }, [refetch, localStorage.getItem("access_token")]);
+  }, [refetch]);
 
   const value = {
     user: userData?.data.result || null,
     isAuthenticated: !!userData?.data.result,
     isLoading,
   };
+
+  console.log("AuthContext value:", value);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

@@ -16,7 +16,7 @@ import { loginSchema } from "@/utils/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 import { AUTH_EVENTS } from "@/constants/events";
@@ -32,9 +32,13 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  if (isAuthenticated) {
-    navigate(PATHS.HOME, { replace: true });
-  }
+  console.log("isAuthenticated", isAuthenticated);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate(PATHS.HOME, { replace: true });
+    }
+  }, [isAuthenticated, navigate]);
 
   const form = useForm<FormValues>({
     defaultValues: {
@@ -48,7 +52,7 @@ export default function LoginPage() {
 
   const { mutate } = useMutation({
     mutationFn: authorizationApis.login,
-    onSuccess: ({ data }) => {
+    onSuccess: async ({ data }) => {
       localStorage.setItem("access_token", data.result?.access_token || "");
 
       // Dispatch event sau khi lưu token
@@ -57,6 +61,9 @@ export default function LoginPage() {
       toast({
         title: data.message,
       });
+
+      // Đợi một chút để đảm bảo context đã được cập nhật
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       navigate(PATHS.HOME, { replace: true });
     },
