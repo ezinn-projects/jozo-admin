@@ -8,12 +8,12 @@ const roomTypeApis = {
   getRoomType: (id: string) =>
     http.get<HTTPResponse<IRoomType>>(`${ROOM_TYPE_CONTROLLER}/${id}`),
   createRoomType: (data: FormData) =>
-    http.post<HTTPResponse<IRoomType>>(
+    http.postForm<HTTPResponse<IRoomType>>(
       `${ROOM_TYPE_CONTROLLER}/add-room-type`,
       data
     ),
-  updateRoomType: (data: FormData) =>
-    http.put(`${ROOM_TYPE_CONTROLLER}/${data.get("_id")}`, data),
+  updateRoomType: (data: FormData, id: string) =>
+    http.patch(`${ROOM_TYPE_CONTROLLER}/${id}`, data),
   deleteRoomType: ({ _id }: { _id: string }) =>
     http.delete(`${ROOM_TYPE_CONTROLLER}/${_id}`),
 };

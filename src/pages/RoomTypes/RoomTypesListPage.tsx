@@ -45,8 +45,6 @@ function RoomTypesListPage() {
     },
   });
 
-  console.log("data", data?.data.result);
-
   const columns: ColumnDef<IRoomType>[] = [
     {
       id: "select",
@@ -95,31 +93,45 @@ function RoomTypesListPage() {
       header: "Prices",
       columns: [
         {
-          header: "Morning (10:00-14:00)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "10:00-14:00"
-            );
-            return formatCurrency(price?.price || 0);
-          },
+          header: "Time Slot",
+          accessorKey: "timeSlot",
+          cell: ({ row }) => (
+            <div className="space-y-2">
+              {row.original.prices.weekday.map((price) => (
+                <div key={price.timeSlot}>{price.timeSlot}</div>
+              ))}
+            </div>
+          ),
         },
         {
-          header: "Afternoon (14:00-17:00)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "14:00-17:00"
-            );
-            return formatCurrency(price?.price || 0);
-          },
+          header: "Weekday Price",
+          cell: ({ row }) => (
+            <div className="space-y-2">
+              {row.original.prices.weekday.map((price) => (
+                <div key={price.timeSlot}>{formatCurrency(price.price)}</div>
+              ))}
+            </div>
+          ),
         },
         {
-          header: "Evening (17:00-23:59)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "17:00-23:59"
-            );
-            return formatCurrency(price?.price || 0);
-          },
+          header: "Weekend Price",
+          cell: ({ row }) => (
+            <div className="space-y-2">
+              {row.original.prices.weekend.map((price) => (
+                <div key={price.timeSlot}>{formatCurrency(price.price)}</div>
+              ))}
+            </div>
+          ),
+        },
+        {
+          header: "Holiday Price",
+          cell: ({ row }) => (
+            <div className="space-y-2">
+              {row.original.prices.holiday.map((price) => (
+                <div key={price.timeSlot}>{formatCurrency(price.price)}</div>
+              ))}
+            </div>
+          ),
         },
       ],
     },
@@ -128,7 +140,7 @@ function RoomTypesListPage() {
       header: "",
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-2">
-          <Link to={`${PATHS.ROOM_TYPES_LISTS}/${row.original._id}`}>
+          <Link to={`${PATHS.ROOM_TYPES_LISTS}/${row.original._id}/edit`}>
             <Button variant="ghost" size="icon">
               <PencilIcon size={16} />
             </Button>

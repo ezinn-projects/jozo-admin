@@ -1,3 +1,6 @@
+import roomTypeApis from "@/apis/roomType.apis";
+import Header from "@/components/Layout/Header";
+import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -7,14 +10,6 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import Typography from "@/components/ui/typography";
-import { useForm } from "react-hook-form";
-import Header from "@/components/Layout/Header";
-import ImagesList from "@/pages/RoomsManagement/components/ui/ImagesList";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -22,11 +17,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { useMutation } from "@tanstack/react-query";
-import roomTypeApis from "@/apis/roomType.apis";
-import { toast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { Textarea } from "@/components/ui/textarea";
+import Typography from "@/components/ui/typography";
 import PATHS from "@/constants/paths";
+import { toast } from "@/hooks/use-toast";
+import ImagesList from "@/pages/RoomsManagement/components/ui/ImagesList";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useForm } from "react-hook-form";
+import { useNavigate, useParams } from "react-router-dom";
+import * as z from "zod";
 
 export enum RoomType {
   Small = "small",
@@ -40,25 +41,20 @@ const roomTypeOptions = [
   { value: RoomType.Large, label: "Large" },
 ];
 
-type Props = {
-  id?: string;
-};
-
 const formSchema = z.object({
   name: z.string().min(1, "Name is required"),
   type: z.nativeEnum(RoomType),
-  capacity: z.number().min(1, "Capacity must be at least 1"),
-  area: z.string(),
+  capacity: z.string().min(1, "Capacity must be at least 1"),
+  area: z.string().min(1, "Area is required"),
   description: z.string(),
   images: z.array(z.string()),
 });
 
 type FormValues = z.infer<typeof formSchema>;
 
-function UpsertRoomTypePage(props: Props) {
-  const { id = "" } = props;
+function UpsertRoomTypePage() {
+  const { id = "" } = useParams();
   const title = id ? "Edit Room Type" : "New Room Type";
-
   const navigate = useNavigate();
 
   const form = useForm<FormValues>({
@@ -66,12 +62,31 @@ function UpsertRoomTypePage(props: Props) {
     defaultValues: {
       name: "",
       type: RoomType.Small,
-      capacity: 1,
+      capacity: "1",
       area: "1",
       description: "",
       images: [],
     },
   });
+
+  const { data: roomTypeData } = useQuery({
+    queryKey: ["roomType", id],
+    queryFn: () => roomTypeApis.getRoomType(id || ""),
+    enabled: !!id,
+  });
+
+  useEffect(() => {
+    if (roomTypeData?.data) {
+      form.reset({
+        name: roomTypeData?.data.result?.name || "",
+        type: roomTypeData?.data.result?.type || RoomType.Small,
+        capacity: roomTypeData?.data.result?.capacity?.toString() || "1",
+        area: roomTypeData?.data.result?.area?.toString() || "1",
+        description: roomTypeData?.data.result?.description || "",
+        images: roomTypeData?.data.result?.images || [],
+      });
+    }
+  }, [roomTypeData, form]);
 
   const { mutate: createRoomType, isPending: isCreating } = useMutation({
     mutationFn: roomTypeApis.createRoomType,
@@ -93,34 +108,50 @@ function UpsertRoomTypePage(props: Props) {
     },
   });
 
+  // Thêm mutation để cập nhật room type
+  const { mutate: updateRoomType, isPending: isUpdating } = useMutation({
+    mutationFn: (data: FormData) => roomTypeApis.updateRoomType(data, id || ""),
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Room type updated successfully",
+      });
+      navigate(PATHS.ROOM_TYPES_LISTS);
+    },
+    onError: (error) => {
+      toast({
+        title: "Error",
+        description: error.message || "Something went wrong",
+        variant: "destructive",
+      });
+    },
+  });
+
   const onSubmit = async (values: FormValues) => {
     try {
-      // Create FormData
       const formData = new FormData();
       formData.append("name", values.name);
       formData.append("type", values.type);
       formData.append("capacity", values.capacity.toString());
-      formData.append("area", values.area || "1");
+      formData.append("area", values.area + "");
       formData.append("description", values.description || "");
 
-      // Chuyển đổi blob URL thành File
-      const imageFiles = await Promise.all(
-        values.images.map(async (blobUrl) => {
-          const response = await fetch(blobUrl);
-          const blob = await response.blob();
-          // Tạo tên file từ blob URL hoặc dùng timestamp
-          const fileName =
-            blobUrl.split("/").pop() || `image-${Date.now()}.jpg`;
-          return new File([blob], fileName, { type: blob.type });
-        })
-      );
+      // Chỉ xử lý các ảnh mới (không phải URL từ server)
+      const newImages = values.images.filter((url) => !url.startsWith("http"));
 
-      // Append các file ảnh
-      imageFiles.forEach((file) => {
+      for (const blobUrl of newImages) {
+        const response = await fetch(blobUrl);
+        const blob = await response.blob();
+        const fileName = blobUrl.split("/").pop() || `image-${Date.now()}.jpg`;
+        const file = new File([blob], fileName, { type: blob.type });
         formData.append("images", file);
-      });
+      }
 
-      createRoomType(formData);
+      if (id) {
+        updateRoomType(formData);
+      } else {
+        createRoomType(formData);
+      }
     } catch (error) {
       console.error(error);
     }
@@ -192,7 +223,6 @@ function UpsertRoomTypePage(props: Props) {
                     placeholder="Enter capacity"
                     min={1}
                     {...field}
-                    onChange={(e) => field.onChange(Number(e.target.value))}
                   />
                 </FormControl>
                 <FormMessage />
@@ -250,8 +280,12 @@ function UpsertRoomTypePage(props: Props) {
             )}
           />
 
-          <Button type="submit" className="mt-6" disabled={isCreating}>
-            {isCreating
+          <Button
+            type="submit"
+            className="mt-6"
+            disabled={isCreating || isUpdating}
+          >
+            {isCreating || isUpdating
               ? "Loading..."
               : id
               ? "Update Room Type"

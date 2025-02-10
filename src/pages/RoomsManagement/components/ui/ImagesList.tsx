@@ -5,7 +5,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
-import { ChangeEvent, useRef, useState } from "react";
+import { ChangeEvent, useRef, useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogTrigger } from "@/components/ui/dialog";
 
 type Props = {
@@ -15,12 +15,16 @@ type Props = {
 };
 
 function ImagesList({ onChange, images, max = 10 }: Props) {
-  const [imagesList, setImagesList] = useState<string[]>(images || []);
+  const [imagesList, setImagesList] = useState<string[]>(images);
   const [filesList, setFilesList] = useState<File[]>([]);
   const [openPopoverIndex, setOpenPopoverIndex] = useState<number | null>(null);
   const [mainImageIndex, setMainImageIndex] = useState<number | null>(null);
 
   const imagePickerRef = useRef<{ openFilePicker: () => void }>(null);
+
+  useEffect(() => {
+    setImagesList(images);
+  }, [images]);
 
   const handleImageChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
@@ -58,7 +62,6 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
     }
 
     e.target.value = "";
-
     setOpenPopoverIndex(null);
   };
 

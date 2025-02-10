@@ -5,13 +5,23 @@ export interface IRoomType {
   type: RoomType;
   name: string;
   capacity: number;
-  area: number;
+  area: string;
   description: string;
   images: string[];
   created_at?: Date;
   updated_at?: Date;
   prices: {
-    timeSlot: string;
-    price: number;
-  }[];
+    weekday: {
+      timeSlot: string;
+      price: number;
+    }[];
+    weekend: {
+      timeSlot: string;
+      price: number;
+    }[];
+    holiday: {
+      timeSlot: string;
+      price: number;
+    }[];
+  };
 }
