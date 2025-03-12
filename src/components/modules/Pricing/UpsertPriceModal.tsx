@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { type Price } from "@/@types/general-management";
 import {
   Accordion,
@@ -28,7 +29,11 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { DayType, RoomType } from "@/constants/enum";
 import { DAY_TYPE_OPTIONS } from "@/constants/options";
-import { useAddPricing, useGetPricingById } from "@/hooks/pricing";
+import {
+  useAddPricing,
+  useGetPricingById,
+  useUpdatePricing,
+} from "@/hooks/pricing";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils";
@@ -38,7 +43,7 @@ import { Portal } from "@radix-ui/react-portal";
 import { AxiosError } from "axios";
 import { format } from "date-fns";
 import { CalendarIcon, CircleXIcon } from "lucide-react";
-import { ReactNode, useRef, useState } from "react";
+import { ReactNode, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Calendar } from "../../ui/calendar";
 import { Input } from "../../ui/input";
@@ -57,6 +62,7 @@ type Props = {
   id?: string;
   icon?: ReactNode;
   defaultOpen?: boolean;
+  onUpsert?: (payload: any) => void;
 };
 
 type FormValues = {
@@ -77,7 +83,7 @@ type FormValues = {
 const roomTypes = Object.values(RoomType).filter((type) => type);
 
 function UpsertPricingModal(props: Props) {
-  const { id = "", icon, defaultOpen = false } = props;
+  const { id = "", icon, defaultOpen = false, onUpsert } = props;
   const closeRef = useRef<HTMLButtonElement>(null);
   const [open, setOpen] = useState(defaultOpen);
 
@@ -87,7 +93,11 @@ function UpsertPricingModal(props: Props) {
 
   const price = priceData?.data.result || ({} as Price);
 
-  const { mutate, isPending } = useAddPricing();
+  const { mutate: addPricing, isPending: isAddPending } = useAddPricing();
+  const { mutate: updatePricing, isPending: isUpdatePending } =
+    useUpdatePricing();
+
+  const isPending = isAddPending || isUpdatePending;
 
   const defaultValues = {
     dayType: price.day_type || "",
@@ -98,7 +108,7 @@ function UpsertPricingModal(props: Props) {
         prices:
           slot.prices?.map((price) => ({
             roomType: price.room_type,
-            price: formatCurrency(price.price),
+            price: formatCurrency(price.price, false),
           })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
       })) ||
       Array(3)
@@ -118,6 +128,29 @@ function UpsertPricingModal(props: Props) {
     defaultValues,
   });
 
+  useEffect(() => {
+    if (price && Object.keys(price).length > 0) {
+      form.reset({
+        dayType: price.day_type || "",
+        timeSlots: price.time_slots?.map((slot) => ({
+          start: slot.start || "",
+          end: slot.end || "",
+          prices: slot.prices?.map((price) => ({
+            roomType: price.room_type,
+            price: formatCurrency(price.price, false),
+          })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
+        })) || Array(3).fill(null).map(() => ({
+          start: "",
+          end: "",
+          prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
+        })),
+        effectiveDate: price.effective_date || "",
+        endDate: price.end_date || undefined,
+        note: price.note || undefined,
+      });
+    }
+  }, [price]);
+
   const {
     control,
     handleSubmit,
@@ -127,7 +160,7 @@ function UpsertPricingModal(props: Props) {
 
   const onSubmit = handleSubmit(
     (values: FormValues) => {
-      const payload = {
+      const data = {
         ...values,
         timeSlots: values.timeSlots.map((slot) => ({
           ...slot,
@@ -142,24 +175,67 @@ function UpsertPricingModal(props: Props) {
           : undefined,
       };
 
-      mutate(payload, {
-        onSuccess: () => {
-          closeRef.current?.click();
-          form.reset();
-        },
-        onError: (error) => {
-          const axiosError = error as AxiosError<{
-            errors: Record<string, ErrorField>;
-          }>;
+      if (onUpsert) {
+        onUpsert(data);
+      } else {
+        if (id) {
+          updatePricing(
+            {
+              _id: id,
+              ...data,
+            },
+            {
+              onSuccess: () => {
+                closeRef.current?.click();
+                form.reset();
+                toast({
+                  title: "Price updated",
+                  description: "The price has been updated successfully.",
+                });
+              },
+              onError: (error: any) => {
+                const axiosError = error as AxiosError<{
+                  errors: Record<string, ErrorField>;
+                }>;
 
-          if (axiosError.response?.data) {
-            const errors = axiosError.response.data.errors;
-            for (const key in errors) {
-              setError(key as keyof FormValues, { message: errors[key].msg });
+                if (axiosError.response?.data) {
+                  const errors = axiosError.response.data.errors;
+                  for (const key in errors) {
+                    setError(key as keyof FormValues, {
+                      message: errors[key].msg,
+                    });
+                  }
+                }
+              },
             }
-          }
-        },
-      });
+          );
+        } else {
+          addPricing(data, {
+            onSuccess: () => {
+              closeRef.current?.click();
+              form.reset();
+              toast({
+                title: "Price added",
+                description: "The price has been added successfully.",
+              });
+            },
+            onError: (error: any) => {
+              const axiosError = error as AxiosError<{
+                errors: Record<string, ErrorField>;
+              }>;
+
+              if (axiosError.response?.data) {
+                const errors = axiosError.response.data.errors;
+                for (const key in errors) {
+                  setError(key as keyof FormValues, {
+                    message: errors[key].msg,
+                  });
+                }
+              }
+            },
+          });
+        }
+      }
     },
     (error) =>
       toast({
@@ -254,7 +330,6 @@ function UpsertPricingModal(props: Props) {
                                     field.onChange(date?.toISOString())
                                   }
                                   disabled={(date) =>
-                                    date > new Date() ||
                                     date < new Date("1900-01-01")
                                   }
                                   initialFocus
@@ -275,7 +350,7 @@ function UpsertPricingModal(props: Props) {
                           <FormLabel>Day type</FormLabel>
                           <Select
                             onValueChange={field.onChange}
-                            defaultValue={field.value}
+                            value={field.value}
                           >
                             <FormControl>
                               <SelectTrigger>
@@ -523,7 +598,6 @@ function UpsertPricingModal(props: Props) {
                                     field.onChange(date?.toISOString())
                                   }
                                   disabled={(date) =>
-                                    date > new Date() ||
                                     date < new Date("1900-01-01")
                                   }
                                   initialFocus

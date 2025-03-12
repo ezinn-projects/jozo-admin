@@ -16,30 +16,30 @@ export interface IAddRoomRequestBody {
 }
 
 const roomApis = {
-  createRoom: async (payload: FormData) => {
+  createRoom: (payload: FormData) => {
     return http.postForm<HTTPResponse<IRoom>>(
       `${ROOM_CONTROLLER}/add-room`,
       payload
     );
   },
-  getRooms: async () => {
+  getRooms: () => {
     return http.get<HTTPResponse<IRoom[]>>(`${ROOM_CONTROLLER}`);
   },
-  updateRoom: async (payload: FormData) => {
+  updateRoom: (payload: FormData) => {
     return http.postForm<HTTPResponse<IRoom>>(
       `${ROOM_CONTROLLER}/update-room`,
       payload
     );
   },
-  getRoomById: async (id: string) => {
+  getRoomById: (id: string) => {
     return http.get<HTTPResponse<IRoom>>(`${ROOM_CONTROLLER}/${id}`);
   },
-  deleteRoom: async (payload: { _id: string }) => {
+  deleteRoom: (payload: { _id: string }) => {
     return http.delete<HTTPResponse<IRoom>>(
       `${ROOM_CONTROLLER}/${payload._id}`
     );
   },
-  deleteRoomByIds: async (payload: { ids: string[] }) => {
+  deleteRoomByIds: (payload: { ids: string[] }) => {
     return http.delete<HTTPResponse<IRoom>>(
       `${ROOM_CONTROLLER}/delete-room-by-ids`,
       { data: payload }

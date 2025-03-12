@@ -1,5 +1,7 @@
+import RoomTimelineTable from "./RoomSchedule/components/RoomTimelineTable";
+
 function AdminPage() {
-  return <div>AdminPage</div>;
+  return <div><RoomTimelineTable /></div>;
 }
 
 export default AdminPage;

@@ -129,7 +129,7 @@ function PricePage() {
           <UpdatePricingModal
             id={row.original._id}
             icon={<PencilIcon size={12} />}
-            defaultOpen={true}
+            defaultOpen={false}
           />
           <Button
             variant="ghost"

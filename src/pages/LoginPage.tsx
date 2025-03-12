@@ -10,8 +10,10 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import Typography from "@/components/ui/typography";
+import { AUTH_EVENTS } from "@/constants/events";
 import PATHS from "@/constants/paths";
 import { useToast } from "@/hooks/use-toast";
+import useAuth from "@/hooks/useAuth";
 import { loginSchema } from "@/utils/schema";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -19,8 +21,6 @@ import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
-import { AUTH_EVENTS } from "@/constants/events";
-import useAuth from "@/hooks/useAuth";
 
 type FormValues = {
   email: string;
@@ -53,17 +53,21 @@ export default function LoginPage() {
     onSuccess: async ({ data }) => {
       localStorage.setItem("access_token", data.result?.access_token || "");
 
-      // Dispatch event sau khi lưu token
+      // Dispatch event login success
       window.dispatchEvent(new Event(AUTH_EVENTS.LOGIN_SUCCESS));
 
       toast({
         title: data.message,
       });
 
-      // Đợi một chút để đảm bảo context đã được cập nhật
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      // Tăng thời gian chờ để đảm bảo context được cập nhật
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
-      navigate(PATHS.HOME, { replace: true });
+      // Kiểm tra lại trạng thái authentication trước khi navigate
+      const authState = await authorizationApis.getMe();
+      if (authState.data.result) {
+        navigate(PATHS.HOME, { replace: true });
+      }
     },
     onError: (error) => {
       toast({

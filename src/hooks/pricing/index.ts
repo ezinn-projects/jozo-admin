@@ -63,12 +63,12 @@ export const useGetPricingById = (id: string, enabled?: boolean) => {
   });
 };
 
-export const useUpsertPricing = () => {
+export const useUpdatePricing = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: pricingApis.updatePricing,
-    onSuccess: (data) => {
+    onSuccess: (data, payload: PricePayload) => {
       toast({
         title: "Pricing updated successfully",
         description: "Pricing has been updated successfully",
@@ -76,12 +76,46 @@ export const useUpsertPricing = () => {
 
       queryClient.setQueryData(
         ["pricing"],
-        (oldData: AxiosResponse<HTTPResponse<Price[]>>) => {
+        (oldData: AxiosResponse<HTTPResponse<Price[]>> | undefined) => {
+          if (!oldData?.data?.result) return oldData;
+
+          console.log("Payload ID:", payload._id);
+          console.log("Response data:", data?.data?.result);
+
+          const newPricing = {
+            _id: payload._id, // Use the ID from the payload directly
+            day_type: payload.dayType,
+            time_slots: payload.timeSlots.map((slot) => ({
+              start: slot.start,
+              end: slot.end,
+              prices: slot.prices.map((price) => ({
+                room_type: price.roomType,
+                price: +price.price,
+              })),
+            })),
+            effective_date: payload.effectiveDate,
+            end_date: payload.endDate || null,
+            note: payload.note || null,
+          };
+
+          console.log("Old data:", oldData.data.result);
+          console.log("New pricing object:", newPricing);
+
+          const updatedPricing = oldData.data.result.map((item) => {
+            const isMatch = item._id === newPricing._id;
+            console.log(
+              `Comparing ${item._id} with ${newPricing._id}: ${isMatch}`
+            );
+            return isMatch ? newPricing : item;
+          });
+
+          console.log("Final updatedPricing:", updatedPricing);
+
           return {
             ...oldData,
             data: {
               ...oldData.data,
-              result: data.data.result,
+              result: updatedPricing,
             },
           };
         }

@@ -34,3 +34,22 @@ export enum RoomType {
   Medium = "medium",
   Large = "large",
 }
+
+/**
+ * Enum for types of room status.
+ * @enum {string}
+ * @property {string} Available - A room is available
+ * @property {string} InUse - A room is in use
+ * @property {string} Booked - A room is booked
+ * @property {string} Maintenance - A room is in maintenance
+ * @property {string} Locked - A room is locked
+ * @property {string} Cancelled - A room is cancelled
+ */
+export enum RoomStatus {
+  Available = "available",
+  InUse = "in use",
+  Booked = "booked",
+  Maintenance = "maintenance",
+  Locked = "locked",
+  Cancelled = "cancelled",
+}

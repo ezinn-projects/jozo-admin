@@ -7,14 +7,17 @@ const http = axios.create({
   timeout: 30000,
   headers: {
     "Content-Type": "application/json",
-    Authorization: `Bearer ${localStorage.getItem("access_token")}`,
   },
 });
 
 // Thêm một bộ đón chặn request
 http.interceptors.request.use(
   function (config) {
-    // Làm gì đó trước khi request dựoc gửi đi
+    // Lấy token mới nhất từ localStorage mỗi khi gửi request
+    const token = localStorage.getItem("access_token");
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   function (error) {

@@ -1,4 +1,4 @@
-import { DayType, RoomType } from "@/constants/enum";
+import { DayType, RoomStatus, RoomType } from "@/constants/enum";
 
 interface ITimeSlotPrice {
   timeSlot: string;
@@ -24,4 +24,16 @@ interface IRoom {
   updatedAt: string;
 }
 
-export type { IRoom, ITimeSlot, ITimeSlotPrice };
+interface IRoomSchedule {
+  _id: string;
+  roomId: string;
+  startTime: string;
+  endTime: string | null;
+  status: RoomStatus;
+  createdAt: string;
+  updatedAt: string;
+  createdBy: string;
+  updatedBy: string;
+}
+
+export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };

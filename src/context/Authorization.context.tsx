@@ -25,7 +25,10 @@ export const AuthContext = createContext<AuthContextValues>(
 // Provider component để bọc toàn bộ app
 export function AuthProvider({ children }: { children: ReactNode }) {
   // Giả lập một role, trong thực tế bạn sẽ lấy role từ API hoặc authentication state
-
+  console.log(
+    'localStorage.getItem("access_token")',
+    localStorage.getItem("access_token")
+  );
   const {
     data: userData,
     isLoading,
@@ -33,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   } = useQuery({
     queryKey: ["user", localStorage.getItem("access_token")],
     queryFn: authorizationApis.getMe,
-    enabled: !!localStorage.getItem("access_token"), // Chỉ chạy query nếu có token
+    enabled: !!localStorage.getItem("access_token"),
   });
 
   // Thêm effect để lắng nghe sự kiện đăng nhập
