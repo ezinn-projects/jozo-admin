@@ -30,7 +30,7 @@ jobs:
         run: npm run build
 
       - name: Get commit SHA
-        id: vars
+        id: get-sha
         run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Log in to Docker Hub
@@ -44,10 +44,6 @@ jobs:
 
       - name: Push Docker image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha_short }}
-
-      - name: Get commit SHA
-        id: get-sha
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
 
       - name: Create commit SHA file
         run: echo "${{ env.sha_short }}" > commit-sha.txt
@@ -64,12 +60,12 @@ jobs:
 
     steps:
       - name: Download commit SHA artifact
-        uses: actions/download-artifact@v3.0.0
+        uses: actions/download-artifact@v3
         with:
           name: commit-sha
 
       - name: Read commit SHA
-        id: vars
+        id: read-sha
         run: echo "sha=$(cat commit-sha.txt)" >> $GITHUB_ENV
 
       - name: Deploy to VPS via SSH
@@ -94,7 +90,7 @@ jobs:
 
   cleanup:
     runs-on: ubuntu-latest
-    if: always() # Run this job even if the build fails
+    if: always()
 
     steps:
       - name: Log in to Docker Hub
