@@ -16,10 +16,10 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
           node-version: "20"
 
@@ -53,7 +53,7 @@ jobs:
         run: echo "${{ env.sha_short }}" > commit-sha.txt
 
       - name: Upload commit SHA as artifact
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v3.1.0
         with:
           name: commit-sha
           path: ./commit-sha.txt
@@ -64,7 +64,7 @@ jobs:
 
     steps:
       - name: Download commit SHA artifact
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v3.0.0
         with:
           name: commit-sha
 
