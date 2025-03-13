@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build --verbose
 
 # Expose the new port (adjust if you are using a different port)
-EXPOSE 3001
+EXPOSE 3002
 
 # Start the app using Vite's preview mode
-CMD ["npm", "run", "preview", "--", "--host", "--port", "3001"]
+CMD ["npm", "run", "preview", "--", "--host", "--port", "3002"]
