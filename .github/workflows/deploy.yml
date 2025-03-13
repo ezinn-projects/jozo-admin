@@ -88,5 +88,5 @@ jobs:
             docker run -d \
               --name jozo-admin \
               --env-file $ENV_FILE \
-              -p 3001:3001 \
+              -p 3002:3002 \
               ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}
