@@ -1,4 +1,4 @@
-name: Deploy to Staging
+name: CI/CD for Jozo Admin
 
 on:
   push:
@@ -6,112 +6,87 @@ on:
       - main
       - develop
 
-permissions:
-  contents: write
-  deployments: write
-
 jobs:
-  build-docker-image:
+  build:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repository
+      # 1. Checkout code
+      - name: Checkout code
         uses: actions/checkout@v3
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
-        with:
-          node-version: "20"
+      # 2. Xác định tên file env dựa trên branch
+      - name: Set environment file variable
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "ENV_FILE=.env.production" >> $GITHUB_ENV
+          else
+            echo "ENV_FILE=.env.development" >> $GITHUB_ENV
+          fi
 
-      - name: Install dependencies
-        run: npm install
+      # 3. Tạo file env từ secret (không commit file env vào repo)
+      - name: Create environment file for build
+        run: |
+          if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+            echo "${{ secrets.ENV_PRODUCTION }}" > .env.production
+          else
+            echo "${{ secrets.ENV_DEVELOPMENT }}" > .env.development
+          fi
 
-      - name: Build the jozo Admin app
-        run: npm run build
+      # 4. Set up Docker Buildx
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
 
-      - name: Get commit SHA
-        id: get-sha
-        run: echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_ENV
-
+      # 5. Log in to Docker Hub
       - name: Log in to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
           password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Build Docker image
-        run: docker build --no-cache -t ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha_short }} .
-
-      - name: Push Docker image
-        run: docker push ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha_short }}
-
-      - name: Create commit SHA file
-        run: echo "${{ env.sha_short }}" > commit-sha.txt
-
-      - name: Upload commit SHA as artifact
-        uses: actions/upload-artifact@v2
+      # 6. Build Docker image và push lên Docker Hub
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v4
         with:
-          name: commit-sha
-          path: ./commit-sha.txt
+          context: .
+          file: Dockerfile
+          push: true
+          build-args: ENV_FILE=${{ env.ENV_FILE }}
+          tags: |
+            ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}
+            ${{ secrets.DOCKER_USERNAME }}/jozo-admin:latest
 
-  deploy-to-vps:
+  deploy:
     runs-on: ubuntu-latest
-    needs: build-docker-image
+    needs: build
 
     steps:
-      - name: Download commit SHA artifact
-        uses: actions/download-artifact@v2
-        with:
-          name: commit-sha
-
-      - name: Read commit SHA
-        id: read-sha
-        run: echo "sha=$(cat commit-sha.txt)" >> $GITHUB_ENV
-
-      - name: Deploy to VPS via SSH
-        uses: appleboy/ssh-action@v0.1.3
+      # 1. Kết nối SSH đến VPS và deploy container
+      - name: Connect to VPS via SSH
+        uses: appleboy/ssh-action@master
         with:
           host: ${{ secrets.VPS_IP }}
           username: ${{ secrets.VPS_USERNAME }}
           password: ${{ secrets.VPS_PASSWORD }}
-          port: 22
           script: |
+            # Login Docker Hub trên VPS
+            docker login -u ${{ secrets.DOCKER_USERNAME }} -p ${{ secrets.DOCKER_PASSWORD }}
+
+            # Tạo file env trên VPS từ secret
+            if [ "${{ github.ref }}" == "refs/heads/main" ]; then
+              echo "${{ secrets.ENV_PRODUCTION }}" > /tmp/.env.production
+              ENV_FILE="/tmp/.env.production"
+            else
+              echo "${{ secrets.ENV_DEVELOPMENT }}" > /tmp/.env.development
+              ENV_FILE="/tmp/.env.development"
+            fi
+
+            # Pull image mới, dừng container cũ và chạy container mới với --env-file
+            docker pull ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}
             docker stop jozo-admin || true
             docker rm jozo-admin || true
-            docker pull ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha }}
-            docker run -d --name jozo-admin -p 3001:3001 ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ env.sha }}
-
-      - name: Run deployment action in Jira
-        uses: chrnorm/deployment-action@releases/v1
-        with:
-          environment: "staging"
-          token: ${{ secrets.GITHUB_TOKEN }}
-          description: "Deploying jozo-admin to staging via Docker"
-
-  cleanup:
-    runs-on: ubuntu-latest
-    if: always()
-
-    steps:
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v2
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Remove old Docker images from VPS
-        uses: appleboy/ssh-action@v0.1.3
-        with:
-          host: ${{ secrets.VPS_IP }}
-          username: ${{ secrets.VPS_USERNAME }}
-          password: ${{ secrets.VPS_PASSWORD }}
-          port: 22
-          script: |
-            docker image prune -f --filter "until=24h"
-
-      - name: Remove old images from Docker Hub
-        run: |
-          images=$(docker images -q --filter "dangling=true")
-          if [ -n "$images" ]; then
-            docker rmi $images
-          fi
+            docker run -d \
+              --name jozo-admin \
+              --env-file $ENV_FILE \
+              -p 3001:3001 \
+              ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}
