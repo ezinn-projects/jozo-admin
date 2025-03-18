@@ -1,3 +1,4 @@
+import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
 const apiUrl = import.meta.env.VITE_API_URL;
@@ -36,6 +37,11 @@ http.interceptors.response.use(
   function (error) {
     // Bất kì mã trạng thái nào lọt ra ngoài tầm 2xx đều khiến hàm này được trigger\
     // Làm gì đó với lỗi response
+    toast({
+      title: "Error",
+      description: error.response?.data?.message || "An unknown error occurred",
+      variant: "destructive",
+    });
     return Promise.reject(error);
   }
 );

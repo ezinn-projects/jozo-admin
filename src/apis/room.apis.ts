@@ -1,7 +1,6 @@
-import { RoomStatus } from "@/pages/RoomsManagement/constants/enum";
+import { IRoom } from "@/@types/Room";
 import { RoomType } from "@/constants/enum";
 import http from "@/utils/http";
-import { IRoom } from "@/@types/Room";
 
 const ROOM_CONTROLLER = "/rooms";
 
@@ -9,15 +8,12 @@ const ROOM_CONTROLLER = "/rooms";
 export interface IAddRoomRequestBody {
   roomName: string;
   roomType: RoomType;
-  maxCapacity: number;
-  status: RoomStatus;
   description?: string;
-  images?: string[];
 }
 
 const roomApis = {
-  createRoom: (payload: FormData) => {
-    return http.postForm<HTTPResponse<IRoom>>(
+  createRoom: (payload: IRoom) => {
+    return http.post<HTTPResponse<IRoom>>(
       `${ROOM_CONTROLLER}/add-room`,
       payload
     );
@@ -25,9 +21,9 @@ const roomApis = {
   getRooms: () => {
     return http.get<HTTPResponse<IRoom[]>>(`${ROOM_CONTROLLER}`);
   },
-  updateRoom: (payload: FormData) => {
-    return http.postForm<HTTPResponse<IRoom>>(
-      `${ROOM_CONTROLLER}/update-room`,
+  updateRoom: (payload: IRoom) => {
+    return http.put<HTTPResponse<IRoom>>(
+      `${ROOM_CONTROLLER}/${payload._id}`,
       payload
     );
   },

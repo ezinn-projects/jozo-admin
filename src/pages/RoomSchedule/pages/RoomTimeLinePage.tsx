@@ -1,11 +1,11 @@
-import RoomTimelineTable from '../components/RoomTimelineTable'
+import RoomTimelineTable from "../components/RoomTimelineTable";
 
 function RoomTimeLinePage() {
   return (
     <div>
-        <RoomTimelineTable />
+      <RoomTimelineTable />
     </div>
-  )
+  );
 }
 
-export default RoomTimeLinePage
+export default RoomTimeLinePage;

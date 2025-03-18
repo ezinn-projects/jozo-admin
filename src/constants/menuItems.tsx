@@ -26,11 +26,6 @@ const MENU_ITEMS: MenuItem[] = [
     icon: BedDouble,
     subItems: [
       {
-        title: "Amenities",
-        url: PATHS.AMENITIES,
-        icon: BedDouble,
-      },
-      {
         title: "Room Types",
         url: PATHS.ROOM_TYPES_LISTS,
         icon: BedDouble,

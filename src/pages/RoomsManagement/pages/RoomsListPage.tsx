@@ -1,18 +1,17 @@
 import { IRoom } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
 import Header from "@/components/Layout/Header";
+import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import PATHS from "@/constants/paths";
-import { formatCurrency } from "@/utils";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "@/hooks/use-toast";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, TrashIcon } from "lucide-react";
-import { Link } from "react-router-dom";
 import { useState } from "react";
-import { DeleteModal } from "@/components/shared/DeleteModal";
-import { toast } from "@/hooks/use-toast";
+import { Link } from "react-router-dom";
 // import { toast } from "sonner";
 
 function RoomsListPage() {
@@ -76,54 +75,16 @@ function RoomsListPage() {
       accessorKey: "roomType",
     },
     {
-      id: "maxCapacity",
-      header: "Max Capacity",
-      accessorKey: "maxCapacity",
-    },
-    {
       id: "status",
       header: "Status",
       accessorKey: "status",
-    },
-    {
-      id: "prices",
-      header: "Prices",
-      columns: [
-        {
-          header: "Morning (10:00-14:00)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "10:00-14:00"
-            );
-            return formatCurrency(price?.price || 0);
-          },
-        },
-        {
-          header: "Afternoon (14:00-17:00)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "14:00-17:00"
-            );
-            return formatCurrency(price?.price || 0);
-          },
-        },
-        {
-          header: "Evening (17:00-23:59)",
-          cell: ({ row }) => {
-            const price = row.original.prices.find(
-              (p) => p.timeSlot === "17:00-23:59"
-            );
-            return formatCurrency(price?.price || 0);
-          },
-        },
-      ],
     },
     {
       id: "actions",
       header: "",
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-2">
-          <Link to={`rooms/${row.original._id}`}>
+          <Link to={`/rooms/${row.original._id}/edit`}>
             <Button variant="ghost" size="icon">
               <PencilIcon size={16} />
             </Button>

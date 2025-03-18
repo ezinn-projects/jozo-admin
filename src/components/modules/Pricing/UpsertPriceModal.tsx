@@ -132,18 +132,23 @@ function UpsertPricingModal(props: Props) {
     if (price && Object.keys(price).length > 0) {
       form.reset({
         dayType: price.day_type || "",
-        timeSlots: price.time_slots?.map((slot) => ({
-          start: slot.start || "",
-          end: slot.end || "",
-          prices: slot.prices?.map((price) => ({
-            roomType: price.room_type,
-            price: formatCurrency(price.price, false),
-          })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
-        })) || Array(3).fill(null).map(() => ({
-          start: "",
-          end: "",
-          prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
-        })),
+        timeSlots:
+          price.time_slots?.map((slot) => ({
+            start: slot.start || "",
+            end: slot.end || "",
+            prices:
+              slot.prices?.map((price) => ({
+                roomType: price.room_type,
+                price: formatCurrency(price.price, false),
+              })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
+          })) ||
+          Array(2)
+            .fill(null)
+            .map(() => ({
+              start: "",
+              end: "",
+              prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
+            })),
         effectiveDate: price.effective_date || "",
         endDate: price.end_date || undefined,
         note: price.note || undefined,

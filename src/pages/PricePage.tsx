@@ -18,10 +18,10 @@ function PricePage() {
   const [selectedPricing, setSelectedPricing] = useState<Price | null>(null);
 
   const { data, isLoading, refetch } = useGetPricingLists();
-
   const { mutate: deletePricing } = useDeletePricing();
 
   const columns: ColumnDef<Price>[] = [
+    // Cột checkbox để chọn hàng
     {
       id: "select",
       header: ({ table }) => (
@@ -44,82 +44,64 @@ function PricePage() {
       enableSorting: false,
       enableHiding: false,
     },
+    // Cột Day type
     {
       id: "day_type",
       header: "Day type",
       accessorKey: "day_type",
       enableMultiSort: false,
     },
+    // Cột Prices (chỉ hiển thị 1 cột thay vì 3 cột)
     {
       id: "prices",
       header: "Prices",
       enableMultiSort: false,
-      columns: [
-        {
-          header: "Small Room",
-          accessorKey: "small_room",
-          cell: ({ row }) => {
-            const prices = row.original.time_slots.map((slot) => {
-              const price = slot.prices.find((p) => p.room_type === "small");
-              return `${slot.start}-${slot.end}: ${formatCurrency(
-                price?.price || 0
-              )}`;
-            });
-            return (
-              <div className="flex flex-col gap-1">
-                {prices.map((price, index) => (
-                  <div key={index}>{price}</div>
-                ))}
-              </div>
-            );
-          },
-        },
-        {
-          header: "Medium Room",
-          accessorKey: "medium_room",
-          cell: ({ row }) => {
-            const prices = row.original.time_slots.map((slot) => {
-              const price = slot.prices.find((p) => p.room_type === "medium");
-              return `${slot.start}-${slot.end}: ${formatCurrency(
-                price?.price || 0
-              )}`;
-            });
-            return (
-              <div className="flex flex-col gap-1">
-                {prices.map((price, index) => (
-                  <div key={index}>{price}</div>
-                ))}
-              </div>
-            );
-          },
-        },
-        {
-          header: "Large Room",
-          accessorKey: "large_room",
-          cell: ({ row }) => {
-            const prices = row.original.time_slots.map((slot) => {
-              const price = slot.prices.find((p) => p.room_type === "large");
-              return `${slot.start}-${slot.end}: ${formatCurrency(
-                price?.price || 0
-              )}`;
-            });
-            return (
-              <div className="flex flex-col gap-1">
-                {prices.map((price, index) => (
-                  <div key={index}>{price}</div>
-                ))}
-              </div>
-            );
-          },
-        },
-      ],
+      cell: ({ row }) => {
+        const timeSlots = row.original.time_slots; // Mảng time_slots
+
+        return (
+          <table className="w-full text-sm border-collapse">
+            <thead>
+              <tr className="border-b">
+                <th className="p-1 text-left">Time</th>
+                <th className="p-1 text-left">Small</th>
+                <th className="p-1 text-left">Medium</th>
+                <th className="p-1 text-left">Large</th>
+              </tr>
+            </thead>
+            <tbody>
+              {timeSlots.map((slot, idx) => {
+                const smallPrice =
+                  slot.prices.find((p) => p.room_type === "small")?.price || 0;
+                const mediumPrice =
+                  slot.prices.find((p) => p.room_type === "medium")?.price || 0;
+                const largePrice =
+                  slot.prices.find((p) => p.room_type === "large")?.price || 0;
+
+                return (
+                  <tr key={idx} className="border-b last:border-0">
+                    <td className="p-1">
+                      {slot.start} - {slot.end}
+                    </td>
+                    <td className="p-1">{formatCurrency(smallPrice)}</td>
+                    <td className="p-1">{formatCurrency(mediumPrice)}</td>
+                    <td className="p-1">{formatCurrency(largePrice)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        );
+      },
     },
+    // Cột Note
     {
       id: "note",
       header: "Note",
       accessorKey: "note",
       enableMultiSort: false,
     },
+    // Cột hành động (Sửa/Xoá)
     {
       id: "actions",
       header: "",
@@ -145,10 +127,13 @@ function PricePage() {
 
   return (
     <div>
+      {/* Header */}
       <Header title="Pricing" subtitle="List of pricing" />
 
+      {/* Nút thêm giá mới (nếu cần) */}
       <UpsertPricingModal />
 
+      {/* Modal xóa giá */}
       <DeleteModal
         title="Delete pricing"
         description="Are you sure you want to delete this pricing?"
@@ -167,15 +152,17 @@ function PricePage() {
         }}
       />
 
-      <DataTable
-        rowKey="_id"
-        loading={isLoading}
-        data={data?.data.result || []}
-        columns={columns}
-        scroll={{
-          y: 750,
-        }}
-      />
+      {/* Bọc DataTable trong div overflow-x-auto để hỗ trợ cuộn ngang khi cần */}
+      <div className="overflow-x-auto">
+        <DataTable
+          rowKey="_id"
+          loading={isLoading}
+          data={data?.data.result || []}
+          columns={columns}
+          // Tuỳ chọn scroll nếu bạn muốn cố định chiều cao
+          scroll={{ y: 750 }}
+        />
+      </div>
     </div>
   );
 }

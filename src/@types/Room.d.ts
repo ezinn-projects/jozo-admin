@@ -1,4 +1,4 @@
-import { DayType, RoomStatus, RoomType } from "@/constants/enum";
+import { RoomStatus, RoomType } from "@/constants/enum";
 
 interface ITimeSlotPrice {
   timeSlot: string;
@@ -12,16 +12,13 @@ interface ITimeSlot {
 }
 
 interface IRoom {
-  _id: string;
+  _id?: ObjectId;
   roomName: string;
   roomType: RoomType;
-  maxCapacity: number;
-  status: DayType;
-  description: string;
-  images: string[];
-  prices: ITimeSlotPrice[];
-  createdAt: string;
-  updatedAt: string;
+  status: RoomStatus; // e.g., AVAILABLE, UNAVAILABLE
+  description?: string;
+  createdAt?: Date;
+  updatedAt?: Date;
 }
 
 interface IRoomSchedule {
@@ -30,6 +27,7 @@ interface IRoomSchedule {
   startTime: string;
   endTime: string | null;
   status: RoomStatus;
+  note?: string;
   createdAt: string;
   updatedAt: string;
   createdBy: string;
