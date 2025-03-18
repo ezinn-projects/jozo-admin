@@ -57,7 +57,7 @@ function UpsertRoomPage() {
 
   const { reset } = form;
 
-  const { data, isLoading } = useQuery({
+  const { data } = useQuery({
     queryKey: ["room", id],
     queryFn: () => roomApis.getRoomById(id),
     enabled: !!id,
