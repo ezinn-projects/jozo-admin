@@ -1,4 +1,3 @@
-// src/components/ProcessInUseModal.tsx
 import { IRoomSchedule } from "@/@types/Room";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import roomsScheduleApis from "@/apis/roomSchedule.api";
@@ -14,11 +13,17 @@ import {
 } from "@/components/ui/dialog";
 import { RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import React, { useState } from "react";
+import BillPreviewModal from "./BillPreviewModal";
+import { AxiosResponse } from "axios";
+// import { ApiResponse } from "@/@types/ApiResponse";
+import { IRoom } from "@/@types/Room";
+import { SNACK_OPTIONS } from "@/constants/options";
+import { DRINK_OPTIONS } from "@/constants/options";
+// import BillPreviewModal from "./BillPreviewModal";
 
-// Định nghĩa các prop cần thiết cho modal
 interface ProcessInUseModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -35,9 +40,21 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   onExtendSession,
 }) => {
   const [isFnbModalOpen, setIsFnbModalOpen] = useState(false);
+  const [isBillModalOpen, setIsBillModalOpen] = useState(false);
 
   const openFnbModal = () => setIsFnbModalOpen(true);
   const closeFnbModal = () => setIsFnbModalOpen(false);
+
+  const queryClient = useQueryClient();
+  const roomsData = queryClient.getQueryData<
+    AxiosResponse<HTTPResponse<IRoom[]>>
+  >(["rooms"]);
+
+  console.log("roomsData", roomsData);
+
+  const room = roomsData?.data.result?.find(
+    (room) => room._id === schedule.roomId
+  );
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
@@ -59,7 +76,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     select: (data) => data.data.result,
   });
 
-  // API hoàn thành phiên sử dụng
+  const handleOpenBillModal = () => {
+    // console.log("Attempting to open Bill Modal"); // Debug
+    setIsBillModalOpen(true);
+  };
+
   const handleCompleteSession = () => {
     const now = dayjs();
     const updateData: Partial<IRoomSchedule> = {
@@ -67,12 +88,15 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       status: RoomStatus.Finish,
       endTime: now.toISOString(),
     };
-
     mutate(updateData, { onSuccess: () => refetchSchedules?.() });
   };
 
   const handleExtendSession = () => {
     onExtendSession();
+  };
+
+  const closeBillModal = () => {
+    setIsBillModalOpen(false);
   };
 
   return (
@@ -88,18 +112,17 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             </DialogDescription>
           </DialogHeader>
 
-          {/* Hiển thị chi tiết đơn FNB nếu có dữ liệu */}
-          {data && data && (
+          {data && (
             <div className="mt-4">
               <h4 className="text-lg font-bold">FNB Order Details</h4>
               <p>
-                <strong>Room Schedule ID:</strong> {data.roomScheduleId}
+                <strong>Room:</strong> {room?.roomName}
               </p>
               <div className="mt-2">
                 <h5 className="font-semibold">Drinks:</h5>
                 <ul className="list-disc pl-5">
                   {data?.order?.drinks &&
-                    Object.entries(data?.order?.drinks)?.map(
+                    Object.entries(data.order.drinks).map(
                       ([drink, quantity]) => (
                         <li key={drink}>
                           {drink}: {quantity}
@@ -107,6 +130,15 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       )
                     )}
                 </ul>
+                {data?.order?.drinks && (
+                  <p className="mt-1 font-medium">
+                    <strong>Total Drinks:</strong>{" "}
+                    {Object.values(data.order.drinks).reduce(
+                      (sum: number, quantity: number) => sum + quantity,
+                      0
+                    )}
+                  </p>
+                )}
               </div>
               <div className="mt-2">
                 <h5 className="font-semibold">Snacks:</h5>
@@ -120,39 +152,91 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       )
                     )}
                 </ul>
+                {data?.order?.snacks && (
+                  <p className="mt-1 font-medium">
+                    <strong>Total Snacks:</strong>{" "}
+                    {Object.values(data.order.snacks).reduce(
+                      (sum: number, quantity: number) => sum + quantity,
+                      0
+                    )}
+                  </p>
+                )}
               </div>
               <div className="mt-2">
+                <p className="text-lg font-bold">
+                  <strong>Total Items:</strong>{" "}
+                  {(data?.order?.drinks
+                    ? Object.values(data.order.drinks).reduce(
+                        (sum: number, quantity: number) => sum + quantity,
+                        0
+                      )
+                    : 0) +
+                    (data?.order?.snacks
+                      ? Object.values(data.order.snacks).reduce(
+                          (sum: number, quantity: number) => sum + quantity,
+                          0
+                        )
+                      : 0)}
+                </p>
+                <p className="text-lg font-bold text-green-600">
+                  <strong>Total Price:</strong>{" "}
+                  {(() => {
+                    let totalPrice = 0;
+
+                    // Calculate drinks total
+                    if (data?.order?.drinks) {
+                      totalPrice += Object.entries(data.order.drinks).reduce(
+                        (sum, [drinkId, quantity]) => {
+                          const drink = DRINK_OPTIONS.find(
+                            (d) => d.id === drinkId
+                          );
+                          return sum + (drink?.price || 0) * quantity;
+                        },
+                        0
+                      );
+                    }
+
+                    // Calculate snacks total
+                    if (data?.order?.snacks) {
+                      totalPrice += Object.entries(data.order.snacks).reduce(
+                        (sum, [snackId, quantity]) => {
+                          const snack = SNACK_OPTIONS.find(
+                            (s) => s.id === snackId
+                          );
+                          return sum + (snack?.price || 0) * quantity;
+                        },
+                        0
+                      );
+                    }
+
+                    return `${totalPrice.toLocaleString()} VND`;
+                  })()}
+                </p>
                 <p>
                   <strong>Created At:</strong>{" "}
-                  {dayjs(data?.createdAt).format("HH:mm DD-MM-YYYY")}
+                  {dayjs(data.createdAt).format("HH:mm DD-MM-YYYY")}
                 </p>
                 <p>
                   <strong>Updated At:</strong>{" "}
-                  {dayjs(data?.updatedAt).format("HH:mm DD-MM-YYYY")}
+                  {dayjs(data.updatedAt).format("HH:mm DD-MM-YYYY")}
                 </p>
               </div>
             </div>
           )}
 
           <div className="flex gap-4 mt-4">
-            {/* Nút để mở modal F&B */}
             <Button variant="outline" onClick={openFnbModal}>
               Open F&B Modal
             </Button>
-            <Button
-              variant="destructive"
-              onClick={handleCompleteSession}
-              disabled={isPending}
-              loading={isPending}
-            >
-              End Session
+            <Button onClick={handleExtendSession} disabled={isPending}>
+              Extend Session
             </Button>
             <Button
-              onClick={handleExtendSession}
+              variant="destructive"
+              onClick={handleOpenBillModal}
               disabled={isPending}
-              loading={isPending}
             >
-              Extend Session
+              End Session
             </Button>
           </div>
           <DialogFooter className="mt-4">
@@ -163,12 +247,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         </DialogContent>
       </Dialog>
 
-      {/* Render FoodDrinkModal với trạng thái điều khiển */}
       <FoodDrinkModal
         refetch={refetch}
         isOpen={isFnbModalOpen}
         onClose={closeFnbModal}
         scheduleId={schedule._id}
+      />
+
+      <BillPreviewModal
+        isOpen={isBillModalOpen}
+        onClose={closeBillModal}
+        schedule={schedule}
+        onConfirmEnd={handleCompleteSession}
       />
     </>
   );

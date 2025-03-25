@@ -11,6 +11,7 @@ export interface ICreateFnbOrderRequestBody {
     drinks: Record<string, number>;
     snacks: Record<string, number>;
   };
+  createdBy: string;
 }
 
 const fnbOrderApis = {

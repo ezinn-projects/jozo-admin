@@ -9,9 +9,14 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { toast } from "@/hooks/use-toast";
+import { IFnbOrder } from "@/@types/FnbOrder";
+import { AxiosResponse } from "axios";
+import { useEffect } from "react";
+import useAuth from "@/hooks/useAuth";
+import { DRINK_OPTIONS, SNACK_OPTIONS } from "@/constants/options";
 
 interface FoodDrinkModalProps {
   isOpen: boolean;
@@ -20,19 +25,19 @@ interface FoodDrinkModalProps {
   refetch: VoidFunction;
 }
 
-// Danh sách đồ uống
-const drinks = [
-  { id: "water", name: "Nước", price: 10000 },
-  { id: "soda", name: "Nước ngọt", price: 15000 },
-  { id: "tea", name: "Nước trà", price: 15000 },
-];
+// // Danh sách đồ uống
+// const drinks = [
+//   { id: "water", name: "Nước", price: 10000 },
+//   { id: "soda", name: "Nước ngọt", price: 15000 },
+//   { id: "tea", name: "Nước trà", price: 15000 },
+// ];
 
-// Danh sách snack
-const snacks = [
-  { id: "regular", name: "Snack thường", price: 10000 },
-  { id: "potato", name: "Snack khoai tây", price: 16000 },
-  { id: "medium", name: "Snack tầm trung", price: 12000 },
-];
+// // Danh sách snack
+// const snacks = [
+//   { id: "regular", name: "Snack thường", price: 10000 },
+//   { id: "potato", name: "Snack khoai tây", price: 16000 },
+//   { id: "medium", name: "Snack tầm trung", price: 12000 },
+// ];
 
 const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
   isOpen,
@@ -49,6 +54,24 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
     snacks: { regular: 0, potato: 0, medium: 0 },
   });
 
+  const queryClient = useQueryClient();
+
+  const data = queryClient.getQueryData<AxiosResponse<HTTPResponse<IFnbOrder>>>(
+    ["fnbOrderByScheduleId", scheduleId]
+  );
+
+  console.log("data", data);
+
+  const { user } = useAuth();
+
+  useEffect(() => {
+    if (data) {
+      const orderData = data.data.result?.order as IFnbOrder["order"];
+
+      setOrder(orderData);
+    }
+  }, [data]);
+
   const { mutate, isPending } = useMutation({
     mutationFn: fnbOrderApis.createFnbOrder,
     onSuccess: () => {
@@ -58,6 +81,10 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
       });
       onClose();
       refetch();
+      setOrder({
+        drinks: { water: 0, soda: 0, tea: 0 },
+        snacks: { regular: 0, potato: 0, medium: 0 },
+      });
     },
   });
 
@@ -66,25 +93,33 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
     id: string,
     value: number
   ) => {
-    setOrder((prev) => ({
-      ...prev,
-      [type]: {
-        ...prev[type],
-        [id]: value,
-      },
-    }));
+    setOrder((prev) => {
+      // Create a default structure if prev or prev[type] is undefined
+      const updatedPrev = prev || { drinks: {}, snacks: {} };
+      const updatedType = updatedPrev[type] || {};
+
+      return {
+        ...updatedPrev,
+        [type]: {
+          ...updatedType,
+          [id]: value,
+        },
+      };
+    });
   };
 
   const totalPrice = () => {
-    const totalDrinks = drinks.reduce(
-      (sum, drink) => sum + (order.drinks[drink.id] || 0) * drink.price,
-      0
-    );
-    const totalSnacks = snacks.reduce(
-      (sum, snack) => sum + (order.snacks[snack.id] || 0) * snack.price,
-      0
-    );
-    return totalDrinks + totalSnacks;
+    const totalDrinks =
+      DRINK_OPTIONS?.reduce(
+        (sum, drink) => sum + (order?.drinks?.[drink.id] || 0) * drink.price,
+        0
+      ) || 0;
+    const totalSnacks =
+      SNACK_OPTIONS?.reduce(
+        (sum, snack) => sum + (order?.snacks?.[snack.id] || 0) * snack.price,
+        0
+      ) || 0;
+    return totalDrinks + totalSnacks || 0;
   };
 
   const handleSubmit = () => {
@@ -98,11 +133,20 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           Object.entries(order.snacks).filter(([, quantity]) => quantity > 0)
         ),
       },
+      createdBy: user?.name || "",
     });
   };
 
+  const handleClose = () => {
+    setOrder({
+      drinks: { water: 0, soda: 0, tea: 0 },
+      snacks: { regular: 0, potato: 0, medium: 0 },
+    });
+    onClose();
+  };
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Chọn Đồ Ăn & Đồ Uống</DialogTitle>
@@ -117,7 +161,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           </TabsList>
           <TabsContent value="drinks">
             <div className="space-y-4">
-              {drinks.map((item) => (
+              {DRINK_OPTIONS.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between"
@@ -131,7 +175,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
                   <input
                     type="number"
                     min={0}
-                    value={order.drinks[item.id]}
+                    value={order?.drinks?.[item.id] || 0}
                     onChange={(e) =>
                       handleQuantityChange(
                         "drinks",
@@ -147,7 +191,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           </TabsContent>
           <TabsContent value="snacks">
             <div className="space-y-4">
-              {snacks.map((item) => (
+              {SNACK_OPTIONS.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between"
@@ -161,7 +205,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
                   <input
                     type="number"
                     min={0}
-                    value={order.snacks[item.id]}
+                    value={order?.snacks?.[item.id] || 0}
                     onChange={(e) =>
                       handleQuantityChange(
                         "snacks",
@@ -185,7 +229,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           </Button>
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} loading={isPending}>
+          <Button variant="outline" onClick={handleClose} loading={isPending}>
             Đóng
           </Button>
         </DialogFooter>

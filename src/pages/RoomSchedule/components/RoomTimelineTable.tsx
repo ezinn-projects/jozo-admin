@@ -52,6 +52,7 @@ type Modal =
   | "inUse"
   | "extend"
   | "foodDrink"
+  | "bill"
   | null;
 
 const RoomTimelineTable: React.FC = () => {
@@ -506,7 +507,7 @@ const RoomTimelineTable: React.FC = () => {
           isOpen={true}
           onClose={closeModal}
           refetchSchedules={refetch}
-          scheduleId={lockedSchedule._id}
+          schedule={lockedSchedule}
         />
       )}
       {modal === "booked" && bookedSchedule && (

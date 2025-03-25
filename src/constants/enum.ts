@@ -54,3 +54,23 @@ export enum RoomStatus {
   Cancelled = "cancelled",
   Finish = "finish",
 }
+
+/**
+ * Enum for payment methods.
+ * @enum {string}
+ * @property {string} Cash - Cash payment
+ * @property {string} BankTransfer - Bank transfer payment
+ * @property {string} Momo - Momo e-wallet payment
+ * @property {string} ZaloPay - ZaloPay e-wallet payment
+ */
+export enum PaymentMethod {
+  Cash = "cash",
+  BankTransfer = "bank transfer",
+  Momo = "momo",
+  ZaloPay = "zalo pay",
+}
+
+export enum FoodDrinkType {
+  Drink = "drink",
+  Snack = "snack",
+}

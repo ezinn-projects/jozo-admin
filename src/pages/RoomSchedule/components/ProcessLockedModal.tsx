@@ -16,30 +16,32 @@ import { RoomStatus } from "@/constants/enum";
 import { AxiosError } from "axios";
 import { useMutation } from "@tanstack/react-query";
 import FoodDrinkModal from "@/components/modules/RoomSchedule/FoodDrinkModal";
+import ExtendSessionModal from "./ExtendSessionModal";
 // Giả sử bạn đã import FoodDrinkModal từ vị trí tương ứng
 // import FoodDrinkModal from "@/components/modals/FoodDrinkModal";
 
 interface ProcessLockedModalProps {
   isOpen: boolean;
   onClose: () => void;
-  scheduleId: string;
+  schedule: IRoomSchedule;
   refetchSchedules: () => void;
 }
 
 const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
   isOpen,
   onClose,
-  scheduleId,
+  schedule,
   refetchSchedules,
 }) => {
   const [isFnbModalOpen, setIsFnbModalOpen] = useState(false);
-
+  const [isExtendSessionModalOpen, setIsExtendSessionModalOpen] =
+    useState(false);
   const openFnbModal = () => setIsFnbModalOpen(true);
   const closeFnbModal = () => setIsFnbModalOpen(false);
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
-      roomScheduleApis.updateSchedule(scheduleId, payload),
+      roomScheduleApis.updateSchedule(schedule._id, payload),
     onSuccess: (_, variables) => {
       refetchSchedules();
       onClose();
@@ -73,7 +75,15 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
     mutate(updateData);
   };
 
-  const refetch = () => {};
+  const handleOpenExtendSessionModal = () => {
+    setIsExtendSessionModalOpen(true);
+  };
+
+  const handleCloseExtendSessionModal = () => {
+    setIsExtendSessionModalOpen(false);
+    onClose();
+    refetchSchedules();
+  };
 
   return (
     <>
@@ -92,7 +102,7 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
                 Cancelled
               </Button>
               <Button
-                onClick={() => handleUpdate(RoomStatus.InUse)}
+                onClick={handleOpenExtendSessionModal}
                 loading={isPending}
               >
                 In use
@@ -111,8 +121,15 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
       <FoodDrinkModal
         isOpen={isFnbModalOpen}
         onClose={closeFnbModal}
-        scheduleId={scheduleId}
-        refetch={refetch}
+        scheduleId={schedule._id}
+        refetch={refetchSchedules}
+      />
+
+      <ExtendSessionModal
+        isOpen={isExtendSessionModalOpen}
+        onClose={handleCloseExtendSessionModal}
+        schedule={schedule}
+        refetchSchedules={refetchSchedules}
       />
     </>
   );

@@ -10,6 +10,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
@@ -29,7 +30,9 @@ const ExtendSessionModal: React.FC<ExtendSessionModalProps> = ({
   refetchSchedules,
 }) => {
   // Các khoảng thời gian gia hạn tính theo phút
-  const extensionOptions = [15, 30, 45, 60];
+  const extensionOptions = [
+    15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240,
+  ];
   const [selectedExtension, setSelectedExtension] = useState<number>(15);
 
   const { mutate, isPending } = useMutation({
@@ -43,6 +46,7 @@ const ExtendSessionModal: React.FC<ExtendSessionModalProps> = ({
       // Gọi API cập nhật với dữ liệu mới (chỉ cập nhật endTime)
       return roomsScheduleApis.updateSchedule(schedule._id, {
         endTime: newEndTime.toISOString(),
+        status: RoomStatus.InUse,
       });
     },
     onSuccess: () => {
@@ -69,7 +73,7 @@ const ExtendSessionModal: React.FC<ExtendSessionModalProps> = ({
             be extended by the selected duration.
           </DialogDescription>
         </DialogHeader>
-        <div className="flex gap-4 mt-4">
+        <div className="flex gap-4 mt-4 flex-wrap">
           {extensionOptions.map((minutes) => (
             <Button
               key={minutes}
