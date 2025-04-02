@@ -13,7 +13,10 @@ const roomTypeApis = {
       data
     ),
   updateRoomType: (data: FormData, id: string) =>
-    http.patch(`${ROOM_TYPE_CONTROLLER}/${id}`, data),
+    http.putForm<HTTPResponse<IRoomType>>(
+      `${ROOM_TYPE_CONTROLLER}/${id}`,
+      data
+    ),
   deleteRoomType: ({ _id }: { _id: string }) =>
     http.delete(`${ROOM_TYPE_CONTROLLER}/${_id}`),
 };

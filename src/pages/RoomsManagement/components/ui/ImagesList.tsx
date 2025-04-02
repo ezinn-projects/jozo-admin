@@ -22,6 +22,8 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
 
   const imagePickerRef = useRef<{ openFilePicker: () => void }>(null);
 
+  console.log("imagesList", imagesList);
+
   useEffect(() => {
     setImagesList(images);
   }, [images]);
@@ -85,64 +87,65 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
 
   return (
     <div className="flex flex-wrap gap-2">
-      {imagesList?.map((image, index) => (
-        <Popover
-          key={index}
-          open={openPopoverIndex === index}
-          onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}
-        >
-          <PopoverTrigger asChild>
-            <div
-              className={cn(
-                "relative w-20 h-20 rounded-md overflow-hidden",
-                mainImageIndex === index ? "main-image" : "",
-                openPopoverIndex === index ? "selected-image" : ""
-              )}
-            >
-              <img
-                src={image}
-                alt="room"
-                className="w-full h-full object-cover"
-              />
-            </div>
-          </PopoverTrigger>
+      {imagesList?.length > 0 &&
+        imagesList?.map((image, index) => (
+          <Popover
+            key={index}
+            open={openPopoverIndex === index}
+            onOpenChange={(open) => setOpenPopoverIndex(open ? index : null)}
+          >
+            <PopoverTrigger asChild>
+              <div
+                className={cn(
+                  "relative w-20 h-20 rounded-md overflow-hidden",
+                  mainImageIndex === index ? "main-image" : "",
+                  openPopoverIndex === index ? "selected-image" : ""
+                )}
+              >
+                <img
+                  src={image}
+                  alt="room"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </PopoverTrigger>
 
-          <PopoverContent className="w-40">
-            <ul className="flex flex-col gap-2">
-              <li
-                className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
-                onClick={() => handleSetMainImage(index)}
-              >
-                <p>Set as Main</p>
-              </li>
-              <li
-                className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
-                onClick={() => imagePickerRef.current?.openFilePicker()}
-              >
-                <p>Change</p>
-              </li>
-              <li className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer">
-                <Dialog>
-                  <DialogTrigger>Preview</DialogTrigger>
-                  <DialogContent className="sm:max-w-[90vw] h-[90vh] !p-0 !gap-0 border-none">
-                    <img
-                      src={image}
-                      alt="room"
-                      className="w-full h-full object-cover rounded-md"
-                    />
-                  </DialogContent>
-                </Dialog>
-              </li>
-              <li
-                className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
-                onClick={() => handleRemoveImage(index)}
-              >
-                <p>Remove</p>
-              </li>
-            </ul>
-          </PopoverContent>
-        </Popover>
-      ))}
+            <PopoverContent className="w-40">
+              <ul className="flex flex-col gap-2">
+                <li
+                  className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
+                  onClick={() => handleSetMainImage(index)}
+                >
+                  <p>Set as Main</p>
+                </li>
+                <li
+                  className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
+                  onClick={() => imagePickerRef.current?.openFilePicker()}
+                >
+                  <p>Change</p>
+                </li>
+                <li className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer">
+                  <Dialog>
+                    <DialogTrigger>Preview</DialogTrigger>
+                    <DialogContent className="sm:max-w-[90vw] h-[90vh] !p-0 !gap-0 border-none">
+                      <img
+                        src={image}
+                        alt="room"
+                        className="w-full h-full object-cover rounded-md"
+                      />
+                    </DialogContent>
+                  </Dialog>
+                </li>
+                <li
+                  className="hover:underline hover:underline-offset-4 transition-all duration-300 hover:cursor-pointer"
+                  onClick={() => handleRemoveImage(index)}
+                >
+                  <p>Remove</p>
+                </li>
+              </ul>
+            </PopoverContent>
+          </Popover>
+        ))}
 
       {max === imagesList.length ? null : (
         <ImagePicker onChange={handleImageChange} ref={imagePickerRef} />

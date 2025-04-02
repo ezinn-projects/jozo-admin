@@ -136,15 +136,31 @@ function UpsertRoomTypePage() {
       formData.append("area", values.area + "");
       formData.append("description", values.description || "");
 
-      // Chỉ xử lý các ảnh mới (không phải URL từ server)
+      // Separate existing and new images
+      const existingImages = values.images.filter((url) =>
+        url.startsWith("http")
+      );
       const newImages = values.images.filter((url) => !url.startsWith("http"));
 
-      for (const blobUrl of newImages) {
-        const response = await fetch(blobUrl);
-        const blob = await response.blob();
-        const fileName = blobUrl.split("/").pop() || `image-${Date.now()}.jpg`;
-        const file = new File([blob], fileName, { type: blob.type });
-        formData.append("images", file);
+      // Add existing images as JSON string
+      if (existingImages.length > 0) {
+        formData.append("existingImages", JSON.stringify(existingImages));
+      }
+
+      // Process and add new images
+      if (newImages.length > 0) {
+        for (const blobUrl of newImages) {
+          const response = await fetch(blobUrl);
+          if (!response.ok)
+            throw new Error(`Failed to fetch image: ${blobUrl}`);
+
+          const blob = await response.blob();
+          const fileName = `image-${Date.now()}-${Math.random()
+            .toString(36)
+            .substring(7)}.jpg`;
+          const file = new File([blob], fileName, { type: "image/jpeg" });
+          formData.append("images", file);
+        }
       }
 
       if (id) {
@@ -153,7 +169,12 @@ function UpsertRoomTypePage() {
         createRoomType(formData);
       }
     } catch (error) {
-      console.error(error);
+      console.error("Error submitting form:", error);
+      toast({
+        title: "Error",
+        description: "Failed to process images. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
