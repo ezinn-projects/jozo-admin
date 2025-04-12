@@ -22,6 +22,11 @@ const PATHS = {
   ROOM_TYPES_LISTS: "/room-types",
   ROOM_TYPES_NEW: "/room-types/new",
   ROOM_TYPES_EDIT: "/room-types/:id/edit",
+
+  // fnb management
+  FNB: "/fnb",
+  FNB_NEW: "/fnb/new",
+  FNB_EDIT: "/fnb/:id/edit",
 } as const;
 
 export default PATHS;

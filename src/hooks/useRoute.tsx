@@ -29,6 +29,7 @@ const RoomTypesListPage = lazy(
 const UpsertRoomTypePage = lazy(
   () => import("@/pages/RoomTypes/UpsertRoomTypePage")
 );
+const FnBPage = lazy(() => import("@/pages/FnB"));
 
 function useRoute() {
   return (
@@ -67,6 +68,7 @@ function useRoute() {
                 </Route>
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />
+                <Route path={PATHS.FNB} element={<FnBPage />} />
               </Route>
 
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>

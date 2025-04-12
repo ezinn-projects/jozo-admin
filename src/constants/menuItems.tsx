@@ -1,4 +1,12 @@
-import { Calendar, Settings, Home, BedDouble } from "lucide-react";
+import {
+  Calendar,
+  Settings,
+  Home,
+  BedDouble,
+  DoorOpenIcon,
+  Settings2,
+  AppleIcon,
+} from "lucide-react";
 import PATHS from "./paths";
 
 export type MenuItem = {
@@ -18,12 +26,12 @@ const MENU_ITEMS: MenuItem[] = [
   {
     title: "Rooms management",
     url: PATHS.ROOMS,
-    icon: BedDouble,
+    icon: DoorOpenIcon,
     subItems: [], // No sub-items for Rooms management
   },
   {
     title: "Gerenral management",
-    icon: BedDouble,
+    icon: Settings2,
     subItems: [
       {
         title: "Room Types",
@@ -34,6 +42,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Pricing",
         url: PATHS.PRICE,
         icon: BedDouble,
+      },
+      // menu fnb
+      {
+        title: "Food & Beverage",
+        url: PATHS.FNB,
+        icon: AppleIcon,
       },
     ],
   },
