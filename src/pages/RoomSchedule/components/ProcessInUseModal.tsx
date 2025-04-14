@@ -14,14 +14,13 @@ import {
 import { RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { AxiosResponse } from "axios";
 import dayjs from "dayjs";
 import React, { useState } from "react";
 import BillPreviewModal from "./BillPreviewModal";
-import { AxiosResponse } from "axios";
 // import { ApiResponse } from "@/@types/ApiResponse";
 import { IRoom } from "@/@types/Room";
-import { SNACK_OPTIONS } from "@/constants/options";
-import { DRINK_OPTIONS } from "@/constants/options";
+import { useGetAllMenus } from "@/hooks/use-fnb-menu";
 // import BillPreviewModal from "./BillPreviewModal";
 
 interface ProcessInUseModalProps {
@@ -41,7 +40,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 }) => {
   const [isFnbModalOpen, setIsFnbModalOpen] = useState(false);
   const [isBillModalOpen, setIsBillModalOpen] = useState(false);
-
+  const { data: menus } = useGetAllMenus();
   const openFnbModal = () => setIsFnbModalOpen(true);
   const closeFnbModal = () => setIsFnbModalOpen(false);
 
@@ -85,7 +84,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     const now = dayjs();
     const updateData: Partial<IRoomSchedule> = {
       ...schedule,
-      status: RoomStatus.Finish,
+      status: RoomStatus.Finished,
       endTime: now.toISOString(),
     };
     mutate(updateData, { onSuccess: () => refetchSchedules?.() });
@@ -145,11 +144,16 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 <ul className="list-disc pl-5">
                   {data?.order?.snacks &&
                     Object.entries(data.order.snacks).map(
-                      ([snack, quantity]) => (
-                        <li key={snack}>
-                          {snack}: {quantity}
-                        </li>
-                      )
+                      ([snackId, quantity]) => {
+                        const snackItem = menus?.find(
+                          (menu) => menu._id === snackId
+                        );
+                        return (
+                          <li key={snackId}>
+                            {snackItem?.name || snackId}: {quantity}
+                          </li>
+                        );
+                      }
                     )}
                 </ul>
                 {data?.order?.snacks && (
@@ -187,23 +191,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     if (data?.order?.drinks) {
                       totalPrice += Object.entries(data.order.drinks).reduce(
                         (sum, [drinkId, quantity]) => {
-                          const drink = DRINK_OPTIONS.find(
-                            (d) => d.id === drinkId
+                          const drinkItem = menus?.find(
+                            (menu) => menu._id === drinkId
                           );
-                          return sum + (drink?.price || 0) * quantity;
+                          return (
+                            sum +
+                            (Number(drinkItem?.price) || 0) * Number(quantity)
+                          );
                         },
+
                         0
                       );
                     }
 
-                    // Calculate snacks total
+                    // Calculate snacks total using menus from useGetAllMenus
                     if (data?.order?.snacks) {
                       totalPrice += Object.entries(data.order.snacks).reduce(
                         (sum, [snackId, quantity]) => {
-                          const snack = SNACK_OPTIONS.find(
-                            (s) => s.id === snackId
+                          const snackItem = menus?.find(
+                            (menu) => menu._id === snackId
                           );
-                          return sum + (snack?.price || 0) * quantity;
+                          return (
+                            sum +
+                            (Number(snackItem?.price) || 0) * Number(quantity)
+                          );
                         },
                         0
                       );

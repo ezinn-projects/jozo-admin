@@ -1,8 +1,7 @@
-import { ColumnDef } from "@tanstack/react-table";
-import { Button } from "@/components/ui/button";
-import { Pencil, Trash2 } from "lucide-react";
 import { FnbMenu } from "@/@types/FnBMenu";
-import { formatCurrency } from "@/utils";
+import { Button } from "@/components/ui/button";
+import { ColumnDef } from "@tanstack/react-table";
+import { Pencil, Trash2 } from "lucide-react";
 
 interface ColumnActions {
   onEdit: (menu: FnbMenu) => void;
@@ -14,13 +13,33 @@ export const createColumns = ({
   onDelete,
 }: ColumnActions): ColumnDef<FnbMenu>[] => [
   {
+    accessorKey: "image",
+    header: "Image",
+    cell: ({ row }) => {
+      const image = row.getValue("image") as string;
+      return image ? (
+        <div className="relative w-16 h-16">
+          <img
+            src={image}
+            alt={row.getValue("name")}
+            className="object-cover w-full h-full rounded-md"
+          />
+        </div>
+      ) : (
+        <div className="w-16 h-16 bg-muted rounded-md flex items-center justify-center">
+          No image
+        </div>
+      );
+    },
+  },
+  {
     accessorKey: "name",
     header: "Name",
   },
   {
     accessorKey: "price",
     header: "Price",
-    cell: ({ row }) => formatCurrency(row.getValue("price")),
+    cell: ({ row }) => row.getValue("price"),
   },
   {
     accessorKey: "category",
@@ -34,6 +53,8 @@ export const createColumns = ({
     id: "actions",
     cell: ({ row }) => {
       const menu = row.original;
+
+      console.log("menu", menu);
 
       return (
         <div className="flex items-center justify-center gap-2">

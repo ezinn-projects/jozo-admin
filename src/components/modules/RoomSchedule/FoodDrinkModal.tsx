@@ -17,6 +17,7 @@ import { AxiosResponse } from "axios";
 import { useEffect } from "react";
 import useAuth from "@/hooks/useAuth";
 import { DRINK_OPTIONS, SNACK_OPTIONS } from "@/constants/options";
+import { useGetAllMenus } from "@/hooks/use-fnb-menu";
 
 interface FoodDrinkModalProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
     drinks: { water: 0, soda: 0, tea: 0 },
     snacks: { regular: 0, potato: 0, medium: 0 },
   });
+  const { data: menus } = useGetAllMenus();
 
   const queryClient = useQueryClient();
 
@@ -191,12 +193,17 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           </TabsContent>
           <TabsContent value="snacks">
             <div className="space-y-4">
-              {SNACK_OPTIONS.map((item) => (
+              {menus?.map((item) => (
                 <div
-                  key={item.id}
+                  key={item._id}
                   className="flex items-center justify-between"
                 >
-                  <div>
+                  <div className="flex items-center gap-2">
+                    <img
+                      src={item.image}
+                      alt={item.name}
+                      className="w-16 h-16 rounded-md"
+                    />
                     <p className="font-medium">{item.name}</p>
                     <p className="text-sm text-gray-500">
                       {item.price.toLocaleString()} VND
@@ -205,11 +212,11 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
                   <input
                     type="number"
                     min={0}
-                    value={order?.snacks?.[item.id] || 0}
+                    value={order?.snacks?.[item._id] || 0}
                     onChange={(e) =>
                       handleQuantityChange(
                         "snacks",
-                        item.id,
+                        item._id,
                         parseInt(e.target.value) || 0
                       )
                     }

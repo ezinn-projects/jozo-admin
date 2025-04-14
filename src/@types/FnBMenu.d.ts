@@ -1,7 +1,7 @@
 export interface FnbMenu {
   _id: string;
   name: string;
-  price: number;
+  price: string;
   description: string;
   image: string;
   category: string;
@@ -11,7 +11,7 @@ export interface FnbMenu {
 
 export interface FnbFormValues {
   name: string;
-  price: number;
+  price: string;
   description: string;
   category: string;
   image?: string;

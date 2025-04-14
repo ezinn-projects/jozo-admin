@@ -1,38 +1,22 @@
-import { useState } from "react";
+import { FnbMenu } from "@/@types/FnBMenu";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
 import { DataTable } from "@/components/ui/data-table";
-import { FnbMenu, FnbFormValues } from "@/@types/FnBMenu";
+import { useDeleteMenu, useGetAllMenus } from "@/hooks/use-fnb-menu";
+import { useToast } from "@/hooks/use-toast";
+import { Plus } from "lucide-react";
+import { useState } from "react";
 import { FnbModal } from "./components/FnbModal";
 import { createColumns } from "./components/columns";
-import { useToast } from "@/hooks/use-toast";
 
 const FnBPage = () => {
   const { toast } = useToast();
-  // Mock data
-  const [menus, setMenus] = useState<FnbMenu[]>([
-    {
-      _id: "1",
-      name: "Pizza",
-      price: 10.99,
-      description: "Delicious pizza with cheese and toppings",
-      image: "https://example.com/pizza.jpg",
-      category: "food",
-      createdAt: new Date(),
-    },
-    {
-      _id: "2",
-      name: "Coke",
-      price: 2.99,
-      description: "Refreshing cola drink",
-      image: "https://example.com/coke.jpg",
-      category: "beverage",
-      createdAt: new Date(),
-    },
-  ]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedMenu, setSelectedMenu] = useState<FnbMenu | null>(null);
+
+  const { data: menus, refetch } = useGetAllMenus();
+
+  const { mutate: deleteMenu } = useDeleteMenu();
 
   const handleCreate = () => {
     setSelectedMenu(null);
@@ -45,52 +29,23 @@ const FnBPage = () => {
   };
 
   const handleDelete = (id: string) => {
-    setMenus(menus.filter((menu) => menu._id !== id));
-    toast({
-      title: "Success",
-      description: "Menu item deleted successfully",
+    deleteMenu(id, {
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Menu item deleted successfully",
+        });
+        refetch();
+      },
     });
-  };
-
-  const handleSubmit = (values: FnbFormValues) => {
-    if (selectedMenu) {
-      // Edit
-      setMenus(
-        menus.map((menu) =>
-          menu._id === selectedMenu._id
-            ? {
-                ...menu,
-                ...values,
-                updatedAt: new Date(),
-              }
-            : menu
-        )
-      );
-      toast({
-        title: "Success",
-        description: "Menu item updated successfully",
-      });
-    } else {
-      // Create
-      const newMenu: FnbMenu = {
-        _id: Date.now().toString(),
-        ...values,
-        image: values.image || "",
-        createdAt: new Date(),
-      };
-      setMenus([...menus, newMenu]);
-      toast({
-        title: "Success",
-        description: "Menu item created successfully",
-      });
-    }
-    setIsModalOpen(false);
   };
 
   const columns = createColumns({
     onEdit: handleEdit,
     onDelete: handleDelete,
   });
+
+  console.log("selectedMenu", selectedMenu);
 
   return (
     <div className="container mx-auto py-10">
@@ -104,14 +59,12 @@ const FnBPage = () => {
         </Button>
       </div>
 
-      <DataTable columns={columns} data={menus} />
+      <DataTable columns={columns} data={menus || []} />
 
       <FnbModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
-        onSubmit={handleSubmit}
         initialValues={selectedMenu || undefined}
-        mode={selectedMenu ? "edit" : "create"}
       />
     </div>
   );

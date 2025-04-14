@@ -52,7 +52,7 @@ export enum RoomStatus {
   Maintenance = "maintenance",
   Locked = "locked",
   Cancelled = "cancelled",
-  Finish = "finish",
+  Finished = "finished",
 }
 
 /**

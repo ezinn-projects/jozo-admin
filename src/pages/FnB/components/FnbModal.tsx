@@ -1,4 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
+import { FnbFormValues, FnbMenu } from "@/@types/FnBMenu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -6,8 +7,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -16,114 +24,226 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-// import { FnbFormValues } from "../types";
-import { FnbFormValues } from "@/@types/FnBMenu";
-import { useState } from "react";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
 import { FNB_CATEGORIES, FNB_CATEGORY_LABELS } from "../constants";
+import { useCreateMenu, useUpdateMenu } from "@/hooks/use-fnb-menu";
+import ImagesList from "../../RoomsManagement/components/ui/ImagesList";
+import { useEffect, useState } from "react";
 
 interface FnbModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSubmit: (values: FnbFormValues) => void;
-  initialValues?: Partial<FnbFormValues>;
-  mode: "create" | "edit";
+  initialValues?: Partial<FnbMenu>;
 }
 
-export function FnbModal({
-  isOpen,
-  onClose,
-  onSubmit,
-  initialValues,
-  mode,
-}: FnbModalProps) {
-  const [values, setValues] = useState<FnbFormValues>({
-    name: initialValues?.name || "",
-    price: initialValues?.price || 0,
-    description: initialValues?.description || "",
-    category: initialValues?.category || FNB_CATEGORIES.SNACKS,
-    image: initialValues?.image,
+const formSchema = z.object({
+  name: z.string().min(1, "Name is required"),
+  price: z.string().min(1, "Price is required"),
+  description: z.string(),
+  category: z.string(),
+  image: z.string().optional(),
+});
+
+export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
+  const [files, setFiles] = useState<File[]>([]);
+
+  const form = useForm<z.infer<typeof formSchema>>({
+    resolver: zodResolver(formSchema),
+    defaultValues: {
+      name: initialValues?.name || "",
+      price: initialValues?.price || "1.000",
+      description: initialValues?.description || "",
+      category: initialValues?.category || FNB_CATEGORIES.SNACKS,
+      image: initialValues?.image || "",
+    },
   });
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    onSubmit(values);
+  const { mutate: createMenu, isPending: isCreating } = useCreateMenu();
+  const { mutate: updateMenu, isPending: isUpdating } = useUpdateMenu();
+
+  useEffect(() => {
+    if (initialValues) {
+      form.reset(initialValues);
+    }
+  }, [initialValues]);
+
+  const resetForm = () => {
+    form.reset({
+      name: "",
+      price: "1.000",
+      description: "",
+      category: FNB_CATEGORIES.SNACKS,
+      image: "",
+    });
+    setFiles([]);
+  };
+
+  const handleClose = () => {
+    resetForm();
+    onClose();
+  };
+
+  const onFormSubmit = async (data: z.infer<typeof formSchema>) => {
+    try {
+      const formData = new FormData();
+      formData.append("name", data.name);
+      formData.append("price", data.price.toString());
+      formData.append("description", data.description);
+      formData.append("category", data.category);
+
+      // Handle image upload
+      if (data.image) {
+        if (data.image.startsWith("http")) {
+          // For existing images from server
+          formData.append("existingImage", data.image);
+        } else if (files.length > 0) {
+          // For new image uploads
+          formData.append("file", files[0]);
+        }
+      }
+
+      if (!initialValues?._id) {
+        formData.append("createdAt", new Date().toISOString());
+        createMenu(formData as unknown as Omit<FnbMenu, "_id">, {
+          onSuccess: handleClose,
+        });
+      } else {
+        updateMenu(
+          {
+            id: initialValues._id,
+            menu: formData as unknown as Partial<FnbMenu>,
+          },
+          {
+            onSuccess: handleClose,
+          }
+        );
+      }
+    } catch (error) {
+      console.error("Error submitting form:", error);
+    }
+  };
+
+  const handleImagesChange = (images: string[], imageFiles: File[]) => {
+    setFiles(imageFiles);
+    form.setValue("image", images[0] || "");
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>
-            {mode === "create" ? "Create Menu Item" : "Edit Menu Item"}
+            {!initialValues?._id ? "Create Menu Item" : "Edit Menu Item"}
           </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid gap-2">
-            <Label htmlFor="name">Name</Label>
-            <Input
-              id="name"
-              value={values.name}
-              onChange={(e) =>
-                setValues((prev) => ({ ...prev, name: e.target.value }))
-              }
-              required
+        <Form {...form}>
+          <form
+            onSubmit={form.handleSubmit(onFormSubmit)}
+            className="grid gap-4 py-4"
+          >
+            <FormField
+              control={form.control}
+              name="name"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="name">Name</FormLabel>
+                  <FormControl>
+                    <Input id="name" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="price">Price</Label>
-            <Input
-              id="price"
-              type="number"
-              min={0}
-              step={0.01}
-              value={values.price}
-              onChange={(e) =>
-                setValues((prev) => ({
-                  ...prev,
-                  price: Number(e.target.value),
-                }))
-              }
-              required
+
+            <FormField
+              control={form.control}
+              name="price"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="price">Price</FormLabel>
+                  <FormControl>
+                    <Input
+                      id="price"
+                      currency
+                      type="number"
+                      {...field}
+                      onChange={(e) => field.onChange(e.target.value)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="category">Category</Label>
-            <Select
-              value={values.category}
-              onValueChange={(value) =>
-                setValues((prev) => ({ ...prev, category: value }))
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select a category" />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(FNB_CATEGORIES).map(([_, value]) => (
-                  <SelectItem key={value} value={value}>
-                    {FNB_CATEGORY_LABELS[value]}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="description">Description</Label>
-            <Textarea
-              id="description"
-              value={values.description}
-              onChange={(e) =>
-                setValues((prev) => ({ ...prev, description: e.target.value }))
-              }
-              required
+
+            <FormField
+              control={form.control}
+              name="category"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="category">Category</FormLabel>
+                  <Select value={field.value} onValueChange={field.onChange}>
+                    <FormControl>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a category" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {Object.entries(FNB_CATEGORIES).map(([_, value]) => (
+                        <SelectItem key={value} value={value}>
+                          {FNB_CATEGORY_LABELS[value]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
             />
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button type="button" variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button type="submit">Save</Button>
-          </div>
-        </form>
+
+            <FormField
+              control={form.control}
+              name="description"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel htmlFor="description">Description</FormLabel>
+                  <FormControl>
+                    <Textarea id="description" {...field} />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="image"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Image</FormLabel>
+                  <FormControl>
+                    <ImagesList
+                      images={field.value ? [field.value] : []}
+                      onChange={handleImagesChange}
+                      max={1}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <div className="flex justify-end gap-2">
+              <Button type="button" variant="outline" onClick={handleClose}>
+                Cancel
+              </Button>
+              <Button type="submit" loading={isCreating || isUpdating}>
+                Save
+              </Button>
+            </div>
+          </form>
+        </Form>
       </DialogContent>
     </Dialog>
   );
