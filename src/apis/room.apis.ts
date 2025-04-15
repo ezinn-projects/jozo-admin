@@ -41,6 +41,11 @@ const roomApis = {
       { data: payload }
     );
   },
+  resolveRequest: (roomIndex: string) => {
+    return http.post<HTTPResponse>(
+      `${ROOM_CONTROLLER}/${roomIndex}/resolve-request`
+    );
+  },
 };
 
 export default roomApis;

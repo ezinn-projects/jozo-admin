@@ -3,7 +3,7 @@ import dayjs, { Dayjs } from "dayjs";
 import { useQuery } from "@tanstack/react-query";
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
-import { useRoomSchedules } from "@/hooks/room-schedule";
+import { useResolveRequest, useRoomSchedules } from "@/hooks/room-schedule";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
 import ProcessLockedModal from "./ProcessLockedModal";
 import ProcessBookedModal from "./ProcessBookedModal";
@@ -19,9 +19,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, CircleXIcon } from "lucide-react";
+import { CalendarIcon, CircleXIcon, BellIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import ProcessInUseModal from "./ProcessInUseModal";
+import { useSocket } from "@/hooks/useSocket";
+import { useToast } from "@/hooks/use-toast";
 
 const DAY_START_HOUR = 10;
 const DAY_END_HOUR = 24;
@@ -56,6 +58,8 @@ type Modal =
   | null;
 
 const RoomTimelineTable: React.FC = () => {
+  const { toast } = useToast();
+  const { joinRoom, leaveRoom, onNotification, offNotification } = useSocket();
   const [date, setDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } = useRoomSchedules(date);
   const {
@@ -95,6 +99,8 @@ const RoomTimelineTable: React.FC = () => {
   // State điều khiển auto-scroll
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  const { mutate: resolveRequest } = useResolveRequest();
 
   // Handler để tạm dừng auto-scroll khi người dùng scroll
   const handleScroll = () => {
@@ -148,6 +154,128 @@ const RoomTimelineTable: React.FC = () => {
     }
   }, [currentTime, markerLeft, isToday, autoScrollEnabled]);
 
+  const [notifications, setNotifications] = useState<{
+    [roomId: string]: { message: string; timestamp: number };
+  }>({});
+
+  const [blinkingRooms, setBlinkingRooms] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  // Text-to-speech function
+  const speak = async (text: string) => {
+    const response = await fetch(
+      "https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyDVFaMtyhuPevzta1LLP9b8Tg0GuzbulQE",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          input: { text },
+          voice: {
+            languageCode: "vi-VN",
+            name: "vi-VN-Wavenet-A", // giọng nam. Có thể dùng Wavenet-B, Standard-A,...
+            ssmlGender: "MALE",
+          },
+          audioConfig: {
+            audioEncoding: "MP3",
+            speakingRate: 1.0,
+            pitch: 0,
+          },
+        }),
+      }
+    );
+
+    const data = await response.json();
+    const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
+    audio.play();
+  };
+
+  // Socket connection and notification handling
+  useEffect(() => {
+    // Handle notifications
+    const handleNotification = (data: { roomId: string; message: string }) => {
+      console.log("data", data);
+      // Convert numeric roomId to actual room ID (subtract 1 because backend sends 1-based index)
+      const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
+
+      if (actualRoomId) {
+        setNotifications((prev) => ({
+          ...prev,
+          [actualRoomId]: {
+            message: data.message,
+            timestamp: Date.now(),
+          },
+        }));
+
+        // Start blinking for the room
+        setBlinkingRooms((prev) => ({
+          ...prev,
+          [actualRoomId]: true,
+        }));
+
+        // Stop blinking after 15 seconds
+        setTimeout(() => {
+          setBlinkingRooms((prev) => ({
+            ...prev,
+            [actualRoomId]: false,
+          }));
+        }, 15000);
+
+        const roomName = roomsData?.find(
+          (r) => r._id === actualRoomId
+        )?.roomName;
+        // Speak the notification
+        speak(`Phòng ${roomName} ${data.message}`);
+
+        // Show toast notification
+        toast({
+          title: "New Support Request",
+          description: `Room ${roomName}: ${data.message}`,
+        });
+      }
+    };
+
+    // Subscribe to notifications
+    onNotification(handleNotification);
+
+    // Join room channels for all rooms - using index as room ID (add 1 because backend expects 1-based index)
+    roomsData?.forEach((room, index) => {
+      joinRoom((index + 1).toString());
+    });
+
+    // Cleanup
+    return () => {
+      offNotification(handleNotification);
+      roomsData?.forEach((room, index) => {
+        leaveRoom((index + 1).toString());
+      });
+    };
+  }, [roomsData, toast, joinRoom, leaveRoom, onNotification, offNotification]);
+
+  // Clear old notifications (older than 5 minutes)
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setNotifications((prev) => {
+        const now = Date.now();
+        const filtered = Object.entries(prev).reduce(
+          (acc, [roomId, notification]) => {
+            if (now - notification.timestamp < 5 * 60 * 1000) {
+              // Keep notifications less than 5 minutes old
+              acc[roomId] = notification;
+            }
+            return acc;
+          },
+          {} as typeof prev
+        );
+        return filtered;
+      });
+    }, 60000); // Check every minute
+
+    return () => clearInterval(interval);
+  }, []);
+
   if (isLoading || loadingRooms) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
   if (roomError) return <div>Error: {roomError.message}</div>;
@@ -159,6 +287,11 @@ const RoomTimelineTable: React.FC = () => {
     if (foundRoom) {
       setSelectedRoom(foundRoom);
       setModal("create");
+      // Stop blinking when clicked
+      setBlinkingRooms((prev) => ({
+        ...prev,
+        [roomId]: false,
+      }));
     }
   };
 
@@ -240,6 +373,34 @@ const RoomTimelineTable: React.FC = () => {
     }
 
     return { left, width, bgColor };
+  };
+
+  const handleResolveRequest = (roomId: string) => {
+    const roomIndex =
+      roomsData?.findIndex((room) => room._id === roomId) || 0 + 1 + "";
+
+    resolveRequest(roomIndex.toString(), {
+      onSuccess: () => {
+        // Remove notification for this room
+        setNotifications((prev) => {
+          const newNotifications = { ...prev };
+          delete newNotifications[roomId];
+          return newNotifications;
+        });
+
+        toast({
+          title: "Success",
+          description: "Request resolved successfully",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Failed to resolve request",
+          variant: "destructive",
+        });
+      },
+    });
   };
 
   return (
@@ -352,18 +513,37 @@ const RoomTimelineTable: React.FC = () => {
           {/* Danh sách phòng */}
           {roomsData?.map((room) => {
             const roomSchedules = grouped[room._id] || [];
+            const hasNotification = notifications[room._id];
+            const isBlinking = blinkingRooms[room._id];
+
             return (
               <div
                 key={room._id}
                 className="flex border-b hover:bg-gray-50 w-full"
               >
-                <div className="w-[240px] p-2 border-r flex items-center justify-center sticky left-0 z-10 bg-white">
+                <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
                   <button
                     onClick={() => handleRoomClick(room._id)}
-                    className="text-blue-600 hover:underline"
+                    className={`text-blue-600 hover:underline ${
+                      isBlinking
+                        ? "animate-[blink_1s_ease-in-out_infinite]"
+                        : ""
+                    }`}
                   >
                     {room.roomName}
                   </button>
+                  {hasNotification && (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button onClick={() => handleResolveRequest(room._id)}>
+                          <BellIcon className="h-5 w-5 text-red-500 animate-bounce" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{hasNotification.message}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  )}
                 </div>
                 <div className="flex-1 h-12 relative">
                   {isToday && (

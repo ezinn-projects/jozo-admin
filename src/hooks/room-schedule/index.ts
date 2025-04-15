@@ -1,7 +1,8 @@
 // src/hooks/useRoomSchedules.ts
-import roomsScheduleApis from "@/apis/roomSchedule.api";
-import { useQuery } from "@tanstack/react-query";
 import { IRoomSchedule } from "@/@types/Room";
+import roomApis from "@/apis/room.apis";
+import roomsScheduleApis from "@/apis/roomSchedule.api";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 
 export const useRoomSchedules = (date: Dayjs = dayjs()) => {
@@ -30,5 +31,11 @@ export const useRoomSchedule = (scheduleId: string) => {
       }
       return response.data.result;
     },
+  });
+};
+
+export const useResolveRequest = () => {
+  return useMutation({
+    mutationFn: roomApis.resolveRequest,
   });
 };
