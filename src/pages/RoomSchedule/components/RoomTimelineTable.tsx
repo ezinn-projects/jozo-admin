@@ -248,7 +248,7 @@ const RoomTimelineTable: React.FC = () => {
     // Cleanup
     return () => {
       offNotification(handleNotification);
-      roomsData?.forEach((room, index) => {
+      roomsData?.forEach((_, index) => {
         leaveRoom((index + 1).toString());
       });
     };
