@@ -68,42 +68,11 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
         paymentMethod,
         actualEndTime: dayjs(endTime).toISOString(),
       }),
-    onSuccess: (response) => {
-      if (!response?.data) return;
-
-      // // Convert arraybuffer to blob
-      // const blob = new Blob([response.data], { type: "application/pdf" });
-      // const url = URL.createObjectURL(blob);
-
-      // // Create hidden iframe for printing
-      // const printFrame = document.createElement("iframe");
-      // printFrame.style.display = "none";
-      // printFrame.src = url;
-
-      // // Add to DOM
-      // document.body.appendChild(printFrame);
-
-      // // Wait for PDF to load
-      // printFrame.onload = () => {
-      //   try {
-      //     // Trigger print dialog
-      //     printFrame.contentWindow?.print();
-      //   } catch (error) {
-      //     console.error("Lỗi khi in:", error);
-      //   } finally {
-      //     // Cleanup
-      //     setTimeout(() => {
-      //       document.body.removeChild(printFrame);
-      //       window.URL.revokeObjectURL(url);
-      //     }, 30000);
-      //   }
-      // };
-
+    onSuccess: () => {
       toast({
         title: "Success",
         description: "Hóa đơn đã được in",
       });
-      onClose();
     },
     onError: (error) => {
       console.error("Lỗi khi tạo hóa đơn:", error);

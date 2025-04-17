@@ -4,6 +4,6 @@ export const FNB_CATEGORIES = {
 } as const;
 
 export const FNB_CATEGORY_LABELS = {
-  [FNB_CATEGORIES.SNACKS]: "Food",
-  [FNB_CATEGORIES.DRINKS]: "Beverage",
+  [FNB_CATEGORIES.SNACKS]: "Snack",
+  [FNB_CATEGORIES.DRINKS]: "Drink",
 } as const;

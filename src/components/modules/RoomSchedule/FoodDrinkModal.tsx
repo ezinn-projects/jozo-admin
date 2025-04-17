@@ -163,67 +163,76 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
           </TabsList>
           <TabsContent value="drinks">
             <div className="space-y-4">
-              {DRINK_OPTIONS.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.price.toLocaleString()} VND
-                    </p>
+              {menus
+                ?.filter((item) => item.category === "drinks")
+                ?.map((item) => (
+                  <div
+                    key={item._id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-md"
+                      />
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {item.price.toLocaleString()} VND
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      value={order?.drinks?.[item._id] || 0}
+                      onChange={(e) =>
+                        handleQuantityChange(
+                          "drinks",
+                          item._id,
+                          parseInt(e.target.value) || 0
+                        )
+                      }
+                      className="w-16 border rounded p-1 text-center"
+                    />
                   </div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={order?.drinks?.[item.id] || 0}
-                    onChange={(e) =>
-                      handleQuantityChange(
-                        "drinks",
-                        item.id,
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    className="w-16 border rounded p-1 text-center"
-                  />
-                </div>
-              ))}
+                ))}
             </div>
           </TabsContent>
           <TabsContent value="snacks">
             <div className="space-y-4">
-              {menus?.map((item) => (
-                <div
-                  key={item._id}
-                  className="flex items-center justify-between"
-                >
-                  <div className="flex items-center gap-2">
-                    <img
-                      src={item.image}
-                      alt={item.name}
-                      className="w-16 h-16 rounded-md"
+              {menus
+                ?.filter((item) => item.category === "snacks")
+                ?.map((item) => (
+                  <div
+                    key={item._id}
+                    className="flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-2">
+                      <img
+                        src={item.image}
+                        alt={item.name}
+                        className="w-16 h-16 rounded-md"
+                      />
+                      <p className="font-medium">{item.name}</p>
+                      <p className="text-sm text-gray-500">
+                        {item.price.toLocaleString()} VND
+                      </p>
+                    </div>
+                    <input
+                      type="number"
+                      min={0}
+                      value={order?.snacks?.[item._id] || 0}
+                      onChange={(e) =>
+                        handleQuantityChange(
+                          "snacks",
+                          item._id,
+                          parseInt(e.target.value) || 0
+                        )
+                      }
+                      className="w-16 border rounded p-1 text-center"
                     />
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-500">
-                      {item.price.toLocaleString()} VND
-                    </p>
                   </div>
-                  <input
-                    type="number"
-                    min={0}
-                    value={order?.snacks?.[item._id] || 0}
-                    onChange={(e) =>
-                      handleQuantityChange(
-                        "snacks",
-                        item._id,
-                        parseInt(e.target.value) || 0
-                      )
-                    }
-                    className="w-16 border rounded p-1 text-center"
-                  />
-                </div>
-              ))}
+                ))}
             </div>
           </TabsContent>
         </Tabs>
