@@ -27,6 +27,11 @@ const PATHS = {
   FNB: "/fnb",
   FNB_NEW: "/fnb/new",
   FNB_EDIT: "/fnb/:id/edit",
+
+  // promotion management
+  PROMOTION: "/promotion",
+  PROMOTION_NEW: "/promotion/new",
+  PROMOTION_EDIT: "/promotion/:id/edit",
 } as const;
 
 export default PATHS;
