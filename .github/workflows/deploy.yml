@@ -21,7 +21,7 @@ jobs:
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             echo "ENV_FILE=.env.production" >> $GITHUB_ENV
           else
-            echo "ENV_FILE=.env.development" >> $GITHUB_ENV
+            echo "ENV_FILE=.env.develop" >> $GITHUB_ENV
           fi
 
       # 3. Tạo file env từ secret (không commit file env vào repo)
@@ -30,7 +30,7 @@ jobs:
           if [ "${{ github.ref }}" == "refs/heads/main" ]; then
             echo "${{ secrets.ENV_PRODUCTION }}" > .env.production
           else
-            echo "${{ secrets.ENV_DEVELOPMENT }}" > .env.development
+            echo "${{ secrets.ENV_DEVELOPMENT }}" > .env.develop
           fi
 
       # 4. Set up Docker Buildx
@@ -77,8 +77,8 @@ jobs:
               echo "${{ secrets.ENV_PRODUCTION }}" > /tmp/.env.production
               ENV_FILE="/tmp/.env.production"
             else
-              echo "${{ secrets.ENV_DEVELOPMENT }}" > /tmp/.env.development
-              ENV_FILE="/tmp/.env.development"
+              echo "${{ secrets.ENV_DEVELOPMENT }}" > /tmp/.env.develop
+              ENV_FILE="/tmp/.env.develop"
             fi
 
             # Pull image mới, dừng container cũ và chạy container mới với --env-file
@@ -88,5 +88,5 @@ jobs:
             docker run -d \
               --name jozo-admin \
               --env-file $ENV_FILE \
-              -p 3002:3002 \
+              -p 3002:80 \
               ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}

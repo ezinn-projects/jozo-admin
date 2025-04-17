@@ -1,23 +1,38 @@
-# Use Node.js 20 (latest LTS version) as the base image
-FROM node:20
+# Build stage
+FROM node:20 as build
 
-# Set the working directory inside the container
+# Set the working directory
 WORKDIR /app
 
-# Copy package.json and package-lock.json into the container
+# Copy package files
 COPY package*.json ./
 
-# Install dependencies (including devDependencies for Vite)
+# Install dependencies
 RUN npm install --include=dev
 
-# Copy all the source code into the container
+# Copy source code
 COPY . .
 
-# Build the application
-RUN npm run build --verbose
+# Build argument for environment file
+ARG ENV_FILE=.env.develop
 
-# Expose the new port (adjust if you are using a different port)
-EXPOSE 3002
+# Copy the appropriate env file
+COPY ${ENV_FILE} .env
 
-# Start the app using Vite's preview mode
-CMD ["npm", "run", "preview", "--", "--host", "--port", "3002"]
+# Build the application with the correct mode
+RUN npm run build -- --mode $(echo ${ENV_FILE} | cut -d. -f3)
+
+# Production stage
+FROM nginx:alpine
+
+# Copy the built files to Nginx serve directory
+COPY --from=build /app/dist /usr/share/nginx/html
+
+# Copy Nginx configuration (if you have custom config)
+# COPY nginx.conf /etc/nginx/conf.d/default.conf
+
+# Expose port 80
+EXPOSE 80
+
+# Start Nginx
+CMD ["nginx", "-g", "daemon off;"]
