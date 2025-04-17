@@ -1,38 +1,32 @@
 # Build stage
-FROM node:20 as build
+FROM node:20 AS build
 
-# Set the working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-
-# Install dependencies
 RUN npm install --include=dev
 
 # Copy source code
 COPY . .
 
-# Build argument for environment file
+# Build argument cho file .env nếu cần
 ARG ENV_FILE=.env.develop
-
-# Copy the appropriate env file
 COPY ${ENV_FILE} .env
 
-# Build the application with the correct mode
+# Build app với đúng mode (nếu dùng Vite)
 RUN npm run build -- --mode $(echo ${ENV_FILE} | cut -d. -f3)
 
-# Production stage
-FROM nginx:alpine
+# Production stage - serve bằng vite preview
+FROM node:20
 
-# Copy the built files to Nginx serve directory
-COPY --from=build /app/dist /usr/share/nginx/html
+WORKDIR /app
 
-# Copy Nginx configuration (if you have custom config)
-# COPY nginx.conf /etc/nginx/conf.d/default.conf
+# Copy built files và cài vite global
+COPY --from=build /app/dist ./dist
+RUN npm install -g vite
 
-# Expose port 80
+# Chạy vite preview (mặc định chạy cổng 4173, bạn sẽ đổi sang 3002)
 EXPOSE 3002
 
-# Start Nginx
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["vite", "preview", "--port", "3002", "--host"]
