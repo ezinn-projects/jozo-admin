@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
-import { FnbFormValues, FnbMenu } from "@/@types/FnBMenu";
+import { FnbMenu } from "@/@types/FnBMenu";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,13 +24,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { useCreateMenu, useUpdateMenu } from "@/hooks/use-fnb-menu";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
-import { FNB_CATEGORIES, FNB_CATEGORY_LABELS } from "../constants";
-import { useCreateMenu, useUpdateMenu } from "@/hooks/use-fnb-menu";
 import ImagesList from "../../RoomsManagement/components/ui/ImagesList";
-import { useEffect, useState } from "react";
+import { FNB_CATEGORIES, FNB_CATEGORY_LABELS } from "../constants";
 
 interface FnbModalProps {
   isOpen: boolean;

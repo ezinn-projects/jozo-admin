@@ -46,6 +46,9 @@ const roomApis = {
       `${ROOM_CONTROLLER}/${roomIndex}/resolve-request`
     );
   },
+  turnOffAllRooms: () => {
+    return http.post<HTTPResponse>(`${ROOM_CONTROLLER}/turn-off-all-rooms`);
+  },
 };
 
 export default roomApis;

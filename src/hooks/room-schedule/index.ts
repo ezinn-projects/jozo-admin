@@ -39,3 +39,9 @@ export const useResolveRequest = () => {
     mutationFn: roomApis.resolveRequest,
   });
 };
+
+export const useTurnOffAllRooms = () => {
+  return useMutation({
+    mutationFn: roomApis.turnOffAllRooms,
+  });
+};

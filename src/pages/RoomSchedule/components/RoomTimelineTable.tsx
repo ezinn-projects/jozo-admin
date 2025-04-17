@@ -241,7 +241,7 @@ const RoomTimelineTable: React.FC = () => {
     onNotification(handleNotification);
 
     // Join room channels for all rooms - using index as room ID (add 1 because backend expects 1-based index)
-    roomsData?.forEach((room, index) => {
+    roomsData?.forEach((_, index) => {
       joinRoom((index + 1).toString());
     });
 
@@ -438,7 +438,10 @@ const RoomTimelineTable: React.FC = () => {
           </PopoverContent>
         </Popover>
       </div>
-
+      {/* Thêm button để tắt video hết các trong các phòng */}
+      <div className="flex justify-end mb-4">
+        <Button variant="destructive">Tắt video tất cả phòng</Button>
+      </div>
       {/* Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */}
       <div
         className="overflow-x-auto"
