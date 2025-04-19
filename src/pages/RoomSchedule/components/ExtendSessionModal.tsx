@@ -31,7 +31,18 @@ const ExtendSessionModal: React.FC<ExtendSessionModalProps> = ({
 }) => {
   // Các khoảng thời gian gia hạn tính theo phút
   const extensionOptions = [
-    15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240,
+    { value: 15, label: "15 phút" },
+    { value: 30, label: "30 phút" },
+    { value: 45, label: "45 phút" },
+    { value: 60, label: "1 giờ" },
+    { value: 75, label: "1 giờ 15 phút" },
+    { value: 90, label: "1 giờ 30 phút" },
+    { value: 105, label: "1 giờ 45 phút" },
+    { value: 120, label: "2 giờ" },
+    { value: 150, label: "2 giờ 30 phút" },
+    { value: 180, label: "3 giờ" },
+    { value: 210, label: "3 giờ 30 phút" },
+    { value: 240, label: "4 giờ" },
   ];
   const [selectedExtension, setSelectedExtension] = useState<number>(15);
 
@@ -76,12 +87,14 @@ const ExtendSessionModal: React.FC<ExtendSessionModalProps> = ({
         <div className="flex gap-4 mt-4 flex-wrap">
           {extensionOptions.map((minutes) => (
             <Button
-              key={minutes}
-              variant={selectedExtension === minutes ? "default" : "outline"}
-              onClick={() => setSelectedExtension(minutes)}
+              key={minutes.value}
+              variant={
+                selectedExtension === minutes.value ? "default" : "outline"
+              }
+              onClick={() => setSelectedExtension(minutes.value)}
               disabled={isPending}
             >
-              {minutes} minutes
+              {minutes.label}
             </Button>
           ))}
         </div>

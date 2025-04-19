@@ -1,7 +1,4 @@
-import promotionApis, {
-  Promotion,
-  PromotionPayload,
-} from "@/apis/promotion.apis";
+import promotionApis, { PromotionPayload } from "@/apis/promotion.apis";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 

@@ -48,12 +48,15 @@ const formSchema = z.object({
 
 export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   const [files, setFiles] = useState<File[]>([]);
-
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: initialValues?.name || "",
-      price: initialValues?.price || "1.000",
+      price: initialValues?.price
+        ? typeof initialValues.price === "number"
+          ? (initialValues.price as number).toLocaleString("vi-VN")
+          : String(initialValues.price)
+        : "1.000",
       description: initialValues?.description || "",
       category: initialValues?.category || FNB_CATEGORIES.SNACKS,
       image: initialValues?.image || "",
@@ -65,7 +68,13 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
 
   useEffect(() => {
     if (initialValues) {
-      form.reset(initialValues);
+      form.reset({
+        ...initialValues,
+        price:
+          typeof initialValues.price === "number"
+            ? (initialValues.price as number).toLocaleString("vi-VN")
+            : initialValues.price,
+      });
     }
   }, [initialValues]);
 

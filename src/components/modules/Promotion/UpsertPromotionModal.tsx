@@ -1,4 +1,6 @@
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -20,28 +22,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Textarea } from "@/components/ui/textarea";
-import {
-  useCreatePromotion,
-  useGetPromotionById,
-  useUpdatePromotion,
-} from "@/hooks/promotion";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { format } from "date-fns";
-import { CalendarIcon, PlusIcon, CircleXIcon } from "lucide-react";
-import { ReactNode, useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { z } from "zod";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import { cn } from "@/lib/utils";
-import { Spin } from "@/components/ui/spin";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -49,11 +35,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Spin } from "@/components/ui/spin";
+import { Textarea } from "@/components/ui/textarea";
 import Typography from "@/components/ui/typography";
-import { Portal } from "@radix-ui/react-portal";
-import { RoomType } from "@/constants/enum";
+import {
+  useCreatePromotion,
+  useGetPromotionById,
+  useUpdatePromotion,
+} from "@/hooks/promotion";
 import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { Portal } from "@radix-ui/react-portal";
 import { useQueryClient } from "@tanstack/react-query";
+import { format } from "date-fns";
+import { CalendarIcon, CircleXIcon, PlusIcon } from "lucide-react";
+import { ReactNode, useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
 
 // Create a schema for form validation
 const promotionSchema = z.object({
@@ -70,17 +69,16 @@ const promotionSchema = z.object({
     required_error: "End date is required",
   }),
   isActive: z.boolean().default(false),
-  appliesTo: z.string().min(1, "Select a room type"),
+  appliesTo: z.string().min(1, "Select a service"),
 });
 
 type FormValues = z.infer<typeof promotionSchema>;
 
 // Room type options for multi-select
-const roomTypeOptions = [
-  { label: "All Rooms", value: "ALL" },
-  { label: "Small", value: RoomType.Small },
-  { label: "Medium", value: RoomType.Medium },
-  { label: "Large", value: RoomType.Large },
+// Có, bên FE cần tạo options cho appliesTo khi tạo hoặc cập nhật promotion. Dựa trên code hiện tại, options nên là:
+const appliesToOptions = [
+  { value: "sing", label: "Chỉ dịch vụ thu âm" },
+  { value: "all", label: "Tất cả dịch vụ (hát, đồ ăn, đồ uống)" },
 ];
 
 type Props = {
@@ -128,7 +126,7 @@ export default function UpsertPromotionModal({
         startDate: new Date(promotion.startDate),
         endDate: new Date(promotion.endDate),
         isActive: promotion.isActive,
-        appliesTo: promotion.appliesTo[0] || "",
+        appliesTo: promotion.appliesTo,
       });
     }
   }, [promotion, form]);
@@ -139,7 +137,7 @@ export default function UpsertPromotionModal({
       startDate: values.startDate.toISOString(),
       endDate: values.endDate.toISOString(),
       _id: id,
-      appliesTo: [values.appliesTo],
+      appliesTo: values.appliesTo,
     };
 
     if (id) {
@@ -414,10 +412,10 @@ export default function UpsertPromotionModal({
                             onValueChange={field.onChange}
                           >
                             <SelectTrigger>
-                              <SelectValue placeholder="Select room type" />
+                              <SelectValue placeholder="Select service" />
                             </SelectTrigger>
                             <SelectContent>
-                              {roomTypeOptions.map((option) => (
+                              {appliesToOptions.map((option) => (
                                 <SelectItem
                                   key={option.value}
                                   value={option.value}

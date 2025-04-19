@@ -162,21 +162,43 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
               <span className="col-span-3 text-right">Thành Tiền</span>
             </div>
             {items.map((item, index: number) => (
-              <div key={index} className="grid grid-cols-12 gap-1">
-                <span className="col-span-5 truncate">{item.description}</span>
-                <span className="col-span-1 text-right">{item.quantity}</span>
-                <span className="col-span-3 text-right">
-                  {item.price.toLocaleString("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  })}
-                </span>
-                <span className="col-span-3 text-right">
-                  {(item.price * item.quantity).toLocaleString("vi-VN", {
-                    style: "currency",
-                    currency: "VND",
-                  })}
-                </span>
+              <div key={index}>
+                <div className="grid grid-cols-12 gap-1">
+                  <span className="col-span-5 truncate">
+                    {item.description}
+                  </span>
+                  <span className="col-span-1 text-right">{item.quantity}</span>
+                  <span className="col-span-3 text-right">
+                    {item.price.toLocaleString("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    })}
+                  </span>
+                  <span className="col-span-3 text-right">
+                    {(item.price * item.quantity).toLocaleString("vi-VN", {
+                      style: "currency",
+                      currency: "VND",
+                    })}
+                  </span>
+                </div>
+                {item.discountName && item.discountPercentage ? (
+                  <div className="grid grid-cols-12 gap-1 text-xs text-green-600 italic">
+                    <span className="col-span-9 pl-4">
+                      - {item.discountName} ({item.discountPercentage}%)
+                    </span>
+                    <span className="col-span-3 text-right">
+                      {(
+                        (item.price *
+                          item.quantity *
+                          (item.discountPercentage || 0)) /
+                        100
+                      ).toLocaleString("vi-VN", {
+                        style: "currency",
+                        currency: "VND",
+                      })}
+                    </span>
+                  </div>
+                ) : null}
               </div>
             ))}
           </div>

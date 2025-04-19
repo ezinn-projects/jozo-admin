@@ -10,7 +10,7 @@ export type PromotionPayload = {
   startDate: string;
   endDate: string;
   isActive: boolean;
-  appliesTo: string[];
+  appliesTo: string;
 };
 
 export type Promotion = {
@@ -21,7 +21,7 @@ export type Promotion = {
   startDate: string;
   endDate: string;
   isActive: boolean;
-  appliesTo: string[];
+  appliesTo: string;
 };
 
 export type PromotionResponse = HTTPResponse<Promotion[]>;

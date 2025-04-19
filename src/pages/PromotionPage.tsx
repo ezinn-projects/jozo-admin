@@ -80,11 +80,7 @@ function PromotionPage() {
       cell: ({ row }) => {
         return (
           <div className="flex flex-wrap gap-1">
-            {row.original.appliesTo.map((roomType) => (
-              <Badge key={roomType} variant="secondary">
-                {roomType}
-              </Badge>
-            ))}
+            <Badge variant="secondary">{row.original.appliesTo}</Badge>
           </div>
         );
       },
