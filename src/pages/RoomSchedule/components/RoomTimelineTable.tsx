@@ -3,7 +3,11 @@ import dayjs, { Dayjs } from "dayjs";
 import { useQuery } from "@tanstack/react-query";
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
-import { useResolveRequest, useRoomSchedules } from "@/hooks/room-schedule";
+import {
+  useResolveRequest,
+  useRoomSchedules,
+  useTurnOffAllRooms,
+} from "@/hooks/room-schedule";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
 import ProcessLockedModal from "./ProcessLockedModal";
 import ProcessBookedModal from "./ProcessBookedModal";
@@ -83,6 +87,8 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null
   );
+
+  const { mutate: turnOffAllRooms } = useTurnOffAllRooms();
 
   // Cập nhật currentTime mỗi giây
   const [currentTime, setCurrentTime] = useState(dayjs());
@@ -403,6 +409,16 @@ const RoomTimelineTable: React.FC = () => {
     });
   };
 
+  const handleTurnOffAllRooms = () => {
+    turnOffAllRooms(undefined, {
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "All rooms turned off",
+        });
+      },
+    });
+  };
   return (
     <div className="container mx-auto p-4 w-full">
       {/* Header: Chọn ngày */}
@@ -440,7 +456,9 @@ const RoomTimelineTable: React.FC = () => {
       </div>
       {/* Thêm button để tắt video hết các trong các phòng */}
       <div className="flex justify-end mb-4">
-        <Button variant="destructive">Tắt video tất cả phòng</Button>
+        <Button variant="destructive" onClick={handleTurnOffAllRooms}>
+          Tắt video tất cả phòng
+        </Button>
       </div>
       {/* Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */}
       <div

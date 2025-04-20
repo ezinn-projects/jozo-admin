@@ -47,7 +47,7 @@ const roomApis = {
     );
   },
   turnOffAllRooms: () => {
-    return http.post<HTTPResponse>(`${ROOM_CONTROLLER}/turn-off-all-rooms`);
+    return http.post<HTTPResponse>(`${ROOM_CONTROLLER}/turn-off-videos`);
   },
 };
 
