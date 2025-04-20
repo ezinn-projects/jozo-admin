@@ -32,6 +32,9 @@ const PATHS = {
   PROMOTION: "/promotion",
   PROMOTION_NEW: "/promotion/new",
   PROMOTION_EDIT: "/promotion/:id/edit",
+
+  // total revenue
+  TOTAL_REVENUE: "/total-revenue",
 } as const;
 
 export default PATHS;

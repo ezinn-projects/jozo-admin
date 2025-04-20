@@ -1,24 +1,29 @@
-import { cn } from "@/lib/utils";
+import React from "react";
+import { cn } from "@/utils";
 
 interface SpinnerProps {
+  size?: "small" | "medium" | "large";
   className?: string;
-  size?: "sm" | "md" | "lg";
 }
 
-export function Spinner({ className, size = "md" }: SpinnerProps) {
-  const sizeClasses = {
-    sm: "h-4 w-4",
-    md: "h-6 w-6",
-    lg: "h-8 w-8",
+export const Spinner: React.FC<SpinnerProps> = ({
+  size = "medium",
+  className,
+}) => {
+  const sizeStyles = {
+    small: "w-4 h-4",
+    medium: "w-8 h-8",
+    large: "w-12 h-12",
   };
 
   return (
     <div
       className={cn(
-        "animate-spin rounded-full border-2 border-current border-t-transparent",
-        sizeClasses[size],
+        "animate-spin rounded-full border-2 border-t-transparent",
+        sizeStyles[size],
+        "border-primary",
         className
       )}
     />
   );
-}
+};

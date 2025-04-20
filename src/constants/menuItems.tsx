@@ -69,6 +69,13 @@ const MENU_ITEMS: MenuItem[] = [
     icon: Settings,
     subItems: [], // No sub-items for Settings
   },
+  // total revenue
+  {
+    title: "Total Revenue",
+    url: PATHS.TOTAL_REVENUE,
+    icon: PercentIcon,
+    subItems: [], // No sub-items for Total Revenue
+  },
 ];
 
 export { MENU_ITEMS };

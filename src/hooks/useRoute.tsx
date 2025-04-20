@@ -4,6 +4,7 @@ import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
 import PromotionPage from "@/pages/PromotionPage";
+import RevenueStatisticsPage from "@/pages/RevenueStatisticsPage";
 
 import { lazy, Suspense } from "react";
 import {
@@ -71,6 +72,10 @@ function useRoute() {
                 <Route path={PATHS.PRICE} element={<PricePage />} />
                 <Route path={PATHS.FNB} element={<FnBPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
+                <Route
+                  path={PATHS.TOTAL_REVENUE}
+                  element={<RevenueStatisticsPage />}
+                />
               </Route>
 
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>

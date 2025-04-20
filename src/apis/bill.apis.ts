@@ -25,6 +25,45 @@ const billAPis = {
         "Content-Type": "application/pdf",
       },
     }),
+  // Revenue APIs
+  getDailyRevenue: async (date: string) =>
+    http.get<
+      HTTPResponse<{
+        date: string;
+        formattedDate: string;
+        totalRevenue: number;
+        billCount: number;
+        bills: IBill[];
+      }>
+    >(`/bill/revenue/daily?date=${date}`),
+
+  getWeeklyRevenue: async (date: string) =>
+    http.get<
+      HTTPResponse<{
+        week: number;
+        year: number;
+        dateRange: string;
+        startDate: Date;
+        endDate: Date;
+        totalRevenue: number;
+        billCount: number;
+        bills: IBill[];
+      }>
+    >(`/bill/revenue/weekly?date=${date}`),
+
+  getMonthlyRevenue: async (date: string) =>
+    http.get<
+      HTTPResponse<{
+        month: string;
+        year: number;
+        dateRange: string;
+        startDate: Date;
+        endDate: Date;
+        totalRevenue: number;
+        billCount: number;
+        bills: IBill[];
+      }>
+    >(`/bill/revenue/monthly?date=${date}`),
 };
 
 export default billAPis;
