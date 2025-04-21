@@ -13,14 +13,28 @@ export default defineConfig({
   },
   define: {
     "process.env": process.env,
-    // Vite tự động load các biến môi trường từ file .env, .env.local, .env.[mode], .env.[mode].local
-    // Các biến môi trường phải bắt đầu bằng VITE_ để được expose cho client
-    // Không cần thay đổi gì ở đây, chỉ cần đảm bảo các biến trong .env.develop và .env.production
-    // đều bắt đầu bằng VITE_ (như VITE_API_URL và VITE_SOCKET_URL)
   },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+  },
+  server: {
+    // cho phép truy cập từ subdomain cụ thể
+    host: "0.0.0.0",
+    port: 3002,
+    strictPort: true,
+    hmr: {
+      host: "admin.jozo.com.vn",
+    },
+  },
+  preview: {
+    host: "0.0.0.0",
+    port: 3002,
+    // nếu cần HTTPS, bật phần này:
+    // https: {
+    //   key: fs.readFileSync("./certs/localhost.key"),
+    //   cert: fs.readFileSync("./certs/localhost.crt"),
+    // }
   },
 });
