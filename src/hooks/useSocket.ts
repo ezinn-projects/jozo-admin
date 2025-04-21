@@ -17,6 +17,7 @@ export const useSocket = () => {
       query: {
         isAdmin: true,
       },
+      transports: ["websocket"],
     });
 
     // Setup reconnection handling
