@@ -88,5 +88,6 @@ jobs:
             docker run -d \
               --name jozo-admin \
               --env-file $ENV_FILE \
+              -e __VITE_ADDITIONAL_SERVER_ALLOWED_HOSTS=admin.jozo.com.vn \
               -p 3002:3002 \
               ${{ secrets.DOCKER_USERNAME }}/jozo-admin:${{ github.ref_name }}
