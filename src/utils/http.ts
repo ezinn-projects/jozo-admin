@@ -1,7 +1,7 @@
 import { toast } from "@/hooks/use-toast";
 import axios from "axios";
 
-const apiUrl = import.meta.env.VITE_API_URL;
+const apiUrl = import.meta.env.VITE_API_BASE_URL;
 console.log("API URL:", apiUrl); // Debug line
 
 const http = axios.create({
