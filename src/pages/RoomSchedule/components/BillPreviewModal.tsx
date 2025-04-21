@@ -24,6 +24,27 @@ import dayjs from "dayjs";
 import { Printer } from "lucide-react";
 import React from "react";
 
+// Define bill interfaces
+interface BillItem {
+  description: string;
+  price: number;
+  quantity: number;
+  discountName?: string;
+  discountPercentage?: number;
+  promotionId?: string;
+}
+
+interface BillData {
+  _id?: string;
+  totalAmount?: number;
+  items?: BillItem[];
+  createdAt?: string | Date;
+  paymentMethod?: string;
+  note?: string;
+  endTime?: string | Date;
+  startTime?: string | Date;
+}
+
 interface BillPreviewModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -49,6 +70,7 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
   ]);
   const room = rooms?.data.result?.find((room) => room._id === schedule.roomId);
 
+  const billResult = (billData?.data.result || {}) as BillData;
   const {
     totalAmount,
     items = [],
@@ -57,7 +79,7 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
     note,
     endTime,
     startTime,
-  } = billData?.data.result || {};
+  } = billResult;
 
   const { user } = useAuth();
 
@@ -161,7 +183,7 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
               <span className="col-span-3 text-right">Đơn Giá</span>
               <span className="col-span-3 text-right">Thành Tiền</span>
             </div>
-            {items.map((item, index: number) => (
+            {items.map((item: BillItem, index: number) => (
               <div key={index}>
                 <div className="grid grid-cols-12 gap-1">
                   <span className="col-span-5 truncate">
