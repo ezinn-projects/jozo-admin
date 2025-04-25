@@ -53,6 +53,12 @@ const promotionApis = {
       `${PROMOTION_CONTROLLER}/${payload._id}`
     );
   },
+
+  getStandardPromotions: () => {
+    return http.get<HTTPResponse<Promotion[]>>(
+      `${PROMOTION_CONTROLLER}/checkout`
+    );
+  },
 };
 
 export default promotionApis;

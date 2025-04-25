@@ -9,6 +9,13 @@ export const useGetPromotions = () => {
   });
 };
 
+export const useGetStandardPromotions = () => {
+  return useQuery({
+    queryKey: ["standardPromotions"],
+    queryFn: promotionApis.getStandardPromotions,
+  });
+};
+
 export const useGetActivePromotion = () => {
   return useQuery({
     queryKey: ["activePromotion"],

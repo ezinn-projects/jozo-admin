@@ -5,19 +5,22 @@ import dayjs from "dayjs";
 const billAPis = {
   getBillByScheduleId: async (
     scheduleId: string,
+    promotionId?: string,
     actualEndTime: string = dayjs().toISOString()
-  ) =>
-    http.get<HTTPResponse<IBill>>(
-      `/bill/${scheduleId}/?actualEndTime=${actualEndTime}`
-    ),
+  ) => {
+    const url = promotionId
+      ? `/bill/${scheduleId}/?actualEndTime=${actualEndTime}&promotionId=${promotionId}`
+      : `/bill/${scheduleId}/?actualEndTime=${actualEndTime}`;
+    return http.get<HTTPResponse<IBill>>(url);
+  },
   printBill: async (
     scheduleId: string,
-    data: { paymentMethod: string; actualEndTime: string }
+    data: { paymentMethod: string; actualEndTime: string; promotionId?: string }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
   // API generate PDF, trả về file PDF ở dạng buffer (arraybuffer)
   generateBill: async (
     scheduleId: string,
-    data: { paymentMethod: string; actualEndTime: string }
+    data: { paymentMethod: string; actualEndTime: string; promotionId?: string }
   ) =>
     http.post(`/bill/${scheduleId}/generate`, data, {
       responseType: "blob",

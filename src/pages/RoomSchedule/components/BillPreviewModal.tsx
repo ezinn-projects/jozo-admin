@@ -18,11 +18,12 @@ import {
 import { PaymentMethod, RoomStatus, RoomType } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
+import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import dayjs from "dayjs";
-import { Printer } from "lucide-react";
-import React from "react";
+import { Printer, Gift } from "lucide-react";
+import React, { useState } from "react";
 
 // Define bill interfaces
 interface BillItem {
@@ -58,9 +59,18 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
   schedule,
   onConfirmEnd,
 }) => {
-  const { data: billData } = useQuery({
-    queryKey: ["bill", schedule._id],
-    queryFn: () => billAPis.getBillByScheduleId(schedule._id),
+  const [selectedPromotion, setSelectedPromotion] = useState<string>("");
+
+  const { data: standardPromotions } = useGetStandardPromotions();
+  const promotionList = standardPromotions?.data.result || [];
+
+  const { data: billData, refetch: refetchBill } = useQuery({
+    queryKey: ["bill", schedule._id, selectedPromotion],
+    queryFn: () =>
+      billAPis.getBillByScheduleId(
+        schedule._id,
+        selectedPromotion || undefined
+      ),
     enabled: isOpen,
   });
 
@@ -89,6 +99,7 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
       billAPis.printBill(schedule._id, {
         paymentMethod,
         actualEndTime: dayjs(endTime).toISOString(),
+        promotionId: selectedPromotion || undefined,
       }),
     onSuccess: () => {
       toast({
@@ -145,6 +156,18 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
       }
     );
   };
+
+  const handlePromotionChange = (value: string) => {
+    setSelectedPromotion(value === "none" ? "" : value);
+    refetchBill();
+  };
+
+  const getAppliedPromotion = () => {
+    if (!selectedPromotion) return null;
+    return promotionList.find((promo) => promo._id === selectedPromotion);
+  };
+
+  const appliedPromotion = getAppliedPromotion();
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -225,6 +248,39 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
             ))}
           </div>
           <div className="border-t-2 border-dashed border-purple-400" />
+
+          {/* Lucky Draw Promotion Section */}
+          <div className="flex items-center gap-2 mb-2">
+            <Gift className="w-4 h-4 text-pink-500" />
+            <span>Khuyến mãi bốc thăm:</span>
+            <Select
+              value={selectedPromotion || "none"}
+              onValueChange={handlePromotionChange}
+            >
+              <SelectTrigger className="w-[220px]">
+                <SelectValue placeholder="Chọn khuyến mãi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Không áp dụng</SelectItem>
+                {promotionList.map((promotion) => (
+                  <SelectItem key={promotion._id} value={promotion._id}>
+                    {promotion.name} ({promotion.discountPercentage}%)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {appliedPromotion && (
+            <div className="p-2 bg-green-100 rounded-md text-green-700 text-sm">
+              <p className="font-bold">{appliedPromotion.name}</p>
+              <p>{appliedPromotion.description}</p>
+              <p className="text-right font-bold">
+                Giảm: {appliedPromotion.discountPercentage}%
+              </p>
+            </div>
+          )}
+
           <div className="flex justify-between font-bold text-lg text-pink-600">
             <span>Tổng:</span>
             <span>
