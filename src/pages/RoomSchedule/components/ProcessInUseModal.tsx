@@ -60,8 +60,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     AxiosResponse<HTTPResponse<IRoom[]>>
   >(["rooms"]);
 
-  console.log("roomsData", roomsData);
-
   const room = roomsData?.data.result?.find(
     (room) => room._id === schedule.roomId
   );

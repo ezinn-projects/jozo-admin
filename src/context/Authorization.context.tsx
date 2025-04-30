@@ -24,11 +24,6 @@ export const AuthContext = createContext<AuthContextValues>(
 
 // Provider component để bọc toàn bộ app
 export function AuthProvider({ children }: { children: ReactNode }) {
-  // Giả lập một role, trong thực tế bạn sẽ lấy role từ API hoặc authentication state
-  console.log(
-    'localStorage.getItem("access_token")',
-    localStorage.getItem("access_token")
-  );
   const {
     data: userData,
     isLoading,
@@ -58,8 +53,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     isAuthenticated: !!userData?.data.result,
     isLoading,
   };
-
-  console.log("AuthContext value:", value);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

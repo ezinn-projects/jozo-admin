@@ -148,6 +148,7 @@ function UpsertRoomPage() {
                 <FormLabel>Room Type</FormLabel>
                 <Select
                   onValueChange={field.onChange}
+                  value={field.value}
                   defaultValue={field.value}
                 >
                   <FormControl>
@@ -192,6 +193,7 @@ function UpsertRoomPage() {
                 <FormLabel>Status</FormLabel>
                 <Select
                   onValueChange={field.onChange}
+                  value={field.value}
                   defaultValue={field.value}
                 >
                   <FormControl>

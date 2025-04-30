@@ -3,6 +3,7 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
+import CalendarPage from "@/pages/CalendarPage";
 import PromotionPage from "@/pages/PromotionPage";
 import RevenueStatisticsPage from "@/pages/RevenueStatisticsPage";
 
@@ -76,6 +77,7 @@ function useRoute() {
                   path={PATHS.TOTAL_REVENUE}
                   element={<RevenueStatisticsPage />}
                 />
+                <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
               </Route>
 
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>

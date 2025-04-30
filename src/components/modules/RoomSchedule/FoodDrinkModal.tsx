@@ -62,8 +62,6 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
     ["fnbOrderByScheduleId", scheduleId]
   );
 
-  console.log("data", data);
-
   const { user } = useAuth();
 
   useEffect(() => {
