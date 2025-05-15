@@ -1,3 +1,10 @@
+export interface Inventory {
+  quantity: number;
+  unit: string;
+  minStock: number;
+  maxStock: number;
+}
+
 export interface FnbMenu {
   _id: string;
   name: string;
@@ -5,6 +12,7 @@ export interface FnbMenu {
   description: string;
   image: string;
   category: string;
+  inventory: Inventory;
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -15,4 +23,5 @@ export interface FnbFormValues {
   description: string;
   category: string;
   image?: string;
+  inventory: Inventory;
 }

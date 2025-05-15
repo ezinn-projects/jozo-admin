@@ -31,9 +31,6 @@ export default defineConfig({
         ws: true,
       },
     },
-    hmr: {
-      host: "admin.jozo.com.vn",
-    },
   },
   preview: {
     host: "0.0.0.0",

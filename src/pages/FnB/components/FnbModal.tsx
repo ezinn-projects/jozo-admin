@@ -44,7 +44,31 @@ const formSchema = z.object({
   description: z.string(),
   category: z.string(),
   image: z.string().optional(),
+  inventory: z.object({
+    quantity: z.number().min(0, "Quantity must be greater than or equal to 0"),
+    unit: z.string().min(1, "Unit is required"),
+    minStock: z
+      .number()
+      .min(0, "Minimum stock must be greater than or equal to 0"),
+    maxStock: z
+      .number()
+      .min(0, "Maximum stock must be greater than or equal to 0"),
+  }),
 });
+
+const INVENTORY_UNITS = {
+  CAN: "lon",
+  BAG: "bịch",
+  BOTTLE: "chai",
+  PACK: "gói",
+} as const;
+
+const INVENTORY_UNIT_LABELS = {
+  [INVENTORY_UNITS.CAN]: "Lon",
+  [INVENTORY_UNITS.BAG]: "Bịch",
+  [INVENTORY_UNITS.BOTTLE]: "Chai",
+  [INVENTORY_UNITS.PACK]: "Gói",
+} as const;
 
 export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   const [files, setFiles] = useState<File[]>([]);
@@ -60,6 +84,12 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       description: initialValues?.description || "",
       category: initialValues?.category || FNB_CATEGORIES.SNACKS,
       image: initialValues?.image || "",
+      inventory: {
+        quantity: initialValues?.inventory?.quantity || 0,
+        unit: initialValues?.inventory?.unit || INVENTORY_UNITS.CAN,
+        minStock: initialValues?.inventory?.minStock || 0,
+        maxStock: initialValues?.inventory?.maxStock || 0,
+      },
     },
   });
 
@@ -85,6 +115,12 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       description: "",
       category: FNB_CATEGORIES.SNACKS,
       image: "",
+      inventory: {
+        quantity: 0,
+        unit: INVENTORY_UNITS.CAN,
+        minStock: 0,
+        maxStock: 0,
+      },
     });
     setFiles([]);
   };
@@ -101,14 +137,13 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       formData.append("price", data.price.toString());
       formData.append("description", data.description);
       formData.append("category", data.category);
+      formData.append("inventory", JSON.stringify(data.inventory));
 
       // Handle image upload
       if (data.image) {
         if (data.image.startsWith("http")) {
-          // For existing images from server
           formData.append("existingImage", data.image);
         } else if (files.length > 0) {
-          // For new image uploads
           formData.append("file", files[0]);
         }
       }
@@ -242,6 +277,92 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
                 </FormItem>
               )}
             />
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Inventory Management</h3>
+
+              <FormField
+                control={form.control}
+                name="inventory.quantity"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="inventory.unit"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Unit</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a unit" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        {Object.entries(INVENTORY_UNITS).map(([_, value]) => (
+                          <SelectItem key={value} value={value}>
+                            {INVENTORY_UNIT_LABELS[value]}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="inventory.minStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Minimum Stock</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="inventory.maxStock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Maximum Stock</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min={0}
+                        {...field}
+                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex justify-end gap-2">
               <Button type="button" variant="outline" onClick={handleClose}>

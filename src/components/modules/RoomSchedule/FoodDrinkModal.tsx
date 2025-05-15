@@ -147,7 +147,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[500px] max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Chọn Đồ Ăn & Đồ Uống</DialogTitle>
           <DialogDescription>
@@ -160,7 +160,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
             <TabsTrigger value="snacks">Snacks</TabsTrigger>
           </TabsList>
           <TabsContent value="drinks">
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto">
               {menus
                 ?.filter((item) => item.category === "drinks")
                 ?.map((item) => (
@@ -197,7 +197,7 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
             </div>
           </TabsContent>
           <TabsContent value="snacks">
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-[50vh] overflow-y-auto">
               {menus
                 ?.filter((item) => item.category === "snacks")
                 ?.map((item) => (
