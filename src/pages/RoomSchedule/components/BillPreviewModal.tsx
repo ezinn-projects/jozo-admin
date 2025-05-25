@@ -1,6 +1,6 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
-import roomApis from "@/apis/room.apis";
+import roomsScheduleApis from "@/apis/roomSchedule.api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -15,15 +15,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { PaymentMethod, RoomStatus, RoomType } from "@/constants/enum";
+import { PaymentMethod, RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import dayjs from "dayjs";
-import { Printer, Gift } from "lucide-react";
-import React, { useState } from "react";
+import { Printer, Gift, Clock } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Define bill interfaces
 interface BillItem {
@@ -60,16 +62,25 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
   onConfirmEnd,
 }) => {
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
+  const [customEndTime, setCustomEndTime] = useState<string>("");
 
   const { data: standardPromotions } = useGetStandardPromotions();
   const promotionList = standardPromotions?.data.result || [];
 
+  // Set default end time when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      setCustomEndTime(dayjs().format("HH:mm"));
+    }
+  }, [isOpen]);
+
   const { data: billData, refetch: refetchBill } = useQuery({
-    queryKey: ["bill", schedule._id, selectedPromotion],
+    queryKey: ["bill", schedule._id, selectedPromotion, customEndTime],
     queryFn: () =>
       billAPis.getBillByScheduleId(
         schedule._id,
-        selectedPromotion || undefined
+        selectedPromotion || undefined,
+        customEndTime || undefined
       ),
     enabled: isOpen,
   });
@@ -98,7 +109,9 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
     mutationFn: () =>
       billAPis.printBill(schedule._id, {
         paymentMethod,
-        actualEndTime: dayjs(endTime).toISOString(),
+        actualEndTime: customEndTime
+          ? dayjs().format("YYYY-MM-DD") + "T" + customEndTime + ":00"
+          : dayjs(endTime).toISOString(),
         promotionId: selectedPromotion || undefined,
       }),
     onSuccess: () => {
@@ -119,15 +132,16 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
 
   // Sử dụng useMutation để gọi API kết thúc phiên
   const { mutate: confirmEnd } = useMutation({
-    mutationFn: () =>
-      roomApis.updateRoom({
-        _id: schedule.roomId,
-        status: RoomStatus.Available,
-        roomName: room?.roomName || "",
-        roomType: room?.roomType as RoomType,
-        description: room?.description || "",
-        ...room,
-      }),
+    mutationFn: () => {
+      const actualEndTime = customEndTime
+        ? dayjs().format("YYYY-MM-DD") + "T" + customEndTime + ":00"
+        : dayjs().toISOString();
+
+      return roomsScheduleApis.updateSchedule(schedule._id, {
+        status: RoomStatus.Finished,
+        endTime: actualEndTime,
+      });
+    },
     onSuccess: () => {
       onConfirmEnd();
       toast({
@@ -169,6 +183,14 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
 
   const appliedPromotion = getAppliedPromotion();
 
+  const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCustomEndTime(e.target.value);
+  };
+
+  const handleApplyEndTime = () => {
+    refetchBill();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-lg font-mono text-sm bg-gradient-to-br from-purple-100 to-pink-100">
@@ -191,9 +213,30 @@ const BillPreviewModal: React.FC<BillPreviewModalProps> = ({
           <div className="border-t-2 border-dashed border-purple-400" />
           <div>
             <p>🎤 Bắt đầu: {dayjs(startTime).format("DD/MM/YYYY HH:mm")}</p>
-            {endTime && (
-              <p>🎶 Kết thúc: {dayjs(endTime).format("DD/MM/YYYY HH:mm")}</p>
-            )}
+
+            {/* Custom End Time Input */}
+            <div className="flex items-center gap-2 my-2">
+              <Clock className="w-4 h-4 text-purple-500" />
+              <Label htmlFor="end-time" className="text-sm">
+                Thời gian kết thúc:
+              </Label>
+              <Input
+                id="end-time"
+                type="time"
+                value={customEndTime}
+                onChange={handleEndTimeChange}
+                className="w-36 h-8 text-sm"
+              />
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 border-purple-400 text-purple-600 hover:bg-purple-200"
+                onClick={handleApplyEndTime}
+              >
+                Áp dụng
+              </Button>
+            </div>
+
             <p>
               Người tạo: <span className="font-bold">{user?.name}</span>
             </p>

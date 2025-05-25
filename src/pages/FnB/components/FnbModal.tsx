@@ -72,6 +72,8 @@ const INVENTORY_UNIT_LABELS = {
 
 export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [itemKey, setItemKey] = useState<string>("");
+
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -96,8 +98,15 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   const { mutate: createMenu, isPending: isCreating } = useCreateMenu();
   const { mutate: updateMenu, isPending: isUpdating } = useUpdateMenu();
 
+  // Update itemKey when isOpen changes to ensure form resets properly
   useEffect(() => {
-    if (initialValues) {
+    if (isOpen && initialValues?._id) {
+      setItemKey(initialValues._id);
+    }
+  }, [isOpen, initialValues]);
+
+  useEffect(() => {
+    if (initialValues && itemKey) {
       form.reset({
         ...initialValues,
         price:
@@ -106,7 +115,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
             : initialValues.price,
       });
     }
-  }, [initialValues]);
+  }, [initialValues, itemKey, form]);
 
   const resetForm = () => {
     form.reset({
@@ -123,6 +132,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       },
     });
     setFiles([]);
+    setItemKey("");
   };
 
   const handleClose = () => {
@@ -175,7 +185,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
           <DialogTitle>

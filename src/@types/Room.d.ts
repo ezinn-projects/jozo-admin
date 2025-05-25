@@ -32,6 +32,7 @@ interface IRoomSchedule {
   updatedAt: string;
   createdBy: string;
   updatedBy: string;
+  actualEndTime: string | null;
 }
 
 export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };
