@@ -6,16 +6,36 @@ const billAPis = {
   getBillByScheduleId: async (
     scheduleId: string,
     promotionId?: string,
-    actualEndTime: string = dayjs().toISOString()
+    actualEndTime: string = dayjs().toISOString(),
+    actualStartTime?: string
   ) => {
-    const url = promotionId
-      ? `/bill/${scheduleId}/?actualEndTime=${actualEndTime}&promotionId=${promotionId}`
-      : `/bill/${scheduleId}/?actualEndTime=${actualEndTime}`;
-    return http.get<HTTPResponse<IBill>>(url);
+    const params = new URLSearchParams();
+
+    // Thêm các tham số bắt buộc
+    params.append("actualEndTime", actualEndTime);
+
+    // Thêm các tham số tùy chọn nếu có
+    if (promotionId) {
+      params.append("promotionId", promotionId);
+    }
+
+    if (actualStartTime) {
+      params.append("actualStartTime", actualStartTime);
+    }
+
+    return http.get<HTTPResponse<IBill>>(
+      `/bill/${scheduleId}/?${params.toString()}`
+    );
   },
+
   printBill: async (
     scheduleId: string,
-    data: { paymentMethod: string; actualEndTime: string; promotionId?: string }
+    data: {
+      paymentMethod: string;
+      actualEndTime: string;
+      promotionId?: string;
+      actualStartTime?: string;
+    }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
   // API generate PDF, trả về file PDF ở dạng buffer (arraybuffer)
   generateBill: async (
