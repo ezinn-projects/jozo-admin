@@ -25,6 +25,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/utils/formatters";
 import { useQuery } from "@tanstack/react-query";
 import roomApis from "@/apis/room.apis";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
 
 interface DateInfo {
   date?: string;
@@ -51,6 +58,8 @@ type RevenueData = {
 const RevenueStatisticsPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState<string>("daily");
+  const [selectedBill, setSelectedBill] = useState<string | null>(null);
+  const [billDetailOpen, setBillDetailOpen] = useState<boolean>(false);
 
   const { data: roomsData } = useQuery({
     queryKey: ["rooms"],
@@ -62,7 +71,16 @@ const RevenueStatisticsPage = () => {
       }, {} as Record<string, string>),
   });
 
-  console.log("roomsData", roomsData);
+  const { data: billDetail, isLoading: isLoadingBillDetail } = useQuery({
+    queryKey: ["billDetail", selectedBill],
+    queryFn: () => (selectedBill ? billAPis.getBillById(selectedBill) : null),
+    enabled: !!selectedBill,
+  });
+
+  const handleBillClick = (billId: string) => {
+    setSelectedBill(billId);
+    setBillDetailOpen(true);
+  };
 
   const [dailyRevenue, setDailyRevenue] = useState<RevenueData>({
     loading: false,
@@ -320,7 +338,14 @@ const RevenueStatisticsPage = () => {
                         {dailyRevenue.data.bills.map((bill) => (
                           <TableRow key={bill._id || "unknown"}>
                             <TableCell className="font-medium">
-                              {bill._id ? bill._id.slice(-6) : "N/A"}
+                              <button
+                                className="text-blue-600 hover:underline focus:outline-none"
+                                onClick={() =>
+                                  bill._id && handleBillClick(bill._id)
+                                }
+                              >
+                                {bill.invoiceCode || "N/A"}
+                              </button>
                             </TableCell>
                             <TableCell>
                               {formatBillDate(bill.createdAt.toString())}
@@ -428,7 +453,14 @@ const RevenueStatisticsPage = () => {
                         {weeklyRevenue.data.bills.map((bill) => (
                           <TableRow key={bill._id || "unknown"}>
                             <TableCell className="font-medium">
-                              {bill._id ? bill._id.slice(-6) : "N/A"}
+                              <button
+                                className="text-blue-600 hover:underline focus:outline-none"
+                                onClick={() =>
+                                  bill._id && handleBillClick(bill._id)
+                                }
+                              >
+                                {bill.invoiceCode || "N/A"}
+                              </button>
                             </TableCell>
                             <TableCell>
                               {formatBillDate(bill.createdAt.toString())}
@@ -536,7 +568,14 @@ const RevenueStatisticsPage = () => {
                         {monthlyRevenue.data.bills.map((bill) => (
                           <TableRow key={bill._id || "unknown"}>
                             <TableCell className="font-medium">
-                              {bill._id ? bill._id.slice(-6) : "N/A"}
+                              <button
+                                className="text-blue-600 hover:underline focus:outline-none"
+                                onClick={() =>
+                                  bill._id && handleBillClick(bill._id)
+                                }
+                              >
+                                {bill.invoiceCode || "N/A"}
+                              </button>
                             </TableCell>
                             <TableCell>
                               {formatBillDate(bill.createdAt.toString())}
@@ -562,6 +601,130 @@ const RevenueStatisticsPage = () => {
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Modal chi tiết hóa đơn */}
+      <Dialog open={billDetailOpen} onOpenChange={setBillDetailOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Chi tiết hóa đơn</DialogTitle>
+            <DialogDescription>Thông tin chi tiết về hóa đơn</DialogDescription>
+          </DialogHeader>
+          {isLoadingBillDetail ? (
+            <div className="py-6 flex justify-center">
+              <Spinner />
+            </div>
+          ) : billDetail && billDetail.data && billDetail.data.result ? (
+            <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-sm">
+              <h4 className="text-center text-lg text-purple-700 font-bold mb-2">
+                🎉 Jozo Bill 🎉
+              </h4>
+
+              <div className="space-y-2 text-gray-800">
+                <div className="text-center">
+                  <p>
+                    Phòng:{" "}
+                    <span className="font-bold">
+                      {billDetail.data.result.roomName || "N/A"}
+                    </span>
+                  </p>
+                  <p>
+                    Loại phòng:{" "}
+                    <span className="font-bold">
+                      {billDetail.data.result.roomType || "N/A"}
+                    </span>
+                  </p>
+                  <p>
+                    Ngày: {billDetail.data.result.formattedCreatedAt || "N/A"}
+                  </p>
+                  <p>
+                    Mã hóa đơn: {billDetail.data.result.invoiceCode || "N/A"}
+                  </p>
+                </div>
+
+                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+
+                <div>
+                  <p>
+                    <span className="font-bold">Khách hàng:</span>{" "}
+                    {billDetail.data.result.customerName || "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-bold">Thời gian bắt đầu:</span>{" "}
+                    {billDetail.data.result.formattedStartTime || "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-bold">Thời gian kết thúc:</span>{" "}
+                    {billDetail.data.result.formattedEndTime || "N/A"}
+                  </p>
+                  <p>
+                    <span className="font-bold">Thời lượng sử dụng:</span>{" "}
+                    {billDetail.data.result.usageDuration || "0"} giờ
+                  </p>
+                </div>
+
+                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+
+                {billDetail.data.result.items &&
+                billDetail.data.result.items.length > 0 ? (
+                  <div>
+                    <div className="grid grid-cols-12 font-bold text-purple-600 gap-1">
+                      <span className="col-span-5">Tên</span>
+                      <span className="col-span-1 text-right">SL</span>
+                      <span className="col-span-3 text-right">Đơn Giá</span>
+                      <span className="col-span-3 text-right">Thành Tiền</span>
+                    </div>
+                    {billDetail.data.result.items.map((item, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-1 py-1">
+                        <span className="col-span-5 truncate">
+                          {item.description}
+                        </span>
+                        <span className="col-span-1 text-right">
+                          {item.quantity}
+                        </span>
+                        <span className="col-span-3 text-right">
+                          {formatCurrency(item.price)}
+                        </span>
+                        <span className="col-span-3 text-right">
+                          {formatCurrency(item.price * item.quantity)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-center italic">
+                    Không có chi tiết đơn hàng
+                  </p>
+                )}
+
+                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+
+                <div>
+                  <p>
+                    <span className="font-bold">Phương thức thanh toán:</span>{" "}
+                    {billDetail.data.result.paymentMethod || "N/A"}
+                  </p>
+                  <p className="text-right font-bold text-lg text-green-600">
+                    Tổng tiền:{" "}
+                    {formatCurrency(billDetail.data.result.totalAmount || 0)}{" "}
+                    VNĐ
+                  </p>
+                </div>
+
+                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+
+                <div className="text-center">
+                  <p className="text-purple-700 font-bold">Jozo - Vui Hết Ý!</p>
+                  <p className="text-sm italic">Hẹn gặp lại nhé! 😉</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-6 text-center text-red-500">
+              Không thể tải thông tin hóa đơn
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

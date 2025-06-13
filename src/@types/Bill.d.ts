@@ -25,4 +25,5 @@ export interface IBill {
   actualEndTime: Date;
   createdAt: Date;
   updatedAt: Date;
+  invoiceCode: string;
 }

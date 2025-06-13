@@ -28,6 +28,30 @@ const billAPis = {
     );
   },
 
+  getBillById: async (billId: string) => {
+    return http.get<
+      HTTPResponse<
+        IBill & {
+          roomName: string;
+          roomType: string;
+          customerName: string;
+          formattedStartTime: string;
+          formattedEndTime: string;
+          formattedCreatedAt: string;
+          usageDuration: string;
+          items?: {
+            description: string;
+            price: number;
+            quantity: number;
+            discountName?: string;
+            discountPercentage?: number;
+            promotionId?: string;
+          }[];
+        }
+      >
+    >(`/bill/details/${billId}`);
+  },
+
   printBill: async (
     scheduleId: string,
     data: {

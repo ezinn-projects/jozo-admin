@@ -160,6 +160,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     startTime,
   } = billResult;
 
+  console.log("Current payment method:", paymentMethod);
+
   const handleCompleteSession = () => {
     const actualEndTime = customEndTime
       ? dayjs().format("YYYY-MM-DD") + "T" + customEndTime + ":00"
@@ -191,26 +193,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const handlePaymentMethodChange = (value: string) => {
-    queryClient.setQueryData(["bill", schedule._id], (oldData: unknown) => {
-      if (!oldData) return oldData;
-      const typedOldData = oldData as {
-        data?: {
-          result?: {
-            paymentMethod?: string;
+    queryClient.setQueryData(
+      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
+      (oldData: unknown) => {
+        console.log("oldData", oldData);
+        if (!oldData) return oldData;
+        const typedOldData = oldData as {
+          data?: {
+            result?: {
+              paymentMethod?: string;
+            };
           };
         };
-      };
-      return {
-        ...typedOldData,
-        data: {
-          ...typedOldData.data,
-          result: {
-            ...typedOldData.data?.result,
-            paymentMethod: value,
+        return {
+          ...typedOldData,
+          data: {
+            ...typedOldData.data,
+            result: {
+              ...typedOldData.data?.result,
+              paymentMethod: value,
+            },
           },
-        },
-      };
-    });
+        };
+      }
+    );
   };
 
   const handlePromotionChange = (value: string) => {
@@ -453,13 +459,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
                 <div className="border-t-2 border-dashed border-purple-400" />
                 <div>
-                  <p>
-                    🎤 Bắt đầu:{" "}
-                    {dayjs(startTime || schedule.startTime).format(
-                      "DD/MM/YYYY HH:mm"
-                    )}
-                  </p>
-
                   {/* Custom Start Time Input */}
                   <div className="flex items-center gap-2 my-2">
                     <Clock className="w-4 h-4 text-purple-500" />
@@ -595,18 +594,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   <div className="flex items-center gap-2">
                     <span>💳 Thanh toán:</span>
                     <Select
-                      value={paymentMethod || ""}
+                      defaultValue={PaymentMethod.Cash}
+                      value={paymentMethod}
                       onValueChange={handlePaymentMethodChange}
                     >
                       <SelectTrigger className="w-[180px]">
                         <SelectValue placeholder="Chọn phương thức" />
                       </SelectTrigger>
                       <SelectContent>
-                        {Object.values(PaymentMethod).map((method) => (
-                          <SelectItem key={method} value={method}>
-                            {method.charAt(0).toUpperCase() + method.slice(1)}
-                          </SelectItem>
-                        ))}
+                        <SelectItem value={PaymentMethod.Cash}>Cash</SelectItem>
+                        <SelectItem value={PaymentMethod.BankTransfer}>
+                          Bank Transfer
+                        </SelectItem>
+                        <SelectItem value={PaymentMethod.Momo}>Momo</SelectItem>
+                        <SelectItem value={PaymentMethod.ZaloPay}>
+                          ZaloPay
+                        </SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
