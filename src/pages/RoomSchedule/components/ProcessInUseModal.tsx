@@ -50,6 +50,7 @@ interface BillItem {
   description: string;
   price: number;
   quantity: number;
+  originalPrice?: number;
   discountName?: string;
   discountPercentage?: number;
   promotionId?: string;
@@ -164,23 +165,47 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handleCompleteSession = () => {
     const actualEndTime = customEndTime
-      ? dayjs().format("YYYY-MM-DD") + "T" + customEndTime + ":00"
+      ? dayjs()
+          .set("hour", parseInt(customEndTime.split(":")[0]))
+          .set("minute", parseInt(customEndTime.split(":")[1]))
+          .set("second", 0)
+          .toISOString()
       : dayjs().toISOString();
 
     const actualStartTime = customStartTime
-      ? dayjs(schedule.startTime).format("YYYY-MM-DD") +
-        "T" +
-        customStartTime +
-        ":00"
+      ? dayjs(schedule.startTime)
+          .set("hour", parseInt(customStartTime.split(":")[0]))
+          .set("minute", parseInt(customStartTime.split(":")[1]))
+          .set("second", 0)
+          .toISOString()
       : schedule.startTime;
 
-    const updateData: Partial<IRoomSchedule> = {
-      ...schedule,
-      status: RoomStatus.Finished,
-      endTime: actualEndTime,
+    // Tạo bill object để save
+    const billToSave = {
+      scheduleId: schedule._id,
+      roomId: schedule.roomId,
+      items: items || [],
+      totalAmount: totalAmount || 0,
+      paymentMethod: paymentMethod,
       startTime: actualStartTime,
+      endTime: actualEndTime,
+      note: note,
+      promotionId: selectedPromotion || undefined,
     };
-    mutate(updateData, { onSuccess: () => refetchSchedules?.() });
+
+    // Save bill trước khi update schedule status
+    saveBillMutation(billToSave, {
+      onSuccess: () => {
+        // Sau khi save bill thành công, update schedule status
+        const updateData: Partial<IRoomSchedule> = {
+          ...schedule,
+          status: RoomStatus.Finished,
+          endTime: actualEndTime,
+          startTime: actualStartTime,
+        };
+        mutate(updateData, { onSuccess: () => refetchSchedules?.() });
+      },
+    });
   };
 
   const handleExtendSession = () => {
@@ -245,13 +270,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       billAPis.printBill(schedule._id, {
         paymentMethod,
         actualEndTime: customEndTime
-          ? dayjs().format("YYYY-MM-DD") + "T" + customEndTime + ":00"
+          ? dayjs()
+              .set("hour", parseInt(customEndTime.split(":")[0]))
+              .set("minute", parseInt(customEndTime.split(":")[1]))
+              .set("second", 0)
+              .toISOString()
           : dayjs(endTime).toISOString(),
         actualStartTime: customStartTime
-          ? dayjs(schedule.startTime).format("YYYY-MM-DD") +
-            "T" +
-            customStartTime +
-            ":00"
+          ? dayjs(schedule.startTime)
+              .set("hour", parseInt(customStartTime.split(":")[0]))
+              .set("minute", parseInt(customStartTime.split(":")[1]))
+              .set("second", 0)
+              .toISOString()
           : dayjs(startTime || schedule.startTime).toISOString(),
         promotionId: selectedPromotion || undefined,
       }),
@@ -266,6 +296,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       toast({
         title: "Error",
         description: "Có lỗi xảy ra khi tạo hóa đơn",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation để save bill vào collection bills
+  const { mutate: saveBillMutation, isPending: isSavingBill } = useMutation({
+    mutationFn: billAPis.saveBill,
+    onSuccess: () => {
+      console.log("Bill saved successfully");
+    },
+    onError: (error) => {
+      console.error("Lỗi khi lưu hóa đơn:", error);
+      toast({
+        title: "Error",
+        description: "Có lỗi xảy ra khi lưu hóa đơn",
         variant: "destructive",
       });
     },
@@ -650,7 +696,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             <Button
               variant="destructive"
               onClick={() => setIsConfirmEndOpen(true)}
-              disabled={isPending}
+              disabled={isPending || isSavingBill}
               className="text-base px-5 py-2 h-auto"
             >
               Kết thúc
@@ -683,8 +729,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
               onClick={handleCompleteSession}
+              disabled={isSavingBill || isPending}
             >
-              Tiếp tục kết thúc
+              {isSavingBill ? "Đang lưu hóa đơn..." : "Tiếp tục kết thúc"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

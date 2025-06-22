@@ -43,6 +43,7 @@ const billAPis = {
             description: string;
             price: number;
             quantity: number;
+            originalPrice?: number;
             discountName?: string;
             discountPercentage?: number;
             promotionId?: string;
@@ -61,6 +62,31 @@ const billAPis = {
       actualStartTime?: string;
     }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
+
+  // Save bill to bills collection
+  saveBill: async (bill: {
+    scheduleId: string;
+    roomId: string;
+    items: Array<{
+      description: string;
+      price: number;
+      quantity: number;
+      originalPrice?: number;
+      discountName?: string;
+      discountPercentage?: number;
+      promotionId?: string;
+    }>;
+    totalAmount: number;
+    paymentMethod: string;
+    startTime: string;
+    endTime: string;
+    note?: string;
+    promotionId?: string;
+    _id?: string;
+    createdAt?: string | Date;
+    invoiceCode?: string;
+  }) => http.post<HTTPResponse<IBill>>("/bill/save", bill),
+
   // API generate PDF, trả về file PDF ở dạng buffer (arraybuffer)
   generateBill: async (
     scheduleId: string,

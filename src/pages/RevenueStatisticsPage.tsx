@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -32,6 +32,16 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+
+interface BillItem {
+  description: string;
+  price: number;
+  quantity: number;
+  originalPrice?: number;
+  discountName?: string;
+  discountPercentage?: number;
+  promotionId?: string;
+}
 
 interface DateInfo {
   date?: string;
@@ -207,16 +217,6 @@ const RevenueStatisticsPage = () => {
       });
     }
   };
-
-  useEffect(() => {
-    if (activeTab === "daily") {
-      fetchDailyRevenue();
-    } else if (activeTab === "weekly") {
-      fetchWeeklyRevenue();
-    } else if (activeTab === "monthly") {
-      fetchMonthlyRevenue();
-    }
-  }, [selectedDate, activeTab]);
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
@@ -673,22 +673,43 @@ const RevenueStatisticsPage = () => {
                       <span className="col-span-3 text-right">Đơn Giá</span>
                       <span className="col-span-3 text-right">Thành Tiền</span>
                     </div>
-                    {billDetail.data.result.items.map((item, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-1 py-1">
-                        <span className="col-span-5 truncate">
-                          {item.description}
-                        </span>
-                        <span className="col-span-1 text-right">
-                          {item.quantity}
-                        </span>
-                        <span className="col-span-3 text-right">
-                          {formatCurrency(item.price)}
-                        </span>
-                        <span className="col-span-3 text-right">
-                          {formatCurrency(item.price * item.quantity)}
-                        </span>
-                      </div>
-                    ))}
+                    {billDetail.data.result.items.map(
+                      (item: BillItem, index: number) => (
+                        <div key={index}>
+                          <div className="grid grid-cols-12 gap-1 py-1">
+                            <span className="col-span-5 truncate">
+                              {item.description}
+                            </span>
+                            <span className="col-span-1 text-right">
+                              {item.quantity}
+                            </span>
+                            <span className="col-span-3 text-right">
+                              {formatCurrency(item.price)}
+                            </span>
+                            <span className="col-span-3 text-right">
+                              {formatCurrency(item.price * item.quantity)}
+                            </span>
+                          </div>
+                          {item.discountName && item.discountPercentage ? (
+                            <div className="grid grid-cols-12 gap-1 text-xs text-green-600 italic py-1">
+                              <span className="col-span-9 pl-4">
+                                - {item.discountName} ({item.discountPercentage}
+                                %)
+                              </span>
+                              <span className="col-span-3 text-right">
+                                -
+                                {formatCurrency(
+                                  ((item.originalPrice || item.price) *
+                                    item.quantity *
+                                    (item.discountPercentage || 0)) /
+                                    100
+                                )}
+                              </span>
+                            </div>
+                          ) : null}
+                        </div>
+                      )
+                    )}
                   </div>
                 ) : (
                   <p className="text-center italic">
