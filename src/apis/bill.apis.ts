@@ -63,6 +63,17 @@ const billAPis = {
     }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
 
+  // Print bill via WiFi printer
+  printBillWifi: async (
+    scheduleId: string,
+    data: {
+      paymentMethod: string;
+      actualEndTime: string;
+      promotionId?: string;
+      actualStartTime?: string;
+    }
+  ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}/wifi`, data),
+
   // Save bill to bills collection
   saveBill: async (bill: {
     scheduleId: string;
