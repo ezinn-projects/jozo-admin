@@ -82,13 +82,6 @@ const formSchema = z
     }
   });
 
-const INVENTORY_UNITS = {
-  CAN: "lon",
-  BAG: "bịch",
-  BOTTLE: "chai",
-  PACK: "gói",
-} as const;
-
 const formatPrice = (price: string | number): string => {
   const numericPrice =
     typeof price === "string" ? parseFloat(price.replace(/\./g, "")) : price;
