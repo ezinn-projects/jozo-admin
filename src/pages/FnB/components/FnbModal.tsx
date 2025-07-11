@@ -89,13 +89,6 @@ const INVENTORY_UNITS = {
   PACK: "gói",
 } as const;
 
-const INVENTORY_UNIT_LABELS = {
-  [INVENTORY_UNITS.CAN]: "Lon",
-  [INVENTORY_UNITS.BAG]: "Bịch",
-  [INVENTORY_UNITS.BOTTLE]: "Chai",
-  [INVENTORY_UNITS.PACK]: "Gói",
-} as const;
-
 const formatPrice = (price: string | number): string => {
   const numericPrice =
     typeof price === "string" ? parseFloat(price.replace(/\./g, "")) : price;
@@ -524,7 +517,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
                       <FormField
                         control={form.control}
                         name={`variants.${index}.inventory`}
-                        render={({ field }) => (
+                        render={() => (
                           <FormItem className="space-y-4">
                             <FormLabel>Inventory Management</FormLabel>
                             <div className="grid grid-cols-3 gap-4">
