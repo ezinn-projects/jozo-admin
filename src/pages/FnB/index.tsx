@@ -45,8 +45,6 @@ const FnBPage = () => {
     onDelete: handleDelete,
   });
 
-  console.log("selectedMenu", selectedMenu);
-
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-8">

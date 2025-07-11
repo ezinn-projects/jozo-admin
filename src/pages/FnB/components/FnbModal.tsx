@@ -23,11 +23,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useCreateMenu, useUpdateMenu } from "@/hooks/use-fnb-menu";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { PlusCircle, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
+import { useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
 import ImagesList from "../../RoomsManagement/components/ui/ImagesList";
 import { FNB_CATEGORIES, FNB_CATEGORY_LABELS } from "../constants";
@@ -38,23 +40,47 @@ interface FnbModalProps {
   initialValues?: Partial<FnbMenu>;
 }
 
-const formSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  price: z.string().min(1, "Price is required"),
-  description: z.string(),
-  category: z.string(),
+const variantSchema = z.object({
+  name: z.string().min(1, "Variant name is required"),
+  price: z.string().optional(),
+  isAvailable: z.boolean().default(true),
   image: z.string().optional(),
-  inventory: z.object({
-    quantity: z.number().min(0, "Quantity must be greater than or equal to 0"),
-    unit: z.string().min(1, "Unit is required"),
-    minStock: z
-      .number()
-      .min(0, "Minimum stock must be greater than or equal to 0"),
-    maxStock: z
-      .number()
-      .min(0, "Maximum stock must be greater than or equal to 0"),
-  }),
+  inventory: z
+    .object({
+      quantity: z
+        .number()
+        .min(0, "Quantity must be greater than or equal to 0"),
+      minStock: z
+        .number()
+        .min(0, "Minimum stock must be greater than or equal to 0"),
+      maxStock: z
+        .number()
+        .min(0, "Maximum stock must be greater than or equal to 0"),
+    })
+    .optional(),
 });
+
+const formSchema = z
+  .object({
+    name: z.string().min(1, "Name is required"),
+    price: z.string().min(1, "Price is required"),
+    description: z.string(),
+    category: z.string(),
+    image: z.string().optional(),
+    hasVariants: z
+      .union([z.boolean(), z.string()])
+      .transform((val) => (typeof val === "string" ? val === "true" : val)),
+    variants: z.array(variantSchema).optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (data.hasVariants && (!data.variants || data.variants.length === 0)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Please add at least one variant",
+        path: ["variants"],
+      });
+    }
+  });
 
 const INVENTORY_UNITS = {
   CAN: "lon",
@@ -70,29 +96,35 @@ const INVENTORY_UNIT_LABELS = {
   [INVENTORY_UNITS.PACK]: "Gói",
 } as const;
 
+const formatPrice = (price: string | number): string => {
+  const numericPrice =
+    typeof price === "string" ? parseFloat(price.replace(/\./g, "")) : price;
+  return numericPrice.toLocaleString("vi-VN");
+};
+
 export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   const [files, setFiles] = useState<File[]>([]);
+  const [variantFiles, setVariantFiles] = useState<{ [key: number]: File[] }>(
+    {}
+  );
   const [itemKey, setItemKey] = useState<string>("");
 
   const form = useForm<z.infer<typeof formSchema>>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      name: initialValues?.name || "",
-      price: initialValues?.price
-        ? typeof initialValues.price === "number"
-          ? (initialValues.price as number).toLocaleString("vi-VN")
-          : String(initialValues.price)
-        : "1.000",
-      description: initialValues?.description || "",
-      category: initialValues?.category || FNB_CATEGORIES.SNACKS,
-      image: initialValues?.image || "",
-      inventory: {
-        quantity: initialValues?.inventory?.quantity || 0,
-        unit: initialValues?.inventory?.unit || INVENTORY_UNITS.CAN,
-        minStock: initialValues?.inventory?.minStock || 0,
-        maxStock: initialValues?.inventory?.maxStock || 0,
-      },
+      name: "",
+      price: "1.000",
+      description: "",
+      category: FNB_CATEGORIES.SNACKS,
+      image: "",
+      hasVariants: false,
+      variants: [],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "variants",
   });
 
   const { mutate: createMenu, isPending: isCreating } = useCreateMenu();
@@ -108,11 +140,16 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
   useEffect(() => {
     if (initialValues && itemKey) {
       form.reset({
-        ...initialValues,
-        price:
-          typeof initialValues.price === "number"
-            ? (initialValues.price as number).toLocaleString("vi-VN")
-            : initialValues.price,
+        name: initialValues.name || "",
+        price: formatPrice(initialValues.price || "1.000"),
+        description: initialValues.description || "",
+        category: initialValues.category || FNB_CATEGORIES.SNACKS,
+        image: initialValues.image || "",
+        hasVariants: initialValues.hasVariants || false,
+        variants: (initialValues.variants || []).map((variant) => ({
+          ...variant,
+          price: variant.price ? formatPrice(variant.price) : "",
+        })),
       });
     }
   }, [initialValues, itemKey, form]);
@@ -124,12 +161,8 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       description: "",
       category: FNB_CATEGORIES.SNACKS,
       image: "",
-      inventory: {
-        quantity: 0,
-        unit: INVENTORY_UNITS.CAN,
-        minStock: 0,
-        maxStock: 0,
-      },
+      hasVariants: false,
+      variants: [],
     });
     setFiles([]);
     setItemKey("");
@@ -140,6 +173,23 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
     onClose();
   };
 
+  const handleVariantImagesChange = (
+    index: number,
+    images: string[],
+    imageFiles: File[]
+  ) => {
+    setVariantFiles((prev) => ({
+      ...prev,
+      [index]: imageFiles,
+    }));
+    const variants = form.getValues("variants") || [];
+    variants[index] = {
+      ...variants[index],
+      image: images[0] || "",
+    };
+    form.setValue("variants", variants);
+  };
+
   const onFormSubmit = async (data: z.infer<typeof formSchema>) => {
     try {
       const formData = new FormData();
@@ -147,15 +197,52 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       formData.append("price", data.price.toString());
       formData.append("description", data.description);
       formData.append("category", data.category);
-      formData.append("inventory", JSON.stringify(data.inventory));
+      formData.append("hasVariants", data.hasVariants ? "true" : "false");
 
-      // Handle image upload
+      // Handle main image upload
       if (data.image) {
         if (data.image.startsWith("http")) {
           formData.append("existingImage", data.image);
         } else if (files.length > 0) {
           formData.append("file", files[0]);
         }
+      }
+
+      if (data.hasVariants && data.variants) {
+        // Ensure all variants have the correct structure before sending
+        const processedVariants = await Promise.all(
+          data.variants.map(async (variant, index) => {
+            // Lấy inventory từ variant hoặc tạo mới nếu không có
+            const inventory = variant.inventory || {
+              quantity: 0,
+              minStock: 0,
+              maxStock: 0,
+            };
+
+            // Handle variant image
+            let variantImage = variant.image || "";
+            if (
+              variant.image &&
+              !variant.image.startsWith("http") &&
+              variantFiles[index]?.[0]
+            ) {
+              formData.append(`variantFile_${index}`, variantFiles[index][0]);
+              variantImage = `variantFile_${index}`;
+            }
+
+            return {
+              name: variant.name,
+              price: variant.price
+                ? formatPrice(variant.price)
+                : formatPrice(data.price),
+              isAvailable: true,
+              image: variantImage,
+              inventory,
+            };
+          })
+        );
+
+        formData.append("variants", JSON.stringify(processedVariants));
       }
 
       if (!initialValues?._id) {
@@ -186,7 +273,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && handleClose()}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
             {!initialValues?._id ? "Create Menu Item" : "Edit Menu Item"}
@@ -194,184 +281,320 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
         </DialogHeader>
         <Form {...form}>
           <form
-            onSubmit={form.handleSubmit(onFormSubmit)}
+            onSubmit={form.handleSubmit(onFormSubmit, (errors) => {
+              console.log(errors);
+            })}
             className="grid gap-4 py-4"
           >
-            <FormField
-              control={form.control}
-              name="name"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel htmlFor="name">Name</FormLabel>
-                  <FormControl>
-                    <Input id="name" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="space-y-4">
+              <h3 className="text-lg font-medium">Basic Information</h3>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="name">Name</FormLabel>
+                      <FormControl>
+                        <Input id="name" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-            <FormField
-              control={form.control}
-              name="price"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel htmlFor="price">Price</FormLabel>
-                  <FormControl>
-                    <Input
-                      id="price"
-                      currency
-                      type="number"
-                      {...field}
-                      onChange={(e) => field.onChange(e.target.value)}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                <FormField
+                  control={form.control}
+                  name="price"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="price">Price</FormLabel>
+                      <FormControl>
+                        <Input
+                          id="price"
+                          currency
+                          type="number"
+                          {...field}
+                          onChange={(e) => field.onChange(e.target.value)}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-            <FormField
-              control={form.control}
-              name="category"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel htmlFor="category">Category</FormLabel>
-                  <Select value={field.value} onValueChange={field.onChange}>
+              <div className="grid grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="category"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="category">Category</FormLabel>
+                      <Select
+                        value={field.value}
+                        onValueChange={field.onChange}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a category" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {Object.entries(FNB_CATEGORIES).map(([_, value]) => (
+                            <SelectItem key={value} value={value}>
+                              {FNB_CATEGORY_LABELS[value]}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel htmlFor="description">Description</FormLabel>
+                      <FormControl>
+                        <Textarea id="description" {...field} rows={3} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              <FormField
+                control={form.control}
+                name="image"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image</FormLabel>
                     <FormControl>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select a category" />
-                      </SelectTrigger>
+                      <ImagesList
+                        images={field.value ? [field.value] : []}
+                        onChange={handleImagesChange}
+                        max={1}
+                      />
                     </FormControl>
-                    <SelectContent>
-                      {Object.entries(FNB_CATEGORIES).map(([_, value]) => (
-                        <SelectItem key={value} value={value}>
-                          {FNB_CATEGORY_LABELS[value]}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel htmlFor="description">Description</FormLabel>
-                  <FormControl>
-                    <Textarea id="description" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="image"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Image</FormLabel>
-                  <FormControl>
-                    <ImagesList
-                      images={field.value ? [field.value] : []}
-                      onChange={handleImagesChange}
-                      max={1}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="space-y-4">
-              <h3 className="text-lg font-medium">Inventory Management</h3>
-
               <FormField
                 control={form.control}
-                name="inventory.quantity"
+                name="hasVariants"
                 render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Quantity</FormLabel>
+                  <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                    <div className="space-y-0.5">
+                      <FormLabel className="text-base">Variants</FormLabel>
+                      <div className="text-sm text-muted-foreground">
+                        Enable if this item has different variations
+                      </div>
+                    </div>
                     <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
                       />
                     </FormControl>
-                    <FormMessage />
                   </FormItem>
                 )}
               />
 
-              <FormField
-                control={form.control}
-                name="inventory.unit"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Unit</FormLabel>
-                    <Select value={field.value} onValueChange={field.onChange}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a unit" />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {Object.entries(INVENTORY_UNITS).map(([_, value]) => (
-                          <SelectItem key={value} value={value}>
-                            {INVENTORY_UNIT_LABELS[value]}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {form.watch("hasVariants") && (
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-medium">Variants</h3>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        append({
+                          name: "",
+                          price: "",
+                          isAvailable: true,
+                          image: "",
+                          inventory: {
+                            quantity: 0,
+                            minStock: 0,
+                            maxStock: 0,
+                          },
+                        })
+                      }
+                    >
+                      <PlusCircle className="mr-2 h-4 w-4" />
+                      Add Variant
+                    </Button>
+                  </div>
 
-              <FormField
-                control={form.control}
-                name="inventory.minStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Minimum Stock</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                  {fields.map((field, index) => (
+                    <div
+                      key={field.id}
+                      className="rounded-lg border p-4 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <h4 className="font-medium">Variant {index + 1}</h4>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            remove(index);
+                            setVariantFiles((prev) => {
+                              const newFiles = { ...prev };
+                              delete newFiles[index];
+                              return newFiles;
+                            });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name={`variants.${index}.name`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Variant Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name={`variants.${index}.price`}
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Price (Optional)</FormLabel>
+                              <FormControl>
+                                <Input
+                                  currency
+                                  type="number"
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(e.target.value)
+                                  }
+                                />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.image`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Image</FormLabel>
+                            <FormControl>
+                              <ImagesList
+                                images={field.value ? [field.value] : []}
+                                onChange={(images, files) =>
+                                  handleVariantImagesChange(
+                                    index,
+                                    images,
+                                    files
+                                  )
+                                }
+                                max={1}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
 
-              <FormField
-                control={form.control}
-                name="inventory.maxStock"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Maximum Stock</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="number"
-                        min={0}
-                        {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value))}
+                      <FormField
+                        control={form.control}
+                        name={`variants.${index}.inventory`}
+                        render={({ field }) => (
+                          <FormItem className="space-y-4">
+                            <FormLabel>Inventory Management</FormLabel>
+                            <div className="grid grid-cols-3 gap-4">
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.inventory.quantity`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Quantity</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(Number(e.target.value))
+                                        }
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.inventory.minStock`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Min Stock</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(Number(e.target.value))
+                                        }
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+
+                              <FormField
+                                control={form.control}
+                                name={`variants.${index}.inventory.maxStock`}
+                                render={({ field }) => (
+                                  <FormItem>
+                                    <FormLabel>Max Stock</FormLabel>
+                                    <FormControl>
+                                      <Input
+                                        type="number"
+                                        min={0}
+                                        {...field}
+                                        onChange={(e) =>
+                                          field.onChange(Number(e.target.value))
+                                        }
+                                      />
+                                    </FormControl>
+                                  </FormItem>
+                                )}
+                              />
+                            </div>
+                          </FormItem>
+                        )}
                       />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="flex justify-end gap-2">

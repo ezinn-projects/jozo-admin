@@ -1,8 +1,15 @@
 export interface Inventory {
   quantity: number;
-  unit: string;
   minStock: number;
   maxStock: number;
+}
+
+export interface Variant {
+  name: string;
+  price?: string;
+  isAvailable: boolean;
+  image?: string;
+  inventory?: Inventory;
 }
 
 export interface FnbMenu {
@@ -12,7 +19,8 @@ export interface FnbMenu {
   description: string;
   image: string;
   category: string;
-  inventory: Inventory;
+  hasVariants: boolean;
+  variants?: Variant[];
   createdAt: Date;
   updatedAt?: Date;
 }
@@ -23,5 +31,6 @@ export interface FnbFormValues {
   description: string;
   category: string;
   image?: string;
-  inventory: Inventory;
+  hasVariants: boolean;
+  variants?: Variant[];
 }

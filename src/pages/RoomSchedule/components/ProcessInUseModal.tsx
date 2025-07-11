@@ -301,43 +301,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  // Sử dụng useMutation để gọi API in hóa đơn qua WiFi
-  const { mutate: printBillWifi } = useMutation({
-    mutationFn: () =>
-      billAPis.printBillWifi(schedule._id, {
-        paymentMethod,
-        actualEndTime: customEndTime
-          ? dayjs()
-              .set("hour", parseInt(customEndTime.split(":")[0]))
-              .set("minute", parseInt(customEndTime.split(":")[1]))
-              .set("second", 0)
-              .toISOString()
-          : dayjs(endTime).toISOString(),
-        actualStartTime: customStartTime
-          ? dayjs(schedule.startTime)
-              .set("hour", parseInt(customStartTime.split(":")[0]))
-              .set("minute", parseInt(customStartTime.split(":")[1]))
-              .set("second", 0)
-              .toISOString()
-          : dayjs(startTime || schedule.startTime).toISOString(),
-        promotionId: selectedPromotion || undefined,
-      }),
-    onSuccess: () => {
-      toast({
-        title: "Success",
-        description: "Hóa đơn đã được in qua WiFi",
-      });
-    },
-    onError: (error) => {
-      console.error("Lỗi khi in hóa đơn WiFi:", error);
-      toast({
-        title: "Error",
-        description: "Có lỗi xảy ra khi in hóa đơn WiFi",
-        variant: "destructive",
-      });
-    },
-  });
-
   // Mutation để save bill vào collection bills
   const { mutate: saveBillMutation, isPending: isSavingBill } = useMutation({
     mutationFn: billAPis.saveBill,
@@ -730,14 +693,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               <Printer className="w-4 h-4 mr-2" />
               In hóa đơn
             </Button>
-            <Button
-              variant="outline"
-              className="border-green-400 text-green-600 hover:bg-green-200 text-base px-5 py-2 h-auto"
-              onClick={() => printBillWifi()}
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              In WiFi
-            </Button>
+
             <Button
               variant="destructive"
               onClick={() => setIsConfirmEndOpen(true)}

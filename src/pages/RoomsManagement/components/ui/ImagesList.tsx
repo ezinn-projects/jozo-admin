@@ -22,8 +22,6 @@ function ImagesList({ onChange, images, max = 10 }: Props) {
 
   const imagePickerRef = useRef<{ openFilePicker: () => void }>(null);
 
-  console.log("imagesList", imagesList);
-
   useEffect(() => {
     setImagesList(images);
   }, [images]);

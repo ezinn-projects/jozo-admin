@@ -1,5 +1,6 @@
 import { FnbMenu } from "@/@types/FnBMenu";
 import { Button } from "@/components/ui/button";
+import { formatCurrency } from "@/utils/formatters";
 import { ColumnDef } from "@tanstack/react-table";
 import { Pencil, Trash2 } from "lucide-react";
 
@@ -39,7 +40,7 @@ export const createColumns = ({
   {
     accessorKey: "price",
     header: "Price",
-    cell: ({ row }) => row.getValue("price"),
+    cell: ({ row }) => formatCurrency(row.getValue("price")),
   },
   {
     accessorKey: "category",
