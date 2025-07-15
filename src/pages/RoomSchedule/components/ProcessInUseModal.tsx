@@ -189,58 +189,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           .toISOString()
       : schedule.startTime;
 
-    // Tính toán lại total amount dựa trên thời gian sử dụng mới
-    const startTime = dayjs(actualStartTime);
-    const endTime = dayjs(actualEndTime);
-    const durationInHours = endTime.diff(startTime, "hour", true);
+    // Sử dụng totalAmount từ API thay vì tính toán lại
+    let finalTotal = billData.data.result.totalAmount || 0;
 
-    // Giả sử giá phòng là 100,000 VND/giờ (có thể lấy từ room data)
-    const roomPricePerHour = 100000;
-    const roomCost = durationInHours * roomPricePerHour;
-
-    // Tính tổng từ FNB items
-    let fnbTotal = 0;
-    if (data?.order) {
-      // Tính drinks total
-      if (data.order.drinks) {
-        fnbTotal += Object.entries(data.order.drinks).reduce(
-          (sum, [drinkId, quantity]) => {
-            const drinkItem = menus?.find((menu) => menu._id === drinkId);
-            const price = drinkItem?.price
-              ? typeof drinkItem.price === "string"
-                ? parseInt(drinkItem.price.replace(/\./g, ""))
-                : drinkItem.price
-              : 0;
-            return sum + price * Number(quantity);
-          },
-          0
-        );
-      }
-
-      // Calculate snacks total
-      if (data.order.snacks) {
-        fnbTotal += Object.entries(data.order.snacks).reduce(
-          (sum, [snackId, quantity]) => {
-            const snackItem = menus?.find((menu) => menu._id === snackId);
-            const price = snackItem?.price
-              ? typeof snackItem.price === "string"
-                ? parseInt(snackItem.price.replace(/\./g, ""))
-                : snackItem.price
-              : 0;
-            return sum + price * Number(quantity);
-          },
-          0
-        );
-      }
-    }
-
-    const totalAmount = roomCost + fnbTotal;
-
-    // Áp dụng promotion nếu có
-    let finalTotal = totalAmount;
+    // Chỉ áp dụng promotion nếu có thay đổi
     if (selectedPromotion && appliedPromotion) {
-      finalTotal =
-        totalAmount * (1 - appliedPromotion.discountPercentage / 100);
+      finalTotal = finalTotal * (1 - appliedPromotion.discountPercentage / 100);
     }
 
     return {
