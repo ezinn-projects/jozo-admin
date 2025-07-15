@@ -138,18 +138,24 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     select: (data) => data.data.result,
   });
 
-  // Bill data query - chỉ gọi 1 lần khi modal mở
+  // Bill data query - gọi với thời gian thực tế ngay từ đầu
   const { data: billData, refetch: refetchBill } = useQuery({
-    queryKey: ["bill", schedule._id],
+    queryKey: [
+      "bill",
+      schedule._id,
+      selectedPromotion,
+      customEndTime,
+      customStartTime,
+    ],
     queryFn: () => {
-      // Convert custom times to ISO strings if they exist
+      // Convert custom times to ISO strings
       const actualEndTime = customEndTime
         ? dayjs()
             .set("hour", parseInt(customEndTime.split(":")[0]))
             .set("minute", parseInt(customEndTime.split(":")[1]))
             .set("second", 0)
             .toISOString()
-        : undefined;
+        : dayjs().toISOString();
 
       const actualStartTime = customStartTime
         ? dayjs(schedule.startTime)
@@ -157,7 +163,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             .set("minute", parseInt(customStartTime.split(":")[1]))
             .set("second", 0)
             .toISOString()
-        : undefined;
+        : schedule.startTime;
 
       return billAPis.getBillByScheduleId(
         schedule._id,
@@ -166,33 +172,17 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         actualStartTime
       );
     },
-    enabled: isOpen,
+    enabled: isOpen && !!customEndTime && !!customStartTime,
   });
 
-  // Calculate bill data locally when custom times change
+  // Calculate bill data locally for promotion changes
   const calculateBillData = () => {
     if (!billData?.data.result) return billData?.data.result;
 
-    const actualEndTime = customEndTime
-      ? dayjs()
-          .set("hour", parseInt(customEndTime.split(":")[0]))
-          .set("minute", parseInt(customEndTime.split(":")[1]))
-          .set("second", 0)
-          .toISOString()
-      : dayjs().toISOString();
-
-    const actualStartTime = customStartTime
-      ? dayjs(schedule.startTime)
-          .set("hour", parseInt(customStartTime.split(":")[0]))
-          .set("minute", parseInt(customStartTime.split(":")[1]))
-          .set("second", 0)
-          .toISOString()
-      : schedule.startTime;
-
-    // Sử dụng totalAmount từ API thay vì tính toán lại
+    // Sử dụng totalAmount từ API
     let finalTotal = billData.data.result.totalAmount || 0;
 
-    // Chỉ áp dụng promotion nếu có thay đổi
+    // Áp dụng promotion nếu có
     if (selectedPromotion && appliedPromotion) {
       finalTotal = finalTotal * (1 - appliedPromotion.discountPercentage / 100);
     }
@@ -200,8 +190,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     return {
       ...billData.data.result,
       totalAmount: finalTotal,
-      startTime: actualStartTime,
-      endTime: actualEndTime,
     };
   };
 
@@ -275,27 +263,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const handlePaymentMethodChange = (value: string) => {
-    queryClient.setQueryData(["bill", schedule._id], (oldData: unknown) => {
-      console.log("oldData", oldData);
-      if (!oldData) return oldData;
-      const typedOldData = oldData as {
-        data?: {
-          result?: {
-            paymentMethod?: string;
+    queryClient.setQueryData(
+      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
+      (oldData: unknown) => {
+        console.log("oldData", oldData);
+        if (!oldData) return oldData;
+        const typedOldData = oldData as {
+          data?: {
+            result?: {
+              paymentMethod?: string;
+            };
           };
         };
-      };
-      return {
-        ...typedOldData,
-        data: {
-          ...typedOldData.data,
-          result: {
-            ...typedOldData.data?.result,
-            paymentMethod: value,
+        return {
+          ...typedOldData,
+          data: {
+            ...typedOldData.data,
+            result: {
+              ...typedOldData.data?.result,
+              paymentMethod: value,
+            },
           },
-        },
-      };
-    });
+        };
+      }
+    );
   };
 
   const handlePromotionChange = (value: string) => {
