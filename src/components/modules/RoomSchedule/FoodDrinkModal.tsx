@@ -40,8 +40,8 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
     snacks: Record<string, number>;
     variants: Record<string, Record<string, number>>; // menuId -> variantName -> quantity
   }>({
-    drinks: { water: 0, soda: 0, tea: 0 },
-    snacks: { regular: 0, potato: 0, medium: 0 },
+    drinks: {},
+    snacks: {},
     variants: {},
   });
 
@@ -50,6 +50,8 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
   const [searchSnacks, setSearchSnacks] = React.useState("");
   const [searchVariants, setSearchVariants] = React.useState("");
   const { data: menus } = useGetAllMenus();
+
+  console.log("menus", menus);
 
   const queryClient = useQueryClient();
 

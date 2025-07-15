@@ -71,6 +71,21 @@ const formSchema = z
       .union([z.boolean(), z.string()])
       .transform((val) => (typeof val === "string" ? val === "true" : val)),
     variants: z.array(variantSchema).optional(),
+    inventory: z
+      .object({
+        quantity: z
+          .number()
+          .min(0, "Quantity must be greater than or equal to 0"),
+        unit: z.string().optional(),
+        minStock: z
+          .number()
+          .min(0, "Minimum stock must be greater than or equal to 0"),
+        maxStock: z
+          .number()
+          .min(0, "Maximum stock must be greater than or equal to 0"),
+        lastUpdated: z.date().optional(),
+      })
+      .optional(),
   })
   .superRefine((data, ctx) => {
     if (data.hasVariants && (!data.variants || data.variants.length === 0)) {
@@ -105,6 +120,13 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       image: "",
       hasVariants: false,
       variants: [],
+      inventory: {
+        quantity: 0,
+        unit: "",
+        minStock: 0,
+        maxStock: 0,
+        lastUpdated: new Date(),
+      },
     },
   });
 
@@ -136,6 +158,13 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
           ...variant,
           price: variant.price ? formatPrice(variant.price) : "",
         })),
+        inventory: initialValues.inventory || {
+          quantity: 0,
+          unit: "",
+          minStock: 0,
+          maxStock: 0,
+          lastUpdated: new Date(),
+        },
       });
     }
   }, [initialValues, itemKey, form]);
@@ -149,6 +178,13 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
       image: "",
       hasVariants: false,
       variants: [],
+      inventory: {
+        quantity: 0,
+        unit: "",
+        minStock: 0,
+        maxStock: 0,
+        lastUpdated: new Date(),
+      },
     });
     setFiles([]);
     setItemKey("");
@@ -194,6 +230,17 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
         }
       }
 
+      // Handle inventory for main product (only when hasVariants is false)
+      if (!data.hasVariants && data.inventory) {
+        formData.append(
+          "inventory",
+          JSON.stringify({
+            ...data.inventory,
+            lastUpdated: new Date(),
+          })
+        );
+      }
+
       if (data.hasVariants && data.variants) {
         // Ensure all variants have the correct structure before sending
         const processedVariants = await Promise.all(
@@ -203,6 +250,7 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
               quantity: 0,
               minStock: 0,
               maxStock: 0,
+              lastUpdated: new Date(),
             };
 
             // Handle variant image
@@ -371,6 +419,98 @@ export function FnbModal({ isOpen, onClose, initialValues }: FnbModalProps) {
                   </FormItem>
                 )}
               />
+
+              {/* Inventory Management for Main Product - Only show when hasVariants is false */}
+              {!form.watch("hasVariants") && (
+                <FormField
+                  control={form.control}
+                  name="inventory"
+                  render={() => (
+                    <FormItem className="space-y-4">
+                      <FormLabel>Inventory Management</FormLabel>
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="inventory.quantity"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Quantity</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(Number(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="inventory.unit"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Unit</FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="e.g., pieces, kg, liters"
+                                  {...field}
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-4">
+                        <FormField
+                          control={form.control}
+                          name="inventory.minStock"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Min Stock</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(Number(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="inventory.maxStock"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Max Stock</FormLabel>
+                              <FormControl>
+                                <Input
+                                  type="number"
+                                  min={0}
+                                  {...field}
+                                  onChange={(e) =>
+                                    field.onChange(Number(e.target.value))
+                                  }
+                                />
+                              </FormControl>
+                            </FormItem>
+                          )}
+                        />
+                      </div>
+                    </FormItem>
+                  )}
+                />
+              )}
             </div>
 
             <div className="space-y-4">
