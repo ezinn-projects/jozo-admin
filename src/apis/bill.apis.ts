@@ -6,13 +6,14 @@ const billAPis = {
   getBillByScheduleId: async (
     scheduleId: string,
     promotionId?: string,
-    actualEndTime: string = dayjs().toISOString(),
+    actualEndTime?: string,
     actualStartTime?: string
   ) => {
     const params = new URLSearchParams();
 
-    // Thêm các tham số bắt buộc
-    params.append("actualEndTime", actualEndTime);
+    // Thêm các tham số bắt buộc - sử dụng thời gian hiện tại nếu không có actualEndTime
+    const endTime = actualEndTime || dayjs().toISOString();
+    params.append("actualEndTime", endTime);
 
     // Thêm các tham số tùy chọn nếu có
     if (promotionId) {

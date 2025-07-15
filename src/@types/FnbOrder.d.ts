@@ -1,6 +1,7 @@
 interface FNBOrder {
   drinks: Record<string, number>;
   snacks: Record<string, number>;
+  variants?: Record<string, Record<string, number>>; // menuId -> variantName -> quantity
 }
 
 interface IFnbOrder {

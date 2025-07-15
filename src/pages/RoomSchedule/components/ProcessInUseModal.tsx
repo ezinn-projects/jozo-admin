@@ -102,6 +102,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     }
   }, [isOpen, schedule.startTime]);
 
+  const getAppliedPromotion = () => {
+    if (!selectedPromotion) return null;
+    return promotionList.find((promo) => promo._id === selectedPromotion);
+  };
+
+  const appliedPromotion = getAppliedPromotion();
+
   const queryClient = useQueryClient();
   const roomsData = queryClient.getQueryData<
     AxiosResponse<HTTPResponse<IRoom[]>>
@@ -131,26 +138,122 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     select: (data) => data.data.result,
   });
 
-  // Bill data query
+  // Bill data query - chỉ gọi 1 lần khi modal mở
   const { data: billData, refetch: refetchBill } = useQuery({
-    queryKey: [
-      "bill",
-      schedule._id,
-      selectedPromotion,
-      customEndTime,
-      customStartTime,
-    ],
-    queryFn: () =>
-      billAPis.getBillByScheduleId(
+    queryKey: ["bill", schedule._id],
+    queryFn: () => {
+      // Convert custom times to ISO strings if they exist
+      const actualEndTime = customEndTime
+        ? dayjs()
+            .set("hour", parseInt(customEndTime.split(":")[0]))
+            .set("minute", parseInt(customEndTime.split(":")[1]))
+            .set("second", 0)
+            .toISOString()
+        : undefined;
+
+      const actualStartTime = customStartTime
+        ? dayjs(schedule.startTime)
+            .set("hour", parseInt(customStartTime.split(":")[0]))
+            .set("minute", parseInt(customStartTime.split(":")[1]))
+            .set("second", 0)
+            .toISOString()
+        : undefined;
+
+      return billAPis.getBillByScheduleId(
         schedule._id,
         selectedPromotion || undefined,
-        customEndTime || undefined,
-        customStartTime || undefined
-      ),
+        actualEndTime,
+        actualStartTime
+      );
+    },
     enabled: isOpen,
   });
 
-  const billResult = (billData?.data.result || {}) as BillData;
+  // Calculate bill data locally when custom times change
+  const calculateBillData = () => {
+    if (!billData?.data.result) return billData?.data.result;
+
+    const actualEndTime = customEndTime
+      ? dayjs()
+          .set("hour", parseInt(customEndTime.split(":")[0]))
+          .set("minute", parseInt(customEndTime.split(":")[1]))
+          .set("second", 0)
+          .toISOString()
+      : dayjs().toISOString();
+
+    const actualStartTime = customStartTime
+      ? dayjs(schedule.startTime)
+          .set("hour", parseInt(customStartTime.split(":")[0]))
+          .set("minute", parseInt(customStartTime.split(":")[1]))
+          .set("second", 0)
+          .toISOString()
+      : schedule.startTime;
+
+    // Tính toán lại total amount dựa trên thời gian sử dụng mới
+    const startTime = dayjs(actualStartTime);
+    const endTime = dayjs(actualEndTime);
+    const durationInHours = endTime.diff(startTime, "hour", true);
+
+    // Giả sử giá phòng là 100,000 VND/giờ (có thể lấy từ room data)
+    const roomPricePerHour = 100000;
+    const roomCost = durationInHours * roomPricePerHour;
+
+    // Tính tổng từ FNB items
+    let fnbTotal = 0;
+    if (data?.order) {
+      // Tính drinks total
+      if (data.order.drinks) {
+        fnbTotal += Object.entries(data.order.drinks).reduce(
+          (sum, [drinkId, quantity]) => {
+            const drinkItem = menus?.find((menu) => menu._id === drinkId);
+            const price = drinkItem?.price
+              ? typeof drinkItem.price === "string"
+                ? parseInt(drinkItem.price.replace(/\./g, ""))
+                : drinkItem.price
+              : 0;
+            return sum + price * Number(quantity);
+          },
+          0
+        );
+      }
+
+      // Calculate snacks total
+      if (data.order.snacks) {
+        fnbTotal += Object.entries(data.order.snacks).reduce(
+          (sum, [snackId, quantity]) => {
+            const snackItem = menus?.find((menu) => menu._id === snackId);
+            const price = snackItem?.price
+              ? typeof snackItem.price === "string"
+                ? parseInt(snackItem.price.replace(/\./g, ""))
+                : snackItem.price
+              : 0;
+            return sum + price * Number(quantity);
+          },
+          0
+        );
+      }
+    }
+
+    const totalAmount = roomCost + fnbTotal;
+
+    // Áp dụng promotion nếu có
+    let finalTotal = totalAmount;
+    if (selectedPromotion && appliedPromotion) {
+      finalTotal =
+        totalAmount * (1 - appliedPromotion.discountPercentage / 100);
+    }
+
+    return {
+      ...billData.data.result,
+      totalAmount: finalTotal,
+      startTime: actualStartTime,
+      endTime: actualEndTime,
+    };
+  };
+
+  const calculatedBillData = calculateBillData();
+
+  const billResult = (calculatedBillData || {}) as BillData;
   const {
     totalAmount,
     items = [],
@@ -218,35 +321,32 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const handlePaymentMethodChange = (value: string) => {
-    queryClient.setQueryData(
-      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
-      (oldData: unknown) => {
-        console.log("oldData", oldData);
-        if (!oldData) return oldData;
-        const typedOldData = oldData as {
-          data?: {
-            result?: {
-              paymentMethod?: string;
-            };
+    queryClient.setQueryData(["bill", schedule._id], (oldData: unknown) => {
+      console.log("oldData", oldData);
+      if (!oldData) return oldData;
+      const typedOldData = oldData as {
+        data?: {
+          result?: {
+            paymentMethod?: string;
           };
         };
-        return {
-          ...typedOldData,
-          data: {
-            ...typedOldData.data,
-            result: {
-              ...typedOldData.data?.result,
-              paymentMethod: value,
-            },
+      };
+      return {
+        ...typedOldData,
+        data: {
+          ...typedOldData.data,
+          result: {
+            ...typedOldData.data?.result,
+            paymentMethod: value,
           },
-        };
-      }
-    );
+        },
+      };
+    });
   };
 
   const handlePromotionChange = (value: string) => {
     setSelectedPromotion(value === "none" ? "" : value);
-    refetchBill();
+    // Không cần refetchBill nữa vì chúng ta sử dụng local calculation
   };
 
   const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -256,13 +356,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCustomStartTime(e.target.value);
   };
-
-  const getAppliedPromotion = () => {
-    if (!selectedPromotion) return null;
-    return promotionList.find((promo) => promo._id === selectedPromotion);
-  };
-
-  const appliedPromotion = getAppliedPromotion();
 
   // Sử dụng useMutation để gọi API in hóa đơn
   const { mutate: printBill } = useMutation({
