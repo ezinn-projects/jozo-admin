@@ -264,7 +264,7 @@ export const useMenuItems = () => {
 
       return { previousMenuItems };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _variables, context) => {
       if (context?.previousMenuItems) {
         queryClient.setQueryData(
           menuItemsKeys.lists(),
