@@ -179,7 +179,7 @@ export const useMenuItems = () => {
       // Return a context object with the snapshotted value
       return { previousMenuItems };
     },
-    onError: (err, newMenuItem, context) => {
+    onError: (err, _newMenuItem, context) => {
       // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousMenuItems) {
         queryClient.setQueryData(
@@ -224,7 +224,7 @@ export const useMenuItems = () => {
 
       return { previousMenuItems };
     },
-    onError: (err, variables, context) => {
+    onError: (err, _variables, context) => {
       if (context?.previousMenuItems) {
         queryClient.setQueryData(
           menuItemsKeys.lists(),
@@ -264,7 +264,7 @@ export const useMenuItems = () => {
 
       return { previousMenuItems };
     },
-    onError: (err, itemId, context) => {
+    onError: (err, variables, context) => {
       if (context?.previousMenuItems) {
         queryClient.setQueryData(
           menuItemsKeys.lists(),

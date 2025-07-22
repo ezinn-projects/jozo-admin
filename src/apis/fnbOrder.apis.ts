@@ -1,7 +1,7 @@
 // import { IFnbOrder } from "@/@types/FnbOrder";
 import { IFnbOrder } from "@/@types/FnbOrder";
 import http from "@/utils/http";
-import type { OrderDetail } from "@/components/modules/RoomSchedule/MenuItemsModal";
+import type { OrderDetail } from "@/@types/FnbOrder";
 
 // Interface cho result của complete order
 export interface ICompleteOrderResult {

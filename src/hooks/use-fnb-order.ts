@@ -25,7 +25,7 @@ export const useAddItemToOrder = () => {
         category,
         createdBy,
       }),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate và refetch FNB order data
       queryClient.invalidateQueries({
         queryKey: ["fnbOrderByScheduleId", variables.roomScheduleId],
@@ -73,7 +73,7 @@ export const useRemoveItemFromOrder = () => {
         category,
         createdBy,
       }),
-    onSuccess: (data, variables) => {
+    onSuccess: (_data, variables) => {
       // Invalidate và refetch FNB order data
       queryClient.invalidateQueries({
         queryKey: ["fnbOrderByScheduleId", variables.roomScheduleId],

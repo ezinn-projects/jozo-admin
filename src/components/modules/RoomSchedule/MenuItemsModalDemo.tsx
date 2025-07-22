@@ -103,28 +103,6 @@ const MenuItemsModalDemo: React.FC = () => {
 
   const completeOrderMutation = useCompleteOrder();
 
-  const handleItemSelect = (item: MenuItem, variant?: MenuItemVariant) => {
-    console.log("Selected item:", item);
-    console.log("Selected variant:", variant);
-
-    // Thêm item vào danh sách đã chọn
-    const existingItemIndex = selectedItems.findIndex(
-      (selected) =>
-        selected.item._id === item._id &&
-        selected.variant?.name === variant?.name
-    );
-
-    if (existingItemIndex >= 0) {
-      // Tăng số lượng nếu item đã tồn tại
-      const updatedItems = [...selectedItems];
-      updatedItems[existingItemIndex].quantity += 1;
-      setSelectedItems(updatedItems);
-    } else {
-      // Thêm item mới
-      setSelectedItems([...selectedItems, { item, variant, quantity: 1 }]);
-    }
-  };
-
   const handleCompleteOrder = () => {
     if (selectedItems.length === 0) {
       alert("Vui lòng chọn ít nhất một item");
@@ -255,7 +233,6 @@ const MenuItemsModalDemo: React.FC = () => {
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
           menuItems={sampleMenuItems}
-          onItemSelect={handleItemSelect}
           roomId="room_id_example"
           scheduleId="schedule_id_example"
           createdBy="user_id_example"

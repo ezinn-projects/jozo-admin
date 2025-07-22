@@ -271,7 +271,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
       return { previousOrderData, previousQuantity };
     },
-    onError: (err, variables, context) => {
+    onError: (_err, variables, context) => {
       if (context?.previousOrderData) {
         queryClient.setQueryData(
           ["fnbOrderDetail", scheduleId],
