@@ -1,8 +1,26 @@
 // import { IFnbOrder } from "@/@types/FnbOrder";
 import { IFnbOrder } from "@/@types/FnbOrder";
 import http from "@/utils/http";
+import type { OrderDetail } from "@/components/modules/RoomSchedule/MenuItemsModal";
 
-const FNB_ORDER_CONTROLLER = "/fnb-order";
+// Interface cho result của complete order
+export interface ICompleteOrderResult {
+  order: IFnbOrder;
+  updatedItems: Array<{
+    _id: string;
+    name: string;
+    category: string;
+    price: number;
+    inventory: {
+      quantity: number;
+      minStock?: number;
+      maxStock?: number;
+      lastUpdated: string;
+    };
+  }>;
+}
+
+const FNB_ORDER_CONTROLLER = "/fnb-orders";
 
 // Interface cho FNB Order (input API)
 export interface ICreateFnbOrderRequestBody {
@@ -11,6 +29,24 @@ export interface ICreateFnbOrderRequestBody {
     drinks: Record<string, number>;
     snacks: Record<string, number>;
   };
+  createdBy: string;
+}
+
+// Interface cho Add/Remove Item
+export interface IAddRemoveItemRequestBody {
+  itemId: string;
+  quantity: number;
+  category: "drinks" | "snacks";
+  createdBy: string;
+}
+
+// Interface cho Complete Order
+export interface ICompleteOrderRequestBody {
+  roomScheduleId: string;
+  items: Array<{
+    itemId: string;
+    quantity: number;
+  }>;
   createdBy: string;
 }
 
@@ -43,6 +79,52 @@ const fnbOrderApis = {
   getFnbOrdersByRoomSchedule: (roomScheduleId: string) => {
     return http.get<HTTPResponse<IFnbOrder[]>>(
       `${FNB_ORDER_CONTROLLER}/fnb-order/${roomScheduleId}`
+    );
+  },
+  // Thêm item vào order
+  addItemToOrder: (
+    roomScheduleId: string,
+    payload: IAddRemoveItemRequestBody
+  ) => {
+    return http.post<HTTPResponse<IFnbOrder>>(
+      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/add-item`,
+      payload
+    );
+  },
+  // Xóa item khỏi order
+  removeItemFromOrder: (
+    roomScheduleId: string,
+    payload: IAddRemoveItemRequestBody
+  ) => {
+    return http.post<HTTPResponse<IFnbOrder>>(
+      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/remove-item`,
+      payload
+    );
+  },
+  // Complete order với items
+  completeOrder: (payload: ICompleteOrderRequestBody) => {
+    return http.post<HTTPResponse<ICompleteOrderResult>>(
+      `${FNB_ORDER_CONTROLLER}/complete`,
+      payload
+    );
+  },
+  // Upsert item vào order (thêm hoặc cập nhật số lượng)
+  upsertItem: (payload: {
+    roomScheduleId: string;
+    itemId: string;
+    quantity: number;
+    category: string;
+    createdBy: string;
+  }) => {
+    return http.post<HTTPResponse<IFnbOrder>>(
+      `${FNB_ORDER_CONTROLLER}/upsert-item`,
+      payload
+    );
+  },
+  // Lấy chi tiết order theo roomScheduleId (API mới)
+  getFnbOrderDetail: (roomScheduleId: string) => {
+    return http.get<HTTPResponse<OrderDetail>>(
+      `${FNB_ORDER_CONTROLLER}/detail/${roomScheduleId}`
     );
   },
 };

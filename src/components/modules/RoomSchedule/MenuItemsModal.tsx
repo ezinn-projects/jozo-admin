@@ -1,0 +1,571 @@
+import React, { useState, useMemo } from "react";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Input } from "@/components/ui/input";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Search, Package, Coffee, Utensils } from "lucide-react";
+import fnbOrderApis from "@/apis/fnbOrder.apis";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import type { OrderDetail, OrderDetailItem } from "@/@types/FnbOrder";
+import { IRoom } from "@/@types/Room";
+import { AxiosResponse } from "axios";
+
+interface MenuItem {
+  _id: string;
+  name: string;
+  parentId: string | null;
+  hasVariant: boolean;
+  price: number;
+  image: string;
+  category: string;
+  inventory: {
+    quantity: number;
+    minStock?: number;
+    maxStock?: number;
+    lastUpdated?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  existingImage?: string;
+  quantity?: string;
+  variants?: string; // JSON string của variants
+}
+
+interface MenuItemsModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  menuItems: MenuItem[];
+  roomId?: string; // Thêm prop cho room ID
+  scheduleId?: string; // Thêm prop cho schedule ID
+  createdBy?: string; // Thêm prop cho user ID
+}
+
+const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
+  isOpen,
+  onClose,
+  menuItems,
+  roomId,
+  scheduleId,
+  createdBy,
+}) => {
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const queryClient = useQueryClient();
+
+  const roomsData = queryClient.getQueryData<
+    AxiosResponse<HTTPResponse<IRoom[]>>
+  >(["rooms"]);
+  console.log("roomsData", roomsData?.data.result);
+  const room = roomsData?.data.result?.find((room) => room._id === roomId);
+  console.log("room", room);
+
+  // Query lấy order detail
+  const { data: orderDetailData } = useQuery<OrderDetail | undefined>({
+    queryKey: ["fnbOrderDetail", scheduleId],
+    queryFn: () =>
+      scheduleId
+        ? fnbOrderApis
+            .getFnbOrderDetail(scheduleId)
+            .then((res) => res.data.result as OrderDetail)
+        : Promise.resolve(undefined),
+    enabled: isOpen && !!scheduleId,
+    refetchOnWindowFocus: false,
+  });
+
+  // Lấy quantities từ query data (orderDetailData)
+  const quantities = useMemo(() => {
+    const q: Record<string, number> = {};
+    orderDetailData?.items.drinks.forEach((item: OrderDetailItem) => {
+      q[item.itemId] = item.quantity;
+    });
+    orderDetailData?.items.snacks.forEach((item: OrderDetailItem) => {
+      q[item.itemId] = item.quantity;
+    });
+    return q;
+  }, [orderDetailData]);
+
+  // Phân loại menu items theo category
+  const categorizedItems = React.useMemo(() => {
+    const categories: Record<string, MenuItem[]> = {};
+
+    menuItems.forEach((item) => {
+      const category = item.category || "other";
+      if (!categories[category]) {
+        categories[category] = [];
+      }
+      categories[category].push(item);
+    });
+
+    return categories;
+  }, [menuItems]);
+
+  // Group các item con vào parent
+  const groupedItems = React.useMemo(() => {
+    const parents: MenuItem[] = [];
+    const childrenMap: Record<string, MenuItem[]> = {};
+    menuItems.forEach((item) => {
+      if (!item.parentId) {
+        parents.push(item);
+      } else {
+        if (!childrenMap[item.parentId]) childrenMap[item.parentId] = [];
+        childrenMap[item.parentId].push(item);
+      }
+    });
+    return { parents, childrenMap };
+  }, [menuItems]);
+
+  // Hàm normalize tiếng Việt không dấu và lower case
+  const normalize = (str: string) =>
+    str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "")
+      .replace(/đ/g, "d")
+      .replace(/Đ/g, "d");
+
+  // Lọc items theo search term và category, chỉ lấy parent
+  const filteredParentItems = React.useMemo(() => {
+    let parents = groupedItems.parents;
+    if (searchTerm.trim()) {
+      const searchNorm = normalize(searchTerm);
+      parents = parents.filter((parent) => {
+        // Kiểm tra tên cha
+        if (
+          normalize(parent.name).includes(searchNorm) ||
+          normalize(parent.category).includes(searchNorm)
+        ) {
+          return true;
+        }
+        // Kiểm tra tên các con
+        const children = groupedItems.childrenMap[parent._id] || [];
+        return children.some((child) =>
+          normalize(child.name).includes(searchNorm)
+        );
+      });
+    }
+    if (selectedCategory !== "all") {
+      parents = parents.filter((item) => item.category === selectedCategory);
+    }
+    return parents;
+  }, [groupedItems, searchTerm, selectedCategory]);
+
+  // Lấy tất cả categories
+  const categories = React.useMemo(() => {
+    const cats = Object.keys(categorizedItems).filter((cat) => cat !== "other");
+    return ["all", ...cats];
+  }, [categorizedItems]);
+
+  // Icon cho từng category
+  const getCategoryIcon = (category: string) => {
+    switch (category.toLowerCase()) {
+      case "drinks":
+        return <Coffee className="w-4 h-4" />;
+      case "snacks":
+        return <Utensils className="w-4 h-4" />;
+      default:
+        return <Package className="w-4 h-4" />;
+    }
+  };
+
+  // Label cho category
+  const getCategoryLabel = (category: string) => {
+    switch (category.toLowerCase()) {
+      case "drinks":
+        return "Đồ Uống";
+      case "snacks":
+        return "Đồ Ăn";
+      case "all":
+        return "Tất Cả";
+      default:
+        return category.charAt(0).toUpperCase() + category.slice(1);
+    }
+  };
+
+  // Mutation cho upsertItem với optimistic update
+  const upsertMutation = useMutation({
+    mutationFn: async ({ key, value }: { key: string; value: number }) => {
+      const item = menuItems.find((i) => i._id === key);
+      if (!item || !scheduleId || !createdBy) return;
+      await fnbOrderApis.upsertItem({
+        roomScheduleId: scheduleId,
+        itemId: item._id,
+        quantity: value,
+        category: item.category,
+        createdBy,
+      });
+    },
+    onMutate: async ({ key, value }) => {
+      await queryClient.cancelQueries({
+        queryKey: ["fnbOrderDetail", scheduleId],
+      });
+      const previousOrderData = queryClient.getQueryData([
+        "fnbOrderDetail",
+        scheduleId,
+      ]);
+
+      // Optimistic update cho orderDetail
+      queryClient.setQueryData(
+        ["fnbOrderDetail", scheduleId],
+        (old: OrderDetail | undefined) => {
+          console.log("old fnbOrderDetail", old);
+          if (!old) return old;
+
+          const newDrinks = old.items.drinks.map((item) =>
+            item.itemId === key ? { ...item, quantity: value } : item
+          );
+          const newSnacks = old.items.snacks.map((item) =>
+            item.itemId === key ? { ...item, quantity: value } : item
+          );
+          return {
+            ...old,
+            items: {
+              drinks: newDrinks,
+              snacks: newSnacks,
+            },
+          };
+        }
+      );
+
+      // Optimistic update cho menuItems (cập nhật inventory.quantity)
+      const previousQuantity = quantities[key] || 0;
+      const quantityDiff = value - previousQuantity;
+
+      // Cập nhật menuItems trong cache nếu có
+      queryClient.setQueriesData(
+        { queryKey: ["menuItems"] },
+        (old: { data?: { result?: MenuItem[] } } | undefined) => {
+          console.log("old fnbMenu", old);
+          if (!old?.data?.result) return old;
+          return {
+            ...old,
+            data: {
+              ...old.data,
+              result: old.data.result.map((item: MenuItem) => {
+                if (item._id === key) {
+                  return {
+                    ...item,
+                    inventory: {
+                      ...item.inventory,
+                      quantity: Math.max(
+                        0,
+                        (item.inventory?.quantity || 0) - quantityDiff
+                      ),
+                    },
+                  };
+                }
+                return item;
+              }),
+            },
+          };
+        }
+      );
+
+      return { previousOrderData, previousQuantity };
+    },
+    onError: (err, variables, context) => {
+      if (context?.previousOrderData) {
+        queryClient.setQueryData(
+          ["fnbOrderDetail", scheduleId],
+          context.previousOrderData
+        );
+      }
+      // Rollback menuItems nếu cần
+      if (context?.previousQuantity !== undefined) {
+        const quantityDiff = variables.value - context.previousQuantity;
+        queryClient.setQueriesData(
+          { queryKey: ["fnbMenu"] },
+          (old: { data?: { result?: MenuItem[] } } | undefined) => {
+            if (!old?.data?.result) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                result: old.data.result.map((item: MenuItem) => {
+                  if (item._id === variables.key) {
+                    return {
+                      ...item,
+                      inventory: {
+                        ...item.inventory,
+                        quantity: Math.max(
+                          0,
+                          (item.inventory?.quantity || 0) + quantityDiff
+                        ),
+                      },
+                    };
+                  }
+                  return item;
+                }),
+              },
+            };
+          }
+        );
+      }
+    },
+    onSuccess: () => {
+      if (scheduleId) {
+        queryClient.invalidateQueries({
+          queryKey: ["fnbOrderDetail", scheduleId],
+        });
+        // Refetch bill (queryKey phải giống như trong ProcessInUseModal)
+        queryClient.invalidateQueries({ queryKey: ["bill", scheduleId] });
+      }
+    },
+  });
+
+  // Khi thay đổi số lượng input, gọi mutation luôn
+  const handleQuantityChange = (key: string, value: number) => {
+    upsertMutation.mutate({ key, value: value < 0 ? 0 : value });
+  };
+
+  // Render lại card: nếu có con thì hiển thị các con, không thì hiển thị như món đơn giản
+  const renderMenuItem = (item: MenuItem) => {
+    const children = groupedItems.childrenMap[item._id] || [];
+    if (children.length > 0) {
+      // Card group cho parent có children
+      return (
+        <Card key={item._id} className="mb-4 hover:shadow-md transition-shadow">
+          <CardHeader className="pb-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <img
+                  src={item.image}
+                  alt={item.name}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <div>
+                  <CardTitle className="text-lg">{item.name}</CardTitle>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Badge variant="outline" className="text-xs">
+                      {item.category}
+                    </Badge>
+                    <Badge variant="secondary" className="text-xs">
+                      Có lựa chọn
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              <div className="text-right">
+                <p className="text-lg font-bold text-green-600">
+                  {item.price.toLocaleString("vi-VN")} VND
+                </p>
+                <p className="text-sm text-gray-500">
+                  Tổng tồn kho: {item.inventory.quantity || 0}
+                </p>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-3">
+              <h4 className="font-medium text-gray-700 mb-2">Các lựa chọn:</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {children.map((child) => {
+                  const key = child._id;
+                  return (
+                    <div
+                      key={key}
+                      className="flex items-center justify-between p-3 border rounded-lg hover:bg-gray-50"
+                    >
+                      <div className="flex items-center gap-2">
+                        <img
+                          src={child.image}
+                          alt={child.name}
+                          className="w-12 h-12 rounded-md object-cover"
+                        />
+                        <div>
+                          <p className="font-medium text-sm">{child.name}</p>
+                          <p className="text-xs text-gray-500">
+                            Tồn kho: {child.inventory.quantity || 0}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="number"
+                          min={0}
+                          max={child.inventory.quantity}
+                          value={quantities[key] || 0}
+                          onChange={(e) => {
+                            const newValue = Number(e.target.value);
+                            const maxAllowed = child.inventory.quantity || 0;
+                            if (newValue <= maxAllowed) {
+                              handleQuantityChange(key, newValue);
+                            }
+                          }}
+                          disabled={
+                            (child.inventory.quantity || 0) === 0 &&
+                            (quantities[key] || 0) === 0
+                          }
+                          className={`w-16 border rounded px-2 py-1 text-sm ${
+                            (child.inventory.quantity || 0) === 0 &&
+                            (quantities[key] || 0) === 0
+                              ? "bg-gray-100 cursor-not-allowed"
+                              : ""
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      );
+    }
+    // Nếu không có con, hiển thị như món đơn giản
+    const key = item._id;
+    return (
+      <Card key={item._id} className="mb-4 hover:shadow-md transition-shadow">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <img
+                src={item.image}
+                alt={item.name}
+                className="w-16 h-16 rounded-lg object-cover"
+              />
+              <div>
+                <CardTitle className="text-lg">{item.name}</CardTitle>
+                <div className="flex items-center gap-2 mt-1">
+                  <Badge variant="outline" className="text-xs">
+                    {item.category}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-bold text-green-600">
+                {item.price.toLocaleString("vi-VN")} VND
+              </p>
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="flex justify-between items-center">
+            <div className="text-sm text-gray-600">
+              <p>Tồn kho: {item.inventory?.quantity || 0}</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                min={0}
+                max={item.inventory?.quantity || 0}
+                value={quantities[key] || 0}
+                onChange={(e) => {
+                  const newValue = Number(e.target.value);
+                  const maxAllowed = item.inventory?.quantity || 0;
+                  if (newValue <= maxAllowed) {
+                    handleQuantityChange(key, newValue);
+                  }
+                }}
+                disabled={
+                  (item.inventory?.quantity || 0) === 0 &&
+                  (quantities[key] || 0) === 0
+                }
+                className={`w-16 border rounded px-2 py-1 text-sm ${
+                  (item.inventory?.quantity || 0) === 0 &&
+                  (quantities[key] || 0) === 0
+                    ? "bg-gray-100 cursor-not-allowed"
+                    : ""
+                }`}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  };
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="text-2xl">Danh Sách Menu Items</DialogTitle>
+          <DialogDescription>
+            Chọn món ăn hoặc đồ uống để thêm vào phòng
+            {roomId && scheduleId && (
+              <div className="mt-2 text-sm text-gray-600">
+                <p>Room ID: {room?.roomName || "Không có phòng"}</p>
+                <p>Schedule ID: {scheduleId}</p>
+              </div>
+            )}
+          </DialogDescription>
+        </DialogHeader>
+
+        <div className="flex flex-col h-full">
+          <div className="flex flex-row gap-4 h-full">
+            {/* Bên trái: menu */}
+            <div className="flex-1 flex flex-col">
+              {/* Search và Filter */}
+              <div className="mb-6 space-y-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Tìm kiếm món ăn, đồ uống..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+                {/* Category Tabs */}
+                <Tabs
+                  value={selectedCategory}
+                  onValueChange={setSelectedCategory}
+                >
+                  <TabsList className="grid w-full grid-cols-4">
+                    {categories.slice(0, 4).map((category) => (
+                      <TabsTrigger
+                        key={category}
+                        value={category}
+                        className="flex items-center gap-2"
+                      >
+                        {getCategoryIcon(category)}
+                        {getCategoryLabel(category)}
+                      </TabsTrigger>
+                    ))}
+                  </TabsList>
+                </Tabs>
+              </div>
+              {/* Content */}
+              <div className="flex-1 overflow-y-auto">
+                <div className="space-y-4">
+                  {filteredParentItems.length === 0 ? (
+                    <div className="text-center py-8">
+                      <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">
+                        {searchTerm
+                          ? "Không tìm thấy món nào phù hợp"
+                          : "Không có món nào trong danh mục này"}
+                      </p>
+                    </div>
+                  ) : (
+                    filteredParentItems.map(renderMenuItem)
+                  )}
+                </div>
+              </div>
+            </div>
+            {/* Bên phải: preview nhỏ gọn */}
+            {/* Xoá các đoạn code liên quan đến selectedItems, handleConfirm, completeOrderMutation, và nút xác nhận trong preview */}
+          </div>
+        </div>
+
+        <DialogFooter className="sticky bottom-0 bg-white z-10 border-t pt-4">
+          <Button variant="outline" onClick={onClose}>
+            Đóng
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+};
+
+export default MenuItemsModal;

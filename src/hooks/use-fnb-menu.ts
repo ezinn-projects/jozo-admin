@@ -8,11 +8,9 @@ export const useGetAllMenus = () => {
     queryKey: ["fnbMenus"],
     queryFn: async () => {
       const response = await fnbMenuApis.getAllMenus();
-      console.log("API Response:", response);
       return response;
     },
     select: (data) => {
-      console.log("Selected data:", data.data.result);
       return data.data.result;
     },
     staleTime: 60 * 1000, // Giảm xuống 1 phút

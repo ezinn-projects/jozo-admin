@@ -74,3 +74,8 @@ export enum FoodDrinkType {
   Drink = "drink",
   Snack = "snack",
 }
+
+export enum FnBCategory {
+  SNACK = "snack",
+  DRINK = "drink",
+}

@@ -27,6 +27,9 @@ const PATHS = {
   FNB: "/fnb",
   FNB_NEW: "/fnb/new",
   FNB_EDIT: "/fnb/:id/edit",
+  MENU_ITEMS: "/menu-items",
+  MENU_ITEMS_NEW: "/menu-items/new",
+  MENU_ITEMS_EDIT: "/menu-items/:id/edit",
 
   // promotion management
   PROMOTION: "/promotion",

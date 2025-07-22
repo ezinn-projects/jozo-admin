@@ -51,8 +51,6 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
   const [searchVariants, setSearchVariants] = React.useState("");
   const { data: menus } = useGetAllMenus();
 
-  console.log("menus", menus);
-
   const queryClient = useQueryClient();
 
   const data = queryClient.getQueryData<AxiosResponse<HTTPResponse<IFnbOrder>>>(
@@ -142,7 +140,6 @@ const FoodDrinkModal: React.FC<FoodDrinkModalProps> = ({
       console.log("Order is null or undefined in totalPrice");
       return 0;
     }
-    console.log("Order in totalPrice:", order);
 
     const totalDrinks =
       DRINK_OPTIONS?.reduce(

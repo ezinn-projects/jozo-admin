@@ -7,6 +7,7 @@ export interface Inventory {
 }
 
 export interface Variant {
+  id?: string; // Thêm trường id để đồng bộ với dữ liệu thực tế
   name: string;
   price?: string;
   isAvailable: boolean;

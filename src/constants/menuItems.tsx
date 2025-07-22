@@ -7,6 +7,7 @@ import {
   Settings2,
   AppleIcon,
   PercentIcon,
+  UtensilsCrossed,
 } from "lucide-react";
 import PATHS from "./paths";
 
@@ -49,6 +50,11 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Food & Beverage",
         url: PATHS.FNB,
         icon: AppleIcon,
+      },
+      {
+        title: "Menu Items",
+        url: PATHS.MENU_ITEMS,
+        icon: UtensilsCrossed,
       },
       {
         title: "Promotion",

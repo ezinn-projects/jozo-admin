@@ -1,4 +1,5 @@
 import { FnbMenu } from "@/@types/FnBMenu";
+import { FnBMenuItem } from "@/hooks/use-menu-items";
 import http from "@/utils/http";
 // import { FnbMenu } from '../types/fnbMenu.types';
 
@@ -18,6 +19,30 @@ const fnbMenuApis = {
 
   updateMenu: (id: string, menu: Partial<FnbMenu>) =>
     http.putForm<FnbMenu | null>(`/fnb-menu/${id}`, menu, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+
+  // Menu Item APIs
+  createMenuItem: (menuItem: FormData) =>
+    http.postForm<FnBMenuItem>("/fnb-menu-item", menuItem, {
+      headers: {
+        "Content-Type": "multipart/form-data",
+      },
+    }),
+
+  getMenuItemById: (id: string) =>
+    http.get<HTTPResponse<FnBMenuItem | null>>(`/fnb-menu-item/${id}`),
+
+  getAllMenuItems: () =>
+    http.get<HTTPResponse<FnBMenuItem[]>>(`/fnb-menu-item`),
+
+  deleteMenuItem: (id: string) =>
+    http.delete<FnBMenuItem | null>(`/fnb-menu-item/${id}`),
+
+  updateMenuItem: (id: string, menuItem: FormData) =>
+    http.putForm<FnBMenuItem | null>(`/fnb-menu-item/${id}`, menuItem, {
       headers: {
         "Content-Type": "multipart/form-data",
       },

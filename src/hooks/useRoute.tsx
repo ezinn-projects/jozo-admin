@@ -33,6 +33,7 @@ const UpsertRoomTypePage = lazy(
   () => import("@/pages/RoomTypes/UpsertRoomTypePage")
 );
 const FnBPage = lazy(() => import("@/pages/FnB"));
+const MenuItemsPage = lazy(() => import("@/pages/FnB/MenuItemsPage"));
 
 function useRoute() {
   return (
@@ -72,6 +73,7 @@ function useRoute() {
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />
                 <Route path={PATHS.FNB} element={<FnBPage />} />
+                <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route
                   path={PATHS.TOTAL_REVENUE}

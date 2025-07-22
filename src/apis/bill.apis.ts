@@ -25,7 +25,7 @@ const billAPis = {
     }
 
     return http.get<HTTPResponse<IBill>>(
-      `/bill/${scheduleId}/?${params.toString()}`
+      `/bill/${scheduleId}?${params.toString()}`
     );
   },
 
