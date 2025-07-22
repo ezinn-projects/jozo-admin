@@ -2,6 +2,8 @@ import { IRoom } from "@/@types/Room";
 import roomsScheduleApis, {
   ICreateRoomScheduleRequest,
 } from "@/apis/roomSchedule.api";
+import fnbOrderApis from "@/apis/fnbOrder.apis";
+import useAuth from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -84,6 +86,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   // Biến cờ để đánh dấu nếu người dùng đã tự chỉnh sửa End Time
   const [isEndTimeModified, setIsEndTimeModified] = useState(false);
 
+  const { user } = useAuth();
+
   const { mutate: updateSchedule, isPending: isUpdating } = useMutation({
     mutationFn: (payload: {
       id: string;
@@ -101,7 +105,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const { mutate: createSchedule, isPending: isCreating } = useMutation({
     mutationFn: (payload: ICreateRoomScheduleRequest) =>
       roomsScheduleApis.createSchedule(payload),
-    onSuccess: () => {
+    onSuccess: async (response) => {
+      // response.data.result là roomSchedule vừa tạo
+      const roomScheduleId = response?.data?.result;
+      console.log("roomScheduleId", roomScheduleId);
+
+      if (roomScheduleId) {
+        try {
+          await fnbOrderApis.createFnbOrder({
+            roomScheduleId,
+            order: { drinks: {}, snacks: {} },
+            createdBy: user?.name || "system",
+          });
+        } catch (err) {
+          console.error("Tạo order thất bại:", err);
+        }
+      }
       refetchSchedules();
       onClose();
     },

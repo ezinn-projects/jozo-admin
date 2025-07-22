@@ -23,7 +23,7 @@ const roomsScheduleApis = {
   deleteSchedule: (id: string) =>
     http.delete<HTTPResponse<IRoomSchedule>>(`/room-schedule/${id}`),
   createSchedule: (schedule: ICreateRoomScheduleRequest) =>
-    http.post<HTTPResponse<IRoomSchedule>>(`/room-schedule`, schedule),
+    http.post<HTTPResponse<string>>(`/room-schedule`, schedule),
   getScheduleById: (id: string) =>
     http.get<HTTPResponse<IRoomSchedule>>(`/room-schedule/${id}`),
 };
