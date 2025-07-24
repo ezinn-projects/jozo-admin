@@ -29,7 +29,7 @@ import ProcessInUseModal from "./ProcessInUseModal";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
 
-const DAY_START_HOUR = 10;
+const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
 const HOUR_MARKER_SPACING = 120;
 const SCALE = HOUR_MARKER_SPACING / 60;
@@ -335,7 +335,12 @@ const RoomTimelineTable: React.FC = () => {
         const eventEnd = dayjs(schedule.endTime);
         durationMinutes = eventEnd.diff(eventStart, "minute");
       } else {
-        durationMinutes = currentTime.diff(eventStart, "minute");
+        // Nếu chưa có endTime, kéo dài đến currentTime hoặc đến hết ngày (24h)
+        const endOfDay = eventStart.startOf("day").hour(DAY_END_HOUR).minute(0);
+        const now = dayjs();
+        // Nếu currentTime <= endOfDay thì lấy currentTime, còn nếu đã qua 24h thì lấy endOfDay
+        const actualEnd = now.isBefore(endOfDay) ? now : endOfDay;
+        durationMinutes = actualEnd.diff(eventStart, "minute");
         if (durationMinutes <= 0) durationMinutes = 1;
       }
     }
@@ -478,14 +483,14 @@ const RoomTimelineTable: React.FC = () => {
             </div>
             <div className="flex-1 relative h-10">
               {Array.from({
-                length: (DAY_END_HOUR - DAY_START_HOUR) * 2 + 1,
+                length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
               }).map((_, index) => {
-                const left = index * (HOUR_MARKER_SPACING / 2);
+                const left = index * (HOUR_MARKER_SPACING / 4);
                 return (
                   <div
                     key={`grid-${index}`}
                     className={`absolute h-full w-px ${
-                      index % 2 === 0 ? "bg-gray-300" : "bg-gray-200"
+                      index % 4 === 0 ? "bg-gray-300" : "bg-gray-200"
                     }`}
                     style={{ left }}
                   />
@@ -584,14 +589,14 @@ const RoomTimelineTable: React.FC = () => {
                     </>
                   )}
                   {Array.from({
-                    length: (DAY_END_HOUR - DAY_START_HOUR) * 2 + 1,
+                    length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
                   }).map((_, index) => {
-                    const left = index * (HOUR_MARKER_SPACING / 2);
+                    const left = index * (HOUR_MARKER_SPACING / 4);
                     return (
                       <div
                         key={`room-grid-${index}`}
                         className={`absolute h-full w-px ${
-                          index % 2 === 0 ? "bg-gray-200" : "bg-gray-100"
+                          index % 4 === 0 ? "bg-gray-200" : "bg-gray-100"
                         }`}
                         style={{ left }}
                       />
