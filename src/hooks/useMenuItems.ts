@@ -1,5 +1,6 @@
 import { useMemo } from "react";
 import { MENU_ITEMS, MenuItem } from "@/constants/menuItems";
+import { Role } from "@/constants/enum";
 import useAuth from "./useAuth";
 
 /**
@@ -21,7 +22,7 @@ export const useMenuItems = (): MenuItem[] => {
       }
 
       // Kiểm tra xem role của user có trong danh sách roles được phép không
-      const hasAccess = item.roles.includes(user.role);
+      const hasAccess = item.roles.includes(user.role as Role);
 
       // Nếu item có subItems, cũng cần lọc subItems
       if (item.subItems && item.subItems.length > 0) {
@@ -29,7 +30,7 @@ export const useMenuItems = (): MenuItem[] => {
           if (!subItem.roles) {
             return true;
           }
-          return subItem.roles.includes(user.role);
+          return subItem.roles.includes(user.role as Role);
         });
 
         // Chỉ hiển thị item nếu có ít nhất một subItem được phép truy cập
@@ -46,7 +47,7 @@ export const useMenuItems = (): MenuItem[] => {
             if (!subItem.roles) {
               return true;
             }
-            return subItem.roles.includes(user.role);
+            return subItem.roles.includes(user.role as Role);
           }),
         };
       }

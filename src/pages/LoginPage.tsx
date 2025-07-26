@@ -23,7 +23,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
 type FormValues = {
-  username: string;
+  email: string;
   password: string;
 };
 
@@ -40,7 +40,7 @@ export default function LoginPage() {
 
   const form = useForm<FormValues>({
     defaultValues: {
-      username: "",
+      email: "",
       password: "",
     },
     resolver: zodResolver(loginSchema),
@@ -99,12 +99,12 @@ export default function LoginPage() {
 
           <FormField
             control={control}
-            name="username"
+            name="email"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Username</FormLabel>
+                <FormLabel>Email</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter username" {...field} />
+                  <Input placeholder="Enter email" {...field} />
                 </FormControl>
 
                 <FormMessage />

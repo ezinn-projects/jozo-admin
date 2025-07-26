@@ -21,7 +21,7 @@ export const usePermission = (requiredRoles: Role[]) => {
       };
     }
 
-    const hasAccess = requiredRoles.includes(user.role);
+    const hasAccess = requiredRoles.includes(user.role as Role);
     const isAdmin = user.role === Role.Admin;
     const isStaff = user.role === Role.Staff;
 
