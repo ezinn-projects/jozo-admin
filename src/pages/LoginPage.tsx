@@ -52,6 +52,7 @@ export default function LoginPage() {
     mutationFn: authorizationApis.login,
     onSuccess: async ({ data }) => {
       localStorage.setItem("access_token", data.result?.access_token || "");
+      localStorage.setItem("refresh_token", data.result?.refresh_token || "");
 
       // Dispatch event login success
       window.dispatchEvent(new Event(AUTH_EVENTS.LOGIN_SUCCESS));

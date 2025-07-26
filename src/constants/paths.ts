@@ -18,6 +18,16 @@ const PATHS = {
   PRICE: "/price",
   CALENDAR: "/calendar",
 
+  // users management
+  USERS_MANAGEMENT: "/users-management",
+  USERS_MANAGEMENT_NEW: "/users-management/new",
+  USERS_MANAGEMENT_EDIT: "/users-management/:id/edit",
+
+  // staff management
+  STAFF_MANAGEMENT: "/staff-management",
+  STAFF_MANAGEMENT_NEW: "/staff-management/new",
+  STAFF_MANAGEMENT_EDIT: "/staff-management/:id/edit",
+
   // room types management
   ROOM_TYPES_LISTS: "/room-types",
   ROOM_TYPES_NEW: "/room-types/new",

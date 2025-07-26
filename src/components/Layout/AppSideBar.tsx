@@ -11,18 +11,20 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import { MENU_ITEMS } from "@/constants/menuItems";
 import useAuth from "@/hooks/useAuth";
-import { ChevronDown, LogOut } from "lucide-react";
+import { useMenuItems } from "@/hooks/useMenuItems";
+import { MenuItem } from "@/constants/menuItems";
+import { ChevronDown } from "lucide-react";
 import { useState } from "react";
-import { Button } from "../ui/button";
 import Typography from "../ui/typography";
 import { Link } from "react-router-dom";
+import { LogoutButton } from "../shared/LogoutButton";
 
 export function AppSidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const { user } = useAuth();
+  const menuItems = useMenuItems();
 
   // Toggle function to expand or collapse a menu item
   const toggleExpand = (title: string) => {
@@ -42,7 +44,7 @@ export function AppSidebar() {
           <SidebarGroupLabel>Application</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {MENU_ITEMS.map((item) => (
+              {menuItems.map((item: MenuItem) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <div
@@ -68,7 +70,7 @@ export function AppSidebar() {
                     item.subItems.length > 0 &&
                     expanded[item.title] && (
                       <SidebarMenu className="mt-2">
-                        {item.subItems.map((subItem) => (
+                        {item.subItems.map((subItem: MenuItem) => (
                           <SidebarMenuItem key={subItem.title}>
                             <SidebarMenuButton asChild>
                               <Link to={subItem.url || "#"}>
@@ -104,9 +106,7 @@ export function AppSidebar() {
             </div>
           </div>
 
-          <Button variant="ghost" size="icon" title="Logout">
-            <LogOut className="w-5 h-5" />
-          </Button>
+          <LogoutButton />
         </div>
       </SidebarFooter>
     </Sidebar>
