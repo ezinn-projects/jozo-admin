@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import PATHS from "@/constants/paths";
 import { toast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/usePermission";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, TrashIcon } from "lucide-react";
@@ -22,6 +23,7 @@ function RoomsListPage() {
 
   const [selectedRoom, setSelectedRoom] = useState<IRoom | null>(null);
   const queryClient = useQueryClient();
+  const isAdmin = useIsAdmin();
 
   const deleteRoomMutation = useMutation({
     mutationFn: (roomId: string) => roomApis.deleteRoom({ _id: roomId }),
@@ -90,13 +92,15 @@ function RoomsListPage() {
             </Button>
           </Link>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setSelectedRoom(row.original)}
-          >
-            <TrashIcon size={16} />
-          </Button>
+          {isAdmin && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setSelectedRoom(row.original)}
+            >
+              <TrashIcon size={16} />
+            </Button>
+          )}
         </div>
       ),
     },
@@ -106,9 +110,11 @@ function RoomsListPage() {
     <div>
       <Header title="Rooms management" subtitle="List of rooms" />
 
-      <Link to={PATHS.NEW_ROOM}>
-        <Button className="mt-3 mb-4">New room</Button>
-      </Link>
+      {isAdmin && (
+        <Link to={PATHS.NEW_ROOM}>
+          <Button className="mt-3 mb-4">New room</Button>
+        </Link>
+      )}
 
       <DataTable
         rowKey="_id"

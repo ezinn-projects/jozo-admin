@@ -6,6 +6,10 @@ type LoginRequest = {
   password: string;
 };
 
+type LogoutRequest = {
+  refresh_token: string;
+};
+
 const authorizationApis = {
   login: (data: LoginRequest) =>
     http.post<
@@ -14,7 +18,10 @@ const authorizationApis = {
         refresh_token: string;
       }>
     >("/users/login", data),
+  logout: (data: LogoutRequest) =>
+    http.post<HTTPResponse<void>>("/users/logout", data),
   getMe: () => http.get<HTTPResponse<User>>("/users/get-user"),
+  getUsers: () => http.get<HTTPResponse<User[]>>("/users"),
 };
 
 export default authorizationApis;

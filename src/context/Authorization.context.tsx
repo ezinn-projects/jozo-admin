@@ -1,7 +1,7 @@
 // AuthContext.js
 import { User } from "@/@types/user";
 import authorizationApis from "@/apis/authorization.apis";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { createContext, ReactNode, useEffect } from "react";
 import { AUTH_EVENTS } from "@/constants/events";
 
@@ -24,6 +24,8 @@ export const AuthContext = createContext<AuthContextValues>(
 
 // Provider component để bọc toàn bộ app
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const queryClient = useQueryClient();
+
   const {
     data: userData,
     isLoading,
@@ -34,19 +36,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     enabled: !!localStorage.getItem("access_token"),
   });
 
-  // Thêm effect để lắng nghe sự kiện đăng nhập
+  // Thêm effect để lắng nghe sự kiện đăng nhập và đăng xuất
   useEffect(() => {
     const handleLoginSuccess = () => {
       console.log("Login success event received");
       refetch();
     };
 
+    const handleLogoutSuccess = () => {
+      console.log("Logout success event received");
+      // Reset query cache khi logout
+      queryClient.clear();
+    };
+
     window.addEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+    window.addEventListener(AUTH_EVENTS.LOGOUT_SUCCESS, handleLogoutSuccess);
 
     return () => {
       window.removeEventListener(AUTH_EVENTS.LOGIN_SUCCESS, handleLoginSuccess);
+      window.removeEventListener(
+        AUTH_EVENTS.LOGOUT_SUCCESS,
+        handleLogoutSuccess
+      );
     };
-  }, [refetch]);
+  }, [refetch, queryClient]);
 
   const value = {
     user: userData?.data.result || null,

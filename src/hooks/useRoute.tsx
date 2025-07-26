@@ -32,8 +32,22 @@ const RoomTypesListPage = lazy(
 const UpsertRoomTypePage = lazy(
   () => import("@/pages/RoomTypes/UpsertRoomTypePage")
 );
-const FnBPage = lazy(() => import("@/pages/FnB"));
+// const FnBPage = lazy(() => import("@/pages/FnB"));
 const MenuItemsPage = lazy(() => import("@/pages/FnB/MenuItemsPage"));
+const StaffManagementPage = lazy(() => import("@/pages/StaffManagement"));
+const CreateStaffPage = lazy(
+  () => import("@/pages/StaffManagement/pages/CreateUserPage")
+);
+const EditStaffPage = lazy(
+  () => import("@/pages/StaffManagement/pages/EditUserPage")
+);
+const UsersManagementPage = lazy(() => import("@/pages/UsersManagement"));
+const CreateUserPage = lazy(
+  () => import("@/pages/UsersManagement/pages/CreateUserPage")
+);
+const EditUserPage = lazy(
+  () => import("@/pages/UsersManagement/pages/EditUserPage")
+);
 
 function useRoute() {
   return (
@@ -51,14 +65,25 @@ function useRoute() {
                 </Layout>
               }
             >
-              <Route element={<RoleGuard requiredRoles={[Role.Admin]} />}>
+              {/* Routes cho Admin và Staff */}
+              <Route
+                element={<RoleGuard requiredRoles={[Role.Admin, Role.Staff]} />}
+              >
                 <Route path={PATHS.HOME} element={<AdminPage />} />
                 <Route path={PATHS.ROOMS}>
                   <Route index element={<RoomsListPage />} />
                   <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
                   <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
                 </Route>
+                <Route
+                  path={PATHS.TOTAL_REVENUE}
+                  element={<RevenueStatisticsPage />}
+                />
+                <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
+              </Route>
 
+              {/* Routes chỉ cho Admin */}
+              <Route element={<RoleGuard requiredRoles={[Role.Admin]} />}>
                 <Route path={PATHS.ROOM_TYPES_LISTS}>
                   <Route index element={<RoomTypesListPage />} />
                   <Route
@@ -72,16 +97,38 @@ function useRoute() {
                 </Route>
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />
-                <Route path={PATHS.FNB} element={<FnBPage />} />
+                {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
-                <Route
-                  path={PATHS.TOTAL_REVENUE}
-                  element={<RevenueStatisticsPage />}
-                />
-                <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
+
+                {/* Users Management Routes */}
+                <Route path={PATHS.USERS_MANAGEMENT}>
+                  <Route index element={<UsersManagementPage />} />
+                  <Route
+                    path={PATHS.USERS_MANAGEMENT_NEW}
+                    element={<CreateUserPage />}
+                  />
+                  <Route
+                    path={PATHS.USERS_MANAGEMENT_EDIT}
+                    element={<EditUserPage />}
+                  />
+                </Route>
+
+                {/* Staff Management Routes */}
+                <Route path={PATHS.STAFF_MANAGEMENT}>
+                  <Route index element={<StaffManagementPage />} />
+                  <Route
+                    path={PATHS.STAFF_MANAGEMENT_NEW}
+                    element={<CreateStaffPage />}
+                  />
+                  <Route
+                    path={PATHS.STAFF_MANAGEMENT_EDIT}
+                    element={<EditStaffPage />}
+                  />
+                </Route>
               </Route>
 
+              {/* Routes chỉ cho Staff */}
               <Route element={<RoleGuard requiredRoles={[Role.Staff]} />}>
                 <Route path="/staff" element={<StaffPage />} />
               </Route>

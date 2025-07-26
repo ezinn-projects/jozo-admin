@@ -1,14 +1,14 @@
 import {
-  Calendar,
-  Settings,
-  Home,
   BedDouble,
+  Calendar,
   DoorOpenIcon,
-  Settings2,
-  AppleIcon,
+  Home,
   PercentIcon,
+  Settings2,
   UtensilsCrossed,
+  Users,
 } from "lucide-react";
+import { Role } from "./enum";
 import PATHS from "./paths";
 
 export type MenuItem = {
@@ -16,6 +16,7 @@ export type MenuItem = {
   url?: string;
   icon: React.FC<React.SVGProps<SVGSVGElement>>;
   subItems?: MenuItem[];
+  roles?: Role[]; // Thêm thuộc tính roles để kiểm soát quyền truy cập
 };
 
 const MENU_ITEMS: MenuItem[] = [
@@ -24,42 +25,61 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.HOME,
     icon: Home,
     subItems: [], // No sub-items for Home
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {
     title: "Rooms management",
     url: PATHS.ROOMS,
     icon: DoorOpenIcon,
     subItems: [], // No sub-items for Rooms management
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {
     title: "Gerenral management",
     icon: Settings2,
+    roles: [Role.Admin], // Chỉ admin mới có thể truy cập
     subItems: [
+      {
+        title: "Users Management",
+        url: PATHS.USERS_MANAGEMENT,
+        icon: Users,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Staff Management",
+        url: PATHS.STAFF_MANAGEMENT,
+        icon: Users,
+        roles: [Role.Admin],
+      },
       {
         title: "Room Types",
         url: PATHS.ROOM_TYPES_LISTS,
         icon: BedDouble,
+        roles: [Role.Admin],
       },
       {
         title: "Pricing",
         url: PATHS.PRICE,
         icon: BedDouble,
+        roles: [Role.Admin],
       },
       // menu fnb
-      {
-        title: "Food & Beverage",
-        url: PATHS.FNB,
-        icon: AppleIcon,
-      },
+      // {
+      //   title: "Food & Beverage",
+      //   url: PATHS.FNB,
+      //   icon: AppleIcon,
+      // },
       {
         title: "Menu Items",
         url: PATHS.MENU_ITEMS,
         icon: UtensilsCrossed,
+        roles: [Role.Admin],
       },
       {
         title: "Promotion",
         url: PATHS.PROMOTION,
         icon: PercentIcon,
+        roles: [Role.Admin],
       },
     ],
   },
@@ -68,19 +88,22 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.CALENDAR,
     icon: Calendar,
     subItems: [], // No sub-items for Calendar
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
-  {
-    title: "Settings",
-    url: PATHS.SETTINGS,
-    icon: Settings,
-    subItems: [], // No sub-items for Settings
-  },
+  // {
+  //   title: "Settings",
+  //   url: PATHS.SETTINGS,
+  //   icon: Settings,
+  //   subItems: [], // No sub-items for Settings
+  //   roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+  // },
   // total revenue
   {
     title: "Total Revenue",
     url: PATHS.TOTAL_REVENUE,
     icon: PercentIcon,
     subItems: [], // No sub-items for Total Revenue
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
 ];
 

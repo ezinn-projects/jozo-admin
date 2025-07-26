@@ -23,7 +23,7 @@ import { useForm } from "react-hook-form";
 import { useNavigate } from "react-router-dom";
 
 type FormValues = {
-  email: string;
+  username: string;
   password: string;
 };
 
@@ -40,7 +40,7 @@ export default function LoginPage() {
 
   const form = useForm<FormValues>({
     defaultValues: {
-      email: "",
+      username: "",
       password: "",
     },
     resolver: zodResolver(loginSchema),
@@ -52,6 +52,7 @@ export default function LoginPage() {
     mutationFn: authorizationApis.login,
     onSuccess: async ({ data }) => {
       localStorage.setItem("access_token", data.result?.access_token || "");
+      localStorage.setItem("refresh_token", data.result?.refresh_token || "");
 
       // Dispatch event login success
       window.dispatchEvent(new Event(AUTH_EVENTS.LOGIN_SUCCESS));
@@ -98,12 +99,12 @@ export default function LoginPage() {
 
           <FormField
             control={control}
-            name="email"
+            name="username"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Email</FormLabel>
+                <FormLabel>Username</FormLabel>
                 <FormControl>
-                  <Input placeholder="Enter email" {...field} />
+                  <Input placeholder="Enter username" {...field} />
                 </FormControl>
 
                 <FormMessage />

@@ -1,9 +1,8 @@
 // components/PrivateRoute.js
 import { Role } from "@/constants/enum";
 import useAuth from "@/hooks/useAuth";
-// import { useAuth } from "@/hooks/useAuth";
 import { Navigate } from "react-router-dom";
-// import { useAuth } from "../AuthContext";
+import PATHS from "@/constants/paths";
 
 function PrivateRoute({
   children,
@@ -14,8 +13,14 @@ function PrivateRoute({
 }) {
   const { user } = useAuth();
 
-  if (!requiredRoles.includes(user?.role as Role)) {
-    return <Navigate to="/unauthorized" replace />;
+  // Nếu chưa đăng nhập, chuyển về trang login
+  if (!user) {
+    return <Navigate to={PATHS.LOGIN} replace />;
+  }
+
+  // Nếu không đủ quyền, chuyển về unauthorized
+  if (!requiredRoles.includes(user.role as Role)) {
+    return <Navigate to={PATHS.UNAUTHORIZED} replace />;
   }
 
   return children;
