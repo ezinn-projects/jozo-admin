@@ -19,7 +19,7 @@ const UsersManagementPage = () => {
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const { users, isLoadingUsers, deleteUser, isDeletingUser } = useUsers();
 
-  // Lọc chỉ users có role "user"
+  // Lọc chỉ users có role "user" (được map từ Role.Staff ở backend)
   const regularUsers = users.filter((user: User) => user.role === "user");
 
   // Lọc users theo search term

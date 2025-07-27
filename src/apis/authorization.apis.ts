@@ -2,7 +2,7 @@ import { User } from "@/@types/user";
 import http from "@/utils/http";
 
 type LoginRequest = {
-  email: string;
+  username: string;
   password: string;
 };
 

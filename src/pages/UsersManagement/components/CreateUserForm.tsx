@@ -51,7 +51,7 @@ const CreateUserForm = () => {
       password: "",
       confirm_password: "",
       date_of_birth: "",
-      role: Role.Staff, // Mặc định là Staff (sẽ được đổi thành User)
+      role: Role.Staff, // Mặc định là Staff (sẽ được map thành "user" ở backend)
       phone_number: "",
     },
   });

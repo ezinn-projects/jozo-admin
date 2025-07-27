@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import PATHS from "@/constants/paths";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { toast } from "@/hooks/use-toast";
+import { Role } from "@/constants/enum";
 
 const StaffManagementPage = () => {
   const navigate = useNavigate();
@@ -21,7 +22,7 @@ const StaffManagementPage = () => {
 
   // Lọc chỉ admin/staff có role "admin" hoặc "staff"
   const adminStaff = users.filter(
-    (user: User) => user.role === "admin" || user.role === "staff"
+    (user: User) => user.role === Role.Admin || user.role === Role.Staff
   );
 
   // Lọc users theo search term
@@ -51,8 +52,8 @@ const StaffManagementPage = () => {
   };
 
   const getRoleBadge = (role: string) => {
-    if (role === "admin") return <Badge variant="default">Admin</Badge>;
-    if (role === "staff") return <Badge variant="secondary">Staff</Badge>;
+    if (role === Role.Admin) return <Badge variant="default">Admin</Badge>;
+    if (role === Role.Staff) return <Badge variant="secondary">Staff</Badge>;
     return null;
   };
 

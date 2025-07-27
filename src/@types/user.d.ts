@@ -8,7 +8,7 @@ export type User = {
   email?: string;
   phone_number: string;
   date_of_birth: string;
-  role: string; // "admin" hoặc "user"
+  role: string; // "admin", "staff", hoặc "user" (user được map từ staff ở backend)
   status?: string;
   created_at: string;
   updated_at: string;

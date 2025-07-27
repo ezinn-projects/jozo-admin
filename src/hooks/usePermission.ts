@@ -54,3 +54,12 @@ export const useIsStaff = () => {
   const { user } = useAuth();
   return user?.role === Role.Staff;
 };
+
+/**
+ * Hook để kiểm tra xem user có phải là user thường không
+ * @returns boolean
+ */
+export const useIsUser = () => {
+  const { user } = useAuth();
+  return user?.role === Role.User;
+};

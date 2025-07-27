@@ -61,7 +61,7 @@ const EditUserForm = () => {
         username: user.username || "",
         email: user.email || "",
         date_of_birth: format(new Date(user.date_of_birth), "yyyy-MM-dd"),
-        role: user.role === "admin" ? Role.Admin : Role.Staff,
+        role: user.role === Role.Admin ? Role.Admin : Role.Staff,
         phone_number: user.phone_number,
       });
     }

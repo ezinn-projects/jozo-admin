@@ -3,10 +3,12 @@
  * @enum {string}
  * @property {string} Admin - Administrator with full access
  * @property {string} Staff - Staff member with limited access
+ * @property {string} User - Regular user with basic access
  */
 export enum Role {
   Admin = "admin",
   Staff = "staff",
+  User = "user",
 }
 
 /**
