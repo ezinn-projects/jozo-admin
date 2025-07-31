@@ -46,6 +46,9 @@ const PATHS = {
   PROMOTION_NEW: "/promotion/new",
   PROMOTION_EDIT: "/promotion/:id/edit",
 
+  // recruitment management
+  RECRUITMENT: "/recruitment",
+
   // total revenue
   TOTAL_REVENUE: "/total-revenue",
 } as const;

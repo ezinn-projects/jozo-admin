@@ -48,6 +48,7 @@ const CreateUserPage = lazy(
 const EditUserPage = lazy(
   () => import("@/pages/UsersManagement/pages/EditUserPage")
 );
+const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
 
 function useRoute() {
   return (
@@ -100,6 +101,7 @@ function useRoute() {
                 {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
+                <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
 
                 {/* Users Management Routes */}
                 <Route path={PATHS.USERS_MANAGEMENT}>

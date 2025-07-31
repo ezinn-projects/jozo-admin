@@ -7,6 +7,7 @@ import {
   Settings2,
   UtensilsCrossed,
   Users,
+  UserPlus,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -79,6 +80,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Promotion",
         url: PATHS.PROMOTION,
         icon: PercentIcon,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Recruitment",
+        url: PATHS.RECRUITMENT,
+        icon: UserPlus,
         roles: [Role.Admin],
       },
     ],
