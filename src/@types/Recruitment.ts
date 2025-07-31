@@ -4,23 +4,28 @@ export interface Recruitment {
   birthDate: string; // API trả về string thay vì Date
   gender: string;
   phone: string;
-  email: string;
+  email: string | null;
   socialMedia: string;
   currentStatus: string;
-  otherStatus: string;
-  workDays: string[];
-  position: string;
+  otherStatus: string | null;
+  position: string[]; // Thay đổi từ string thành string[]
+  workShifts: string[]; // Mới thêm
   submittedAt: string; // API trả về string thay vì Date
   status: string;
+  workDays?: string[] | null; // Optional - backward compatibility
 }
 
 export interface RecruitmentStats {
   total: number;
   pending: number;
   reviewed: number;
-  approved: number;
-  rejected: number;
+  contacted: number; // Mới thêm
   hired: number;
+  rejected: number;
+  // Thêm stats theo position, gender, age
+  byPosition?: Record<string, number>;
+  byGender?: Record<string, number>;
+  byAge?: Record<string, number>;
 }
 
 export interface RecruitmentResponse {
@@ -47,9 +52,9 @@ export interface RecruitmentStatsResponse {
 export enum RecruitmentStatus {
   Pending = "pending",
   Reviewed = "reviewed",
-  Approved = "approved",
-  Rejected = "rejected",
+  Contacted = "contacted", // Mới thêm
   Hired = "hired",
+  Rejected = "rejected",
 }
 
 export enum CurrentStatus {
@@ -61,12 +66,32 @@ export enum CurrentStatus {
 export enum Gender {
   Male = "male",
   Female = "female",
+  Other = "other",
 }
 
 export enum Position {
+  Cashier = "cashier",
   Server = "server",
-  Bartender = "bartender",
+  Parking = "parking",
   Kitchen = "kitchen",
+  Bartender = "bartender",
   Manager = "manager",
   Other = "other",
+}
+
+export enum WorkShift {
+  Morning = "morning",
+  Evening = "evening",
+  Night = "night",
+  FullTime = "fulltime",
+}
+
+export enum WorkDay {
+  Monday = "monday",
+  Tuesday = "tuesday",
+  Wednesday = "wednesday",
+  Thursday = "thursday",
+  Friday = "friday",
+  Saturday = "saturday",
+  Sunday = "sunday",
 }

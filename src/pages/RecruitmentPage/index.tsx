@@ -17,9 +17,9 @@ import { User, Clock, Briefcase } from "lucide-react";
 const statusLabels = {
   [RecruitmentStatus.Pending]: "Chờ xử lý",
   [RecruitmentStatus.Reviewed]: "Đã xem xét",
-  [RecruitmentStatus.Approved]: "Đã duyệt",
-  [RecruitmentStatus.Rejected]: "Từ chối",
+  [RecruitmentStatus.Contacted]: "Đã liên hệ",
   [RecruitmentStatus.Hired]: "Đã tuyển dụng",
+  [RecruitmentStatus.Rejected]: "Từ chối",
 };
 
 const RecruitmentPage: React.FC = () => {
@@ -32,7 +32,8 @@ const RecruitmentPage: React.FC = () => {
   const filteredRecruitments = recruitments?.filter((recruitment) => {
     const matchesSearch =
       recruitment.fullName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      recruitment.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (recruitment.email &&
+        recruitment.email.toLowerCase().includes(searchTerm.toLowerCase())) ||
       recruitment.phone.includes(searchTerm);
     const matchesStatus =
       statusFilter === "all" || recruitment.status === statusFilter;
@@ -104,12 +105,12 @@ const RecruitmentPage: React.FC = () => {
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center space-x-2">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <Briefcase className="h-4 w-4 text-green-600" />
+              <div className="p-2 bg-orange-100 rounded-lg">
+                <Briefcase className="h-4 w-4 text-orange-600" />
               </div>
               <div>
-                <p className="text-sm text-gray-600">Đã duyệt</p>
-                <p className="text-2xl font-bold">{stats?.approved || 0}</p>
+                <p className="text-sm text-gray-600">Đã liên hệ</p>
+                <p className="text-2xl font-bold">{stats?.contacted || 0}</p>
               </div>
             </div>
           </CardContent>

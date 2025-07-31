@@ -11,9 +11,9 @@ import { useUpdateRecruitmentStatus } from "@/hooks/use-recruitment";
 const statusLabels = {
   [RecruitmentStatus.Pending]: "Chờ xử lý",
   [RecruitmentStatus.Reviewed]: "Đã xem xét",
-  [RecruitmentStatus.Approved]: "Đã duyệt",
-  [RecruitmentStatus.Rejected]: "Từ chối",
+  [RecruitmentStatus.Contacted]: "Đã liên hệ",
   [RecruitmentStatus.Hired]: "Đã tuyển dụng",
+  [RecruitmentStatus.Rejected]: "Từ chối",
 };
 
 interface StatusUpdateCellProps {

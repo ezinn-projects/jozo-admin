@@ -2,7 +2,6 @@ import { ColumnDef } from "@tanstack/react-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,9 @@ import {
   Recruitment,
   RecruitmentStatus,
   CurrentStatus,
+  Gender,
+  Position,
+  WorkShift,
 } from "@/@types/Recruitment";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
@@ -23,23 +25,46 @@ import { StatusUpdateCell } from "./StatusUpdateCell";
 const statusColors = {
   [RecruitmentStatus.Pending]: "bg-yellow-100 text-yellow-800",
   [RecruitmentStatus.Reviewed]: "bg-blue-100 text-blue-800",
-  [RecruitmentStatus.Approved]: "bg-green-100 text-green-800",
+  [RecruitmentStatus.Contacted]: "bg-orange-100 text-orange-800",
+  [RecruitmentStatus.Hired]: "bg-green-100 text-green-800",
   [RecruitmentStatus.Rejected]: "bg-red-100 text-red-800",
-  [RecruitmentStatus.Hired]: "bg-purple-100 text-purple-800",
 };
 
 const statusLabels = {
   [RecruitmentStatus.Pending]: "Chờ xử lý",
   [RecruitmentStatus.Reviewed]: "Đã xem xét",
-  [RecruitmentStatus.Approved]: "Đã duyệt",
-  [RecruitmentStatus.Rejected]: "Từ chối",
+  [RecruitmentStatus.Contacted]: "Đã liên hệ",
   [RecruitmentStatus.Hired]: "Đã tuyển dụng",
+  [RecruitmentStatus.Rejected]: "Từ chối",
 };
 
 const currentStatusLabels = {
   [CurrentStatus.Student]: "Sinh viên",
   [CurrentStatus.Working]: "Đang làm việc",
   [CurrentStatus.Other]: "Khác",
+};
+
+const genderLabels = {
+  [Gender.Male]: "Nam",
+  [Gender.Female]: "Nữ",
+  [Gender.Other]: "Khác",
+};
+
+const positionLabels = {
+  [Position.Cashier]: "Thu ngân",
+  [Position.Server]: "Phục vụ",
+  [Position.Parking]: "Giữ xe",
+  [Position.Kitchen]: "Bếp",
+  [Position.Bartender]: "Bartender",
+  [Position.Manager]: "Quản lý",
+  [Position.Other]: "Khác",
+};
+
+const workShiftLabels = {
+  [WorkShift.Morning]: "Sáng",
+  [WorkShift.Evening]: "Tối",
+  [WorkShift.Night]: "Đêm",
+  [WorkShift.FullTime]: "Toàn thời gian",
 };
 
 const getInitials = (name: string) => {
@@ -76,7 +101,14 @@ export const columns: ColumnDef<Recruitment>[] = [
           </Avatar>
           <div>
             <div className="font-medium">{recruitment.fullName}</div>
-            <div className="text-sm text-gray-500">{recruitment.position}</div>
+            <div className="text-sm text-gray-500">
+              {Array.isArray(recruitment.position)
+                ? recruitment.position
+                    .map((pos) => positionLabels[pos as Position] || pos)
+                    .join(", ")
+                : positionLabels[recruitment.position as Position] ||
+                  recruitment.position}
+            </div>
           </div>
         </div>
       );
@@ -90,13 +122,15 @@ export const columns: ColumnDef<Recruitment>[] = [
       return (
         <div className="space-y-1">
           <div className="flex items-center space-x-2 text-sm">
-            <Mail className="h-3 w-3 text-gray-400" />
-            <span>{recruitment.email}</span>
-          </div>
-          <div className="flex items-center space-x-2 text-sm">
             <Phone className="h-3 w-3 text-gray-400" />
             <span>{recruitment.phone}</span>
           </div>
+          {recruitment.email && (
+            <div className="flex items-center space-x-2 text-sm">
+              <Mail className="h-3 w-3 text-gray-400" />
+              <span>{recruitment.email}</span>
+            </div>
+          )}
         </div>
       );
     },
@@ -112,7 +146,9 @@ export const columns: ColumnDef<Recruitment>[] = [
             <Calendar className="h-3 w-3 text-gray-400" />
             <span>{calculateAge(recruitment.birthDate)} tuổi</span>
           </div>
-          <div className="text-sm text-gray-500">{recruitment.gender}</div>
+          <div className="text-sm text-gray-500">
+            {genderLabels[recruitment.gender as Gender] || recruitment.gender}
+          </div>
         </div>
       );
     },
@@ -136,20 +172,31 @@ export const columns: ColumnDef<Recruitment>[] = [
     },
   },
   {
-    accessorKey: "workDays",
-    header: "Ngày làm việc",
+    accessorKey: "workShifts",
+    header: "Ca làm việc",
     cell: ({ row }) => {
       const recruitment = row.original;
       return (
         <div className="flex flex-wrap gap-1">
-          {recruitment.workDays.slice(0, 3).map((day, index) => (
-            <Badge key={index} variant="secondary" className="text-xs">
-              {day}
-            </Badge>
-          ))}
-          {recruitment.workDays.length > 3 && (
-            <Badge variant="outline" className="text-xs">
-              +{recruitment.workDays.length - 3}
+          {Array.isArray(recruitment.workShifts) ? (
+            <>
+              {recruitment.workShifts
+                .slice(0, 2)
+                .map((shift: string, index: number) => (
+                  <Badge key={index} variant="secondary" className="text-xs">
+                    {workShiftLabels[shift as WorkShift] || shift}
+                  </Badge>
+                ))}
+              {recruitment.workShifts.length > 2 && (
+                <Badge variant="outline" className="text-xs">
+                  +{recruitment.workShifts.length - 2}
+                </Badge>
+              )}
+            </>
+          ) : (
+            <Badge variant="secondary" className="text-xs">
+              {workShiftLabels[recruitment.workShifts as WorkShift] ||
+                recruitment.workShifts}
             </Badge>
           )}
         </div>
@@ -232,7 +279,10 @@ export const columns: ColumnDef<Recruitment>[] = [
                     <label className="text-sm font-medium text-gray-700">
                       Giới tính
                     </label>
-                    <p className="text-sm">{recruitment.gender}</p>
+                    <p className="text-sm">
+                      {genderLabels[recruitment.gender as Gender] ||
+                        recruitment.gender}
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-700">
@@ -240,12 +290,14 @@ export const columns: ColumnDef<Recruitment>[] = [
                     </label>
                     <p className="text-sm">{recruitment.phone}</p>
                   </div>
-                  <div>
-                    <label className="text-sm font-medium text-gray-700">
-                      Email
-                    </label>
-                    <p className="text-sm">{recruitment.email}</p>
-                  </div>
+                  {recruitment.email && (
+                    <div>
+                      <label className="text-sm font-medium text-gray-700">
+                        Email
+                      </label>
+                      <p className="text-sm">{recruitment.email}</p>
+                    </div>
+                  )}
                   <div>
                     <label className="text-sm font-medium text-gray-700">
                       Mạng xã hội
@@ -266,7 +318,16 @@ export const columns: ColumnDef<Recruitment>[] = [
                     <label className="text-sm font-medium text-gray-700">
                       Vị trí ứng tuyển
                     </label>
-                    <p className="text-sm">{recruitment.position}</p>
+                    <p className="text-sm">
+                      {Array.isArray(recruitment.position)
+                        ? recruitment.position
+                            .map(
+                              (pos) => positionLabels[pos as Position] || pos
+                            )
+                            .join(", ")
+                        : positionLabels[recruitment.position as Position] ||
+                          recruitment.position}
+                    </p>
                   </div>
                 </div>
 
@@ -281,16 +342,40 @@ export const columns: ColumnDef<Recruitment>[] = [
 
                 <div>
                   <label className="text-sm font-medium text-gray-700">
-                    Ngày có thể làm việc
+                    Ca làm việc
                   </label>
                   <div className="flex flex-wrap gap-2 mt-1">
-                    {recruitment.workDays.map((day, index) => (
-                      <Badge key={index} variant="secondary">
-                        {day}
+                    {Array.isArray(recruitment.workShifts) ? (
+                      recruitment.workShifts.map((shift, index) => (
+                        <Badge key={index} variant="secondary">
+                          {workShiftLabels[shift as WorkShift] || shift}
+                        </Badge>
+                      ))
+                    ) : (
+                      <Badge variant="secondary">
+                        {workShiftLabels[recruitment.workShifts as WorkShift] ||
+                          recruitment.workShifts}
                       </Badge>
-                    ))}
+                    )}
                   </div>
                 </div>
+
+                {recruitment.workDays && recruitment.workDays.length > 0 && (
+                  <div>
+                    <label className="text-sm font-medium text-gray-700">
+                      Ngày có thể làm việc
+                    </label>
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {recruitment.workDays.map(
+                        (day: string, index: number) => (
+                          <Badge key={index} variant="secondary">
+                            {day}
+                          </Badge>
+                        )
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             </DialogContent>
           </Dialog>
