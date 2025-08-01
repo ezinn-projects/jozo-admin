@@ -14,6 +14,31 @@ import { toast } from "@/hooks/use-toast";
 import { useMutation } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import * as React from "react";
+import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
+import { useQuery } from "@tanstack/react-query";
+import fnbMenuApis from "@/apis/fnbMenu.apis";
+
+// Import type MenuItem từ MenuItemsModal
+interface MenuItem {
+  _id: string;
+  name: string;
+  parentId: string | null;
+  hasVariant: boolean;
+  price: number;
+  image: string;
+  category: string;
+  inventory: {
+    quantity: number;
+    minStock?: number;
+    maxStock?: number;
+    lastUpdated?: string;
+  };
+  createdAt: string;
+  updatedAt: string;
+  existingImage?: string;
+  quantity?: string;
+  variants?: string;
+}
 
 interface ProcessBookedModalProps {
   isOpen: boolean;
@@ -36,6 +61,19 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // State cho thời gian điều chỉnh
   const [adjustedStartTime, setAdjustedStartTime] = React.useState<string>("");
   const [adjustedEndTime, setAdjustedEndTime] = React.useState<string>("");
+
+  // State cho modal đặt đồ ăn
+  const [isMenuModalOpen, setIsMenuModalOpen] = React.useState(false);
+
+  // Query lấy menu items
+  const { data: menuItemsData } = useQuery({
+    queryKey: ["menuItems"],
+    queryFn: () => fnbMenuApis.getAllMenuItems(),
+    enabled: isOpen,
+  });
+
+  const menuItems = (menuItemsData?.data?.result ||
+    []) as unknown as MenuItem[];
 
   // Khởi tạo state khi schedule thay đổi
   React.useEffect(() => {
@@ -64,16 +102,37 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   });
 
   const handleUpdate = async (newStatus: RoomStatus) => {
-    const now = dayjs();
     const updateData: Partial<IRoomSchedule> = { status: newStatus };
 
-    // Nếu chuyển sang "In use", cập nhật startTime thành thời gian hiện tại.
+    // Nếu chuyển sang "In use", sử dụng thời gian đã điều chỉnh hoặc thời gian hiện tại
     if (newStatus === RoomStatus.InUse) {
-      updateData.startTime = now.toISOString();
+      if (adjustedStartTime) {
+        // Sử dụng thời gian đã điều chỉnh
+        const datePart = dayjs(schedule.startTime).format("YYYY-MM-DD");
+        const newStartTime = dayjs(`${datePart}T${adjustedStartTime}`);
+        if (newStartTime.isValid()) {
+          updateData.startTime = newStartTime.toISOString();
+          // Thông báo cho người dùng biết đã sử dụng thời gian đã điều chỉnh
+          toast({
+            title: "Thời gian đã được điều chỉnh",
+            description: `Sử dụng thời gian bắt đầu: ${adjustedStartTime}`,
+          });
+        } else {
+          // Nếu thời gian không hợp lệ, sử dụng thời gian hiện tại
+          updateData.startTime = dayjs().toISOString();
+          toast({
+            title: "Thời gian không hợp lệ",
+            description: "Sử dụng thời gian hiện tại",
+          });
+        }
+      } else {
+        // Nếu chưa điều chỉnh thời gian, sử dụng thời gian hiện tại
+        updateData.startTime = dayjs().toISOString();
+      }
     }
     // Nếu chuyển sang "Cancelled", cập nhật endTime thành thời gian hiện tại.
     else if (newStatus === RoomStatus.Cancelled) {
-      updateData.endTime = now.toISOString();
+      updateData.endTime = dayjs().toISOString();
     }
 
     // Gọi API update với dữ liệu mới (bao gồm status và thời gian)
@@ -113,7 +172,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[725px]">
         <DialogHeader>
           <DialogTitle>Process Booked Event</DialogTitle>
           <DialogDescription>
@@ -173,6 +232,24 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         </div>
 
         <DialogFooter className="flex justify-end space-x-2 mt-4">
+          <Button variant="outline" onClick={() => setIsMenuModalOpen(true)}>
+            Order Snacks & Drinks
+          </Button>
+
+          <Button
+            variant="default"
+            onClick={() => {
+              handleUpdate(RoomStatus.InUse);
+            }}
+            loading={isPending}
+          >
+            Mark as In Use
+            {adjustedStartTime && (
+              <span className="text-xs ml-1 opacity-70">
+                ({adjustedStartTime})
+              </span>
+            )}
+          </Button>
           <Button
             variant="destructive"
             onClick={() => {
@@ -182,20 +259,21 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           >
             Cancel Booking
           </Button>
-          <Button
-            variant="default"
-            onClick={() => {
-              handleUpdate(RoomStatus.InUse);
-            }}
-            loading={isPending}
-          >
-            Mark as In Use
-          </Button>
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
         </DialogFooter>
       </DialogContent>
+
+      {/* Modal đặt đồ ăn */}
+      <MenuItemsModal
+        isOpen={isMenuModalOpen}
+        onClose={() => setIsMenuModalOpen(false)}
+        menuItems={menuItems}
+        roomId={schedule.roomId}
+        scheduleId={schedule._id}
+        createdBy={schedule.createdBy}
+      />
     </Dialog>
   );
 };
