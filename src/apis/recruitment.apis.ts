@@ -3,7 +3,15 @@ import { Recruitment, RecruitmentStats } from "@/@types/Recruitment";
 
 export const recruitmentApis = {
   // Lấy danh sách tuyển dụng
-  getRecruitments: (page: number = 1, limit: number = 10, search?: string) => {
+  getRecruitments: (
+    page: number = 1,
+    limit: number = 10,
+    search?: string,
+    status?: string,
+    position?: string,
+    workShifts?: string,
+    gender?: string
+  ) => {
     const params = new URLSearchParams({
       page: page.toString(),
       limit: limit.toString(),
@@ -11,6 +19,18 @@ export const recruitmentApis = {
 
     if (search) {
       params.append("search", search);
+    }
+    if (status) {
+      params.append("status", status);
+    }
+    if (position) {
+      params.append("position", position);
+    }
+    if (workShifts) {
+      params.append("workShifts", workShifts);
+    }
+    if (gender) {
+      params.append("gender", gender);
     }
 
     return http.get<{

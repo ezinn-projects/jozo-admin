@@ -9,6 +9,9 @@ import RefreshButton from "./components/RefreshButton";
 const RecruitmentPage: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [positionFilter, setPositionFilter] = useState<string>("all");
+  const [workShiftsFilter, setWorkShiftsFilter] = useState<string>("all");
+  const [genderFilter, setGenderFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
 
@@ -17,20 +20,21 @@ const RecruitmentPage: React.FC = () => {
     isLoading,
     error,
     refetch: refetchRecruitments,
-  } = useRecruitments(currentPage, pageSize, searchTerm || undefined);
+  } = useRecruitments(
+    currentPage,
+    pageSize,
+    searchTerm || undefined,
+    statusFilter !== "all" ? statusFilter : undefined,
+    positionFilter !== "all" ? positionFilter : undefined,
+    workShiftsFilter !== "all" ? workShiftsFilter : undefined,
+    genderFilter !== "all" ? genderFilter : undefined
+  );
 
   const { data: stats, refetch: refetchStats } = useRecruitmentStats();
 
   // Lấy data và pagination info từ response
   const recruitments = recruitmentData?.data || [];
   const pagination = recruitmentData?.pagination;
-
-  // Filter theo status (client-side vì backend chưa hỗ trợ)
-  const filteredRecruitments = recruitments.filter((recruitment) => {
-    const matchesStatus =
-      statusFilter === "all" || recruitment.status === statusFilter;
-    return matchesStatus;
-  });
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
@@ -41,10 +45,16 @@ const RecruitmentPage: React.FC = () => {
     setCurrentPage(1); // Reset về trang đầu tiên khi thay đổi page size
   };
 
-  // Reset về trang 1 khi search thay đổi
+  // Reset về trang 1 khi filter thay đổi
   React.useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm]);
+  }, [
+    searchTerm,
+    statusFilter,
+    positionFilter,
+    workShiftsFilter,
+    genderFilter,
+  ]);
 
   const handleRefresh = () => {
     refetchRecruitments();
@@ -79,11 +89,17 @@ const RecruitmentPage: React.FC = () => {
         onSearchChange={setSearchTerm}
         statusFilter={statusFilter}
         onStatusChange={setStatusFilter}
+        positionFilter={positionFilter}
+        onPositionChange={setPositionFilter}
+        workShiftsFilter={workShiftsFilter}
+        onWorkShiftsChange={setWorkShiftsFilter}
+        genderFilter={genderFilter}
+        onGenderChange={setGenderFilter}
       />
 
       {/* Data Table */}
       <DataTableContainer
-        data={filteredRecruitments}
+        data={recruitments}
         loading={isLoading}
         total={pagination?.total || 0}
       />

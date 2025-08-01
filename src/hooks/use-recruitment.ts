@@ -5,11 +5,33 @@ import { toast } from "@/hooks/use-toast";
 export const useRecruitments = (
   page: number = 1,
   limit: number = 10,
-  search?: string
+  search?: string,
+  status?: string,
+  position?: string,
+  workShifts?: string,
+  gender?: string
 ) => {
   return useQuery({
-    queryKey: ["recruitments", page, limit, search],
-    queryFn: () => recruitmentApis.getRecruitments(page, limit, search),
+    queryKey: [
+      "recruitments",
+      page,
+      limit,
+      search,
+      status,
+      position,
+      workShifts,
+      gender,
+    ],
+    queryFn: () =>
+      recruitmentApis.getRecruitments(
+        page,
+        limit,
+        search,
+        status,
+        position,
+        workShifts,
+        gender
+      ),
     select: (response) => response.data, // Trả về toàn bộ response để có pagination info
   });
 };
