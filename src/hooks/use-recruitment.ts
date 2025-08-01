@@ -2,11 +2,15 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { recruitmentApis } from "@/apis/recruitment.apis";
 import { toast } from "@/hooks/use-toast";
 
-export const useRecruitments = () => {
+export const useRecruitments = (
+  page: number = 1,
+  limit: number = 10,
+  search?: string
+) => {
   return useQuery({
-    queryKey: ["recruitments"],
-    queryFn: recruitmentApis.getRecruitments,
-    select: (response) => response.data.data, // Lấy data từ response
+    queryKey: ["recruitments", page, limit, search],
+    queryFn: () => recruitmentApis.getRecruitments(page, limit, search),
+    select: (response) => response.data, // Trả về toàn bộ response để có pagination info
   });
 };
 
