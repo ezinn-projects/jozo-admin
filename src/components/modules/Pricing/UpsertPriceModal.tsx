@@ -42,7 +42,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { Portal } from "@radix-ui/react-portal";
 import { AxiosError } from "axios";
 import { format } from "date-fns";
-import { CalendarIcon, CircleXIcon } from "lucide-react";
+import { CalendarIcon, CircleXIcon, PlusIcon, TrashIcon } from "lucide-react";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Calendar } from "../../ui/calendar";
@@ -99,25 +99,24 @@ function UpsertPricingModal(props: Props) {
 
   const isPending = isAddPending || isUpdatePending;
 
+  // Tạo time slot mặc định
+  const createDefaultTimeSlot = () => ({
+    start: "",
+    end: "",
+    prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
+  });
+
   const defaultValues = {
     dayType: price.day_type || "",
-    timeSlots:
-      price.time_slots?.map((slot) => ({
-        start: slot.start || "",
-        end: slot.end || "",
-        prices:
-          slot.prices?.map((price) => ({
-            roomType: price.room_type,
-            price: formatCurrency(price.price, false),
-          })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
-      })) ||
-      Array(3)
-        .fill(null)
-        .map(() => ({
-          start: "",
-          end: "",
-          prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
-        })),
+    timeSlots: price.time_slots?.map((slot) => ({
+      start: slot.start || "",
+      end: slot.end || "",
+      prices:
+        slot.prices?.map((price) => ({
+          roomType: price.room_type,
+          price: formatCurrency(price.price, false),
+        })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
+    })) || [createDefaultTimeSlot()], // Chỉ tạo 1 time slot mặc định
     effectiveDate: price.effective_date || "",
     endDate: price.end_date || undefined,
     note: price.note || undefined,
@@ -132,23 +131,15 @@ function UpsertPricingModal(props: Props) {
     if (price && Object.keys(price).length > 0) {
       form.reset({
         dayType: price.day_type || "",
-        timeSlots:
-          price.time_slots?.map((slot) => ({
-            start: slot.start || "",
-            end: slot.end || "",
-            prices:
-              slot.prices?.map((price) => ({
-                roomType: price.room_type,
-                price: formatCurrency(price.price, false),
-              })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
-          })) ||
-          Array(2)
-            .fill(null)
-            .map(() => ({
-              start: "",
-              end: "",
-              prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
-            })),
+        timeSlots: price.time_slots?.map((slot) => ({
+          start: slot.start || "",
+          end: slot.end || "",
+          prices:
+            slot.prices?.map((price) => ({
+              roomType: price.room_type,
+              price: formatCurrency(price.price, false),
+            })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
+        })) || [createDefaultTimeSlot()], // Chỉ tạo 1 time slot mặc định
         effectiveDate: price.effective_date || "",
         endDate: price.end_date || undefined,
         note: price.note || undefined,
@@ -160,8 +151,33 @@ function UpsertPricingModal(props: Props) {
     control,
     handleSubmit,
     setError,
+    watch,
+    setValue,
     formState: { errors },
   } = form;
+
+  // Lấy danh sách time slots hiện tại
+  const timeSlots = watch("timeSlots");
+
+  // Thêm time slot mới
+  const addTimeSlot = () => {
+    const newTimeSlots = [...timeSlots, createDefaultTimeSlot()];
+    setValue("timeSlots", newTimeSlots);
+  };
+
+  // Xóa time slot
+  const removeTimeSlot = (index: number) => {
+    if (timeSlots.length > 1) {
+      const newTimeSlots = timeSlots.filter((_, i) => i !== index);
+      setValue("timeSlots", newTimeSlots);
+    } else {
+      toast({
+        title: "Cannot remove",
+        description: "At least one time slot is required.",
+        variant: "destructive",
+      });
+    }
+  };
 
   const onSubmit = handleSubmit(
     (values: FormValues) => {
@@ -379,12 +395,26 @@ function UpsertPricingModal(props: Props) {
                     />
 
                     <div className="space-y-6">
+                      <div className="flex items-center justify-between mb-4">
+                        <Typography variant="h6">Time Slots</Typography>
+                        <Button
+                          type="button"
+                          variant="default"
+                          size="sm"
+                          onClick={addTimeSlot}
+                          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white"
+                        >
+                          <PlusIcon size={16} />
+                          Thêm khung giờ
+                        </Button>
+                      </div>
+
                       <Accordion
                         type="single"
                         collapsible
                         className="space-y-4"
                       >
-                        {form.watch("timeSlots").map((timeSlot, index) => (
+                        {timeSlots.map((timeSlot, index) => (
                           <AccordionItem
                             key={index}
                             value={`item-${index}`}
@@ -409,6 +439,21 @@ function UpsertPricingModal(props: Props) {
                                     ? `${timeSlot.start} - ${timeSlot.end}`
                                     : "No time set"}
                                 </Typography>
+                                {timeSlots.length > 1 && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      removeTimeSlot(index);
+                                    }}
+                                    className="ml-auto text-red-500 hover:text-red-700 hover:bg-red-50"
+                                    title="Xóa khung giờ này"
+                                  >
+                                    <TrashIcon size={16} />
+                                  </Button>
+                                )}
                               </div>
                             </AccordionTrigger>
 

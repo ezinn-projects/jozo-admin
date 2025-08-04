@@ -57,7 +57,7 @@ export const addPricingSchema = z
             }
           })
       )
-      .length(2, { message: "Phải có đủ 2 khung giờ" })
+      .min(1, { message: "Phải có ít nhất 1 khung giờ" })
       .refine(
         (timeSlots) => {
           // Sắp xếp các time slots theo thời gian bắt đầu
