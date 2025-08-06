@@ -105,8 +105,6 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
     queryKey: ["menuItem", item?._id],
     queryFn: () => fnbMenuApis.getMenuItemById(item?._id || ""),
     enabled: isEdit && !!item?._id && isOpen,
-    staleTime: 5 * 60 * 1000, // 5 phút
-    gcTime: 10 * 60 * 1000, // 10 phút
   });
 
   const form = useForm<FormData>({

@@ -11,12 +11,16 @@ import {
 } from "@/components/ui/dialog";
 import { RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
-import { useQuery } from "@tanstack/react-query";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
+import fnbOrderApis from "@/apis/fnbOrder.apis";
+import { OrderDetail } from "@/@types/FnbOrder";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Coffee, Utensils, Plus, Minus } from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
 interface MenuItem {
@@ -65,12 +69,108 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // State cho modal đặt đồ ăn
   const [isMenuModalOpen, setIsMenuModalOpen] = React.useState(false);
 
+  const queryClient = useQueryClient();
+
   // Query lấy menu items
   const { data: menuItemsData } = useQuery({
     queryKey: ["menuItems"],
     queryFn: () => fnbMenuApis.getAllMenuItems(),
     enabled: isOpen,
   });
+
+  // Query lấy order detail
+  const { data: orderDetailData } = useQuery<OrderDetail | undefined>({
+    queryKey: ["fnbOrderDetail", schedule._id],
+    queryFn: () =>
+      schedule._id
+        ? fnbOrderApis
+            .getFnbOrderDetail(schedule._id)
+            .then((res) => res.data.result as OrderDetail)
+        : Promise.resolve(undefined),
+    enabled: isOpen && !!schedule._id,
+    refetchOnWindowFocus: false,
+  });
+
+  // Mutation để cập nhật số lượng
+  const { mutate: updateQuantity, isPending: isUpdatingQuantity } = useMutation(
+    {
+      mutationFn: async ({
+        itemId,
+        quantity,
+        category,
+      }: {
+        itemId: string;
+        quantity: number;
+        category: string;
+      }) => {
+        if (!schedule._id || !schedule.createdBy) return;
+        await fnbOrderApis.upsertItem({
+          roomScheduleId: schedule._id,
+          itemId,
+          quantity,
+          category,
+          createdBy: schedule.createdBy,
+        });
+      },
+      onMutate: async ({ itemId, quantity }) => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({
+          queryKey: ["fnbOrderDetail", schedule._id],
+        });
+
+        // Snapshot the previous value
+        const previousOrderData = queryClient.getQueryData([
+          "fnbOrderDetail",
+          schedule._id,
+        ]);
+
+        // Optimistically update to the new value
+        queryClient.setQueryData(
+          ["fnbOrderDetail", schedule._id],
+          (old: OrderDetail | undefined) => {
+            if (!old) return old;
+
+            const newDrinks = old.items.drinks.map((item) =>
+              item.itemId === itemId ? { ...item, quantity } : item
+            );
+            const newSnacks = old.items.snacks.map((item) =>
+              item.itemId === itemId ? { ...item, quantity } : item
+            );
+
+            return {
+              ...old,
+              items: {
+                drinks: newDrinks,
+                snacks: newSnacks,
+              },
+            };
+          }
+        );
+
+        return { previousOrderData };
+      },
+      onError: (err, variables, context) => {
+        // If the mutation fails, use the context returned from onMutate to roll back
+        if (context?.previousOrderData) {
+          queryClient.setQueryData(
+            ["fnbOrderDetail", schedule._id],
+            context.previousOrderData
+          );
+        }
+        toast({
+          title: "Lỗi",
+          description: "Không thể cập nhật số lượng",
+          variant: "destructive",
+        });
+      },
+      onSuccess: () => {
+        // Invalidate and refetch
+        queryClient.invalidateQueries({
+          queryKey: ["fnbOrderDetail", schedule._id],
+        });
+      },
+    }
+  );
 
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
@@ -85,6 +185,23 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       setAdjustedEndTime(defaultEnd.format("HH:mm"));
     }
   }, [schedule]);
+
+  // Hàm xử lý tăng/giảm số lượng
+  const handleQuantityChange = (
+    itemId: string,
+    currentQuantity: number,
+    change: number,
+    category: string
+  ) => {
+    const newQuantity = Math.max(0, currentQuantity + change);
+    // Chuyển đổi category từ số nhiều sang số ít
+    const normalizedCategory = category === "drinks" ? "drink" : "snack";
+    updateQuantity({
+      itemId,
+      quantity: newQuantity,
+      category: normalizedCategory,
+    });
+  };
 
   const { mutate, isPending } = useMutation({
     mutationFn: (updateData: Partial<IRoomSchedule>) =>
@@ -170,6 +287,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     mutate(updateData);
   };
 
+  // Kiểm tra xem có order nào không
+  const hasOrders =
+    orderDetailData &&
+    ((orderDetailData.items.drinks &&
+      orderDetailData.items.drinks.length > 0) ||
+      (orderDetailData.items.snacks &&
+        orderDetailData.items.snacks.length > 0));
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[725px]">
@@ -194,6 +319,134 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </p>
           )}
         </div>
+
+        {/* Hiển thị thông tin đã đặt snacks và drinks */}
+        {hasOrders && (
+          <div className="mt-4 space-y-2">
+            <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Drinks */}
+              {orderDetailData?.items.drinks &&
+                orderDetailData.items.drinks.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <Coffee className="w-4 h-4" />
+                        Drinks
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-1">
+                        {orderDetailData.items.drinks.map((item) => (
+                          <div
+                            key={item.itemId}
+                            className="flex justify-between items-center"
+                          >
+                            <span className="text-sm">{item.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    -1,
+                                    "drinks"
+                                  )
+                                }
+                                disabled={isUpdatingQuantity}
+                                className="w-6 h-6 p-0"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <Badge variant="secondary">{item.quantity}</Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    1,
+                                    "drinks"
+                                  )
+                                }
+                                disabled={isUpdatingQuantity}
+                                className="w-6 h-6 p-0"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+              {/* Snacks */}
+              {orderDetailData?.items.snacks &&
+                orderDetailData.items.snacks.length > 0 && (
+                  <Card>
+                    <CardHeader className="pb-2">
+                      <CardTitle className="flex items-center gap-2 text-sm">
+                        <Utensils className="w-4 h-4" />
+                        Snacks
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="space-y-1">
+                        {orderDetailData.items.snacks.map((item) => (
+                          <div
+                            key={item.itemId}
+                            className="flex justify-between items-center"
+                          >
+                            <span className="text-sm">{item.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    -1,
+                                    "snacks"
+                                  )
+                                }
+                                disabled={isUpdatingQuantity}
+                                className="w-6 h-6 p-0"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <Badge variant="secondary">{item.quantity}</Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() =>
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    1,
+                                    "snacks"
+                                  )
+                                }
+                                disabled={isUpdatingQuantity}
+                                className="w-6 h-6 p-0"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+            </div>
+          </div>
+        )}
 
         {/* Phần điều chỉnh thời gian */}
         <div className="mt-4 space-y-2">

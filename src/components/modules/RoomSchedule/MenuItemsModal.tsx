@@ -388,6 +388,21 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                         </div>
                       </div>
                       <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const currentValue = quantities[key] || 0;
+                            handleQuantityChange(
+                              key,
+                              Math.max(0, currentValue - 1)
+                            );
+                          }}
+                          disabled={false}
+                          className="w-8 h-8 p-0"
+                        >
+                          -
+                        </Button>
                         <input
                           type="number"
                           min={0}
@@ -404,13 +419,32 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                             (child.inventory.quantity || 0) === 0 &&
                             (quantities[key] || 0) === 0
                           }
-                          className={`w-16 border rounded px-2 py-1 text-sm ${
+                          className={`w-16 border rounded px-2 py-1 text-sm text-center ${
                             (child.inventory.quantity || 0) === 0 &&
                             (quantities[key] || 0) === 0
                               ? "bg-gray-100 cursor-not-allowed"
                               : ""
                           }`}
                         />
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            const currentValue = quantities[key] || 0;
+                            const maxAllowed = child.inventory.quantity || 0;
+                            if (currentValue < maxAllowed) {
+                              handleQuantityChange(key, currentValue + 1);
+                            }
+                          }}
+                          disabled={
+                            (child.inventory.quantity || 0) === 0 ||
+                            (quantities[key] || 0) >=
+                              (child.inventory.quantity || 0)
+                          }
+                          className="w-8 h-8 p-0"
+                        >
+                          +
+                        </Button>
                       </div>
                     </div>
                   );
@@ -455,6 +489,18 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
               <p>Tồn kho: {item.inventory?.quantity || 0}</p>
             </div>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentValue = quantities[key] || 0;
+                  handleQuantityChange(key, Math.max(0, currentValue - 1));
+                }}
+                disabled={false}
+                className="w-8 h-8 p-0"
+              >
+                -
+              </Button>
               <input
                 type="number"
                 min={0}
@@ -471,13 +517,31 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                   (item.inventory?.quantity || 0) === 0 &&
                   (quantities[key] || 0) === 0
                 }
-                className={`w-16 border rounded px-2 py-1 text-sm ${
+                className={`w-16 border rounded px-2 py-1 text-sm text-center ${
                   (item.inventory?.quantity || 0) === 0 &&
                   (quantities[key] || 0) === 0
                     ? "bg-gray-100 cursor-not-allowed"
                     : ""
                 }`}
               />
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const currentValue = quantities[key] || 0;
+                  const maxAllowed = item.inventory?.quantity || 0;
+                  if (currentValue < maxAllowed) {
+                    handleQuantityChange(key, currentValue + 1);
+                  }
+                }}
+                disabled={
+                  (item.inventory?.quantity || 0) === 0 ||
+                  (quantities[key] || 0) >= (item.inventory?.quantity || 0)
+                }
+                className="w-8 h-8 p-0"
+              >
+                +
+              </Button>
             </div>
           </div>
         </CardContent>
