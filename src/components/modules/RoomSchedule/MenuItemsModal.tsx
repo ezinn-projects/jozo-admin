@@ -398,7 +398,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                               Math.max(0, currentValue - 1)
                             );
                           }}
-                          disabled={false}
+                          disabled={Number(quantities[key] || 0) === 0}
                           className="w-8 h-8 p-0"
                         >
                           -
@@ -438,8 +438,8 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                           }}
                           disabled={
                             (child.inventory.quantity || 0) === 0 ||
-                            (quantities[key] || 0) >=
-                              (child.inventory.quantity || 0)
+                            Number(quantities[key] || 0) >=
+                              Number(child.inventory.quantity || 0)
                           }
                           className="w-8 h-8 p-0"
                         >
@@ -496,7 +496,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                   const currentValue = quantities[key] || 0;
                   handleQuantityChange(key, Math.max(0, currentValue - 1));
                 }}
-                disabled={false}
+                disabled={Number(quantities[key] || 0) === 0}
                 className="w-8 h-8 p-0"
               >
                 -
@@ -536,7 +536,8 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                 }}
                 disabled={
                   (item.inventory?.quantity || 0) === 0 ||
-                  (quantities[key] || 0) >= (item.inventory?.quantity || 0)
+                  Number(quantities[key] || 0) >=
+                    Number(item.inventory?.quantity || 0)
                 }
                 className="w-8 h-8 p-0"
               >
