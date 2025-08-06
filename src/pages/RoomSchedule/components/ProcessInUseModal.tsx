@@ -1,7 +1,6 @@
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import roomsScheduleApis from "@/apis/roomSchedule.api";
-import FoodDrinkModal from "@/components/modules/RoomSchedule/FoodDrinkModal";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -84,7 +83,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   refetchSchedules,
   onExtendSession,
 }) => {
-  const [isFnbModalOpen, setIsFnbModalOpen] = useState(false);
   const [isMenuItemsModalOpen, setIsMenuItemsModalOpen] = useState(false);
   const [isConfirmEndOpen, setIsConfirmEndOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
@@ -94,8 +92,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
   const promotionList = standardPromotions?.data.result || [];
-  const openFnbModal = () => setIsFnbModalOpen(true);
-  const closeFnbModal = () => setIsFnbModalOpen(false);
+
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
@@ -137,7 +134,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   });
 
   // Bill data query - gọi với thời gian thực tế ngay từ đầu
-  const { data: billData, refetch: refetchBill } = useQuery({
+  const { data: billData } = useQuery({
     queryKey: [
       "bill",
       schedule._id,
@@ -234,10 +231,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handleExtendSession = () => {
     onExtendSession();
-  };
-
-  const handleRefreshBill = () => {
-    refetchBill();
   };
 
   const handlePaymentMethodChange = (value: string) => {
@@ -602,13 +595,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           <div className="flex flex-wrap gap-4 mt-6">
             <Button
               variant="outline"
-              onClick={openFnbModal}
-              className="text-base px-5 py-2 h-auto"
-            >
-              Thêm F&B
-            </Button>
-            <Button
-              variant="outline"
               onClick={openMenuItemsModal}
               className="text-base px-5 py-2 h-auto"
             >
@@ -673,13 +659,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <FoodDrinkModal
-        refetch={handleRefreshBill}
-        isOpen={isFnbModalOpen}
-        onClose={closeFnbModal}
-        scheduleId={schedule._id}
-      />
 
       <MenuItemsModal
         isOpen={isMenuItemsModalOpen}
