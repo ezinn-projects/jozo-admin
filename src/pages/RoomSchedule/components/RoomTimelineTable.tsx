@@ -12,6 +12,7 @@ import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
 import ProcessLockedModal from "./ProcessLockedModal";
 import ProcessBookedModal from "./ProcessBookedModal";
 import ExtendSessionModal from "./ExtendSessionModal";
+import EditRoomTypeModal from "./EditRoomTypeModal";
 import {
   Tooltip,
   TooltipContent,
@@ -23,11 +24,12 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, CircleXIcon, BellIcon } from "lucide-react";
+import { CalendarIcon, CircleXIcon, BellIcon, EditIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import ProcessInUseModal from "./ProcessInUseModal";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
+import { RoomType } from "@/constants/enum";
 
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
@@ -59,6 +61,7 @@ type Modal =
   | "extend"
   | "foodDrink"
   | "bill"
+  | "editRoomType"
   | null;
 
 const RoomTimelineTable: React.FC = () => {
@@ -87,6 +90,7 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null
   );
+  const [roomForEdit, setRoomForEdit] = useState<IRoom | null>(null);
 
   const { mutate: turnOffAllRooms } = useTurnOffAllRooms();
 
@@ -307,6 +311,7 @@ const RoomTimelineTable: React.FC = () => {
     setLockedSchedule(null);
     setBookedSchedule(null);
     setInUseSchedule(null);
+    setRoomForEdit(null);
   };
 
   // Hàm tính toán vị trí và chiều rộng của một event block
@@ -423,6 +428,24 @@ const RoomTimelineTable: React.FC = () => {
         });
       },
     });
+  };
+
+  const getRoomTypeLabel = (type: RoomType) => {
+    switch (type) {
+      case RoomType.Small:
+        return "Nhỏ";
+      case RoomType.Medium:
+        return "Vừa";
+      case RoomType.Large:
+        return "Lớn";
+      default:
+        return "Nhỏ";
+    }
+  };
+
+  const handleEditRoomType = (room: IRoom) => {
+    setRoomForEdit(room);
+    setModal("editRoomType");
   };
   return (
     <div className="container mx-auto p-4 w-full">
@@ -548,16 +571,30 @@ const RoomTimelineTable: React.FC = () => {
                 className="flex border-b hover:bg-gray-50 w-full"
               >
                 <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
-                  <button
-                    onClick={() => handleRoomClick(room._id)}
-                    className={`text-blue-600 hover:underline ${
-                      isBlinking
-                        ? "animate-[blink_1s_ease-in-out_infinite]"
-                        : ""
-                    }`}
-                  >
-                    {room.roomName}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => handleRoomClick(room._id)}
+                      className={`text-blue-600 hover:underline ${
+                        isBlinking
+                          ? "animate-[blink_1s_ease-in-out_infinite]"
+                          : ""
+                      }`}
+                    >
+                      {room.roomName}
+                    </button>
+                    <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
+                      {getRoomTypeLabel(room.roomType)}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleEditRoomType(room);
+                      }}
+                      className="text-gray-400 hover:text-blue-600 transition-colors"
+                    >
+                      <EditIcon className="h-3 w-3" />
+                    </button>
+                  </div>
                   {hasNotification && (
                     <Tooltip>
                       <TooltipTrigger asChild>
@@ -739,6 +776,13 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           schedule={inUseSchedule}
           refetchSchedules={refetch}
+        />
+      )}
+      {modal === "editRoomType" && (
+        <EditRoomTypeModal
+          isOpen={true}
+          onClose={closeModal}
+          room={roomForEdit}
         />
       )}
     </div>
