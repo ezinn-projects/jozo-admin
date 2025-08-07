@@ -149,7 +149,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
         return { previousOrderData };
       },
-      onError: (err, variables, context) => {
+      onError: (_err, _variables, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
         if (context?.previousOrderData) {
           queryClient.setQueryData(
