@@ -1,5 +1,7 @@
+import { OrderDetail } from "@/@types/FnbOrder";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
+import fnbOrderApis from "@/apis/fnbOrder.apis";
 import roomsScheduleApis from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { Button } from "@/components/ui/button";
@@ -42,7 +44,7 @@ import {
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
-import { Clock, Gift, Printer } from "lucide-react";
+import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 
 // Define bill interfaces
 interface BillItem {
@@ -53,6 +55,8 @@ interface BillItem {
   discountName?: string;
   discountPercentage?: number;
   promotionId?: string;
+  itemId?: string; // Thêm itemId để có thể cập nhật số lượng
+  category?: string; // Thêm category để có thể cập nhật số lượng
 }
 
 interface BillData {
@@ -61,6 +65,19 @@ interface BillData {
   roomTotal?: number;
   fnbTotal?: number;
   items?: BillItem[];
+  createdAt?: string | Date;
+  paymentMethod?: string;
+  note?: string;
+  endTime?: string | Date;
+  startTime?: string | Date;
+}
+
+// Interface cho bill response từ API
+interface BillResponse {
+  items?: BillItem[];
+  totalAmount?: number;
+  roomTotal?: number;
+  fnbTotal?: number;
   createdAt?: string | Date;
   paymentMethod?: string;
   note?: string;
@@ -92,6 +109,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
   const promotionList = standardPromotions?.data.result || [];
+  const queryClient = useQueryClient();
 
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
@@ -111,7 +129,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const appliedPromotion = getAppliedPromotion();
 
-  const queryClient = useQueryClient();
   const roomsData = queryClient.getQueryData<
     AxiosResponse<HTTPResponse<IRoom[]>>
   >(["rooms"]);
@@ -132,6 +149,155 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       });
     },
   });
+
+  // Mutation để cập nhật số lượng item
+  const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
+    useMutation({
+      mutationFn: async ({
+        itemId,
+        quantity,
+        category,
+      }: {
+        itemId: string;
+        quantity: number;
+        category: string;
+      }) => {
+        console.log("Mutation function called with:", {
+          itemId,
+          quantity,
+          category,
+        });
+        if (!schedule._id || !user?._id) {
+          console.log("Missing schedule._id or user._id:", {
+            scheduleId: schedule._id,
+            userId: user?._id,
+          });
+          return;
+        }
+        console.log("Calling fnbOrderApis.upsertItem with:", {
+          roomScheduleId: schedule._id,
+          itemId,
+          quantity,
+          category,
+          createdBy: user._id,
+        });
+        await fnbOrderApis.upsertItem({
+          roomScheduleId: schedule._id,
+          itemId,
+          quantity,
+          category,
+          createdBy: user._id,
+        });
+      },
+      onMutate: async ({ itemId, quantity }) => {
+        // Cancel any outgoing refetches
+        await queryClient.cancelQueries({
+          queryKey: [
+            "bill",
+            schedule._id,
+            selectedPromotion,
+            customEndTime,
+            customStartTime,
+          ],
+        });
+
+        // Snapshot the previous value
+        const previousBillData = queryClient.getQueryData([
+          "bill",
+          schedule._id,
+          selectedPromotion,
+          customEndTime,
+          customStartTime,
+        ]);
+
+        // Optimistically update to the new value
+        queryClient.setQueryData(
+          [
+            "bill",
+            schedule._id,
+            selectedPromotion,
+            customEndTime,
+            customStartTime,
+          ],
+          (
+            old:
+              | {
+                  data?: {
+                    result?: {
+                      items?: BillItem[];
+                      roomTotal?: number;
+                      fnbTotal?: number;
+                      totalAmount?: number;
+                    };
+                  };
+                }
+              | undefined
+          ) => {
+            if (!old?.data?.result?.items) return old;
+
+            const updatedItems = old.data.result.items.map((item: BillItem) =>
+              item.itemId === itemId ? { ...item, quantity } : item
+            );
+
+            // Recalculate totals
+            const newFnBTotal = updatedItems.reduce(
+              (sum: number, item: BillItem) => sum + item.price * item.quantity,
+              0
+            );
+
+            const newTotalAmount =
+              (old.data.result.roomTotal || 0) + newFnBTotal;
+
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                result: {
+                  ...old.data.result,
+                  items: updatedItems,
+                  fnbTotal: newFnBTotal,
+                  totalAmount: newTotalAmount,
+                },
+              },
+            };
+          }
+        );
+
+        return { previousBillData };
+      },
+      onError: (_err, _variables, context) => {
+        // If the mutation fails, use the context returned from onMutate to roll back
+        if (context?.previousBillData) {
+          queryClient.setQueryData(
+            [
+              "bill",
+              schedule._id,
+              selectedPromotion,
+              customEndTime,
+              customStartTime,
+            ],
+            context.previousBillData
+          );
+        }
+        toast({
+          title: "Lỗi",
+          description: "Không thể cập nhật số lượng",
+          variant: "destructive",
+        });
+      },
+      onSuccess: () => {
+        // Invalidate and refetch
+        queryClient.invalidateQueries({
+          queryKey: [
+            "bill",
+            schedule._id,
+            selectedPromotion,
+            customEndTime,
+            customStartTime,
+          ],
+        });
+      },
+    });
 
   // Bill data query - gọi với thời gian thực tế ngay từ đầu
   const { data: billData } = useQuery({
@@ -170,19 +336,93 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     enabled: isOpen && !!customEndTime && !!customStartTime,
   });
 
+  // Query để lấy order detail để có itemId và category
+  const { data: orderDetailData } = useQuery<OrderDetail | undefined>({
+    queryKey: ["fnbOrderDetail", schedule._id],
+    queryFn: () =>
+      schedule._id
+        ? fnbOrderApis
+            .getFnbOrderDetail(schedule._id)
+            .then((res) => res.data.result as OrderDetail)
+        : Promise.resolve(undefined),
+    enabled: isOpen && !!schedule._id,
+  });
+
+  // Mapping items với itemId và category từ orderDetailData
+  const itemsWithDetails = React.useMemo(() => {
+    console.log("Mapping items - billData:", billData?.data.result);
+    console.log("Mapping items - orderDetailData:", orderDetailData);
+    console.log("Mapping items - menuItems:", menuItems);
+
+    if (!billData?.data.result) {
+      console.log("Missing billData");
+      return (billData?.data.result as BillResponse)?.items || [];
+    }
+
+    const orderItems = orderDetailData
+      ? [
+          ...(orderDetailData.items?.drinks || []),
+          ...(orderDetailData.items?.snacks || []),
+        ]
+      : [];
+    console.log("Order items:", orderItems);
+
+    const billItems = (billData.data.result as BillResponse)?.items || [];
+    console.log("Bill items:", billItems);
+
+    return billItems.map((item: BillItem) => {
+      // Thử tìm trong orderDetailData trước
+      let orderItem = orderItems.find(
+        (orderItem) =>
+          orderItem.name === item.description ||
+          orderItem.itemId === item.itemId
+      );
+
+      // Nếu không tìm thấy trong orderDetailData, thử tìm trong menuItems
+      if (!orderItem && menuItems) {
+        const menuItem = menuItems.find(
+          (menuItem) => menuItem.name === item.description
+        );
+        if (menuItem) {
+          orderItem = {
+            itemId: menuItem._id,
+            category: menuItem.category,
+            name: menuItem.name,
+            price: menuItem.price,
+            quantity: item.quantity,
+          };
+        }
+      }
+
+      const mappedItem = {
+        ...item,
+        itemId: orderItem?.itemId || item.itemId,
+        category: orderItem?.category || item.category,
+      };
+
+      console.log("Mapped item:", mappedItem);
+      return mappedItem;
+    });
+  }, [billData?.data.result, orderDetailData, menuItems]);
+
   // Sử dụng trực tiếp dữ liệu từ API vì backend đã tính toán promotion
   const billResult = (billData?.data.result || {}) as BillData;
   const {
     totalAmount,
     roomTotal,
-    fnbTotal,
-    items = [],
+    items = itemsWithDetails, // Sử dụng itemsWithDetails thay vì items
     createdAt,
+    fnbTotal,
     paymentMethod = PaymentMethod.Cash,
     note,
     endTime,
     startTime,
   } = billResult;
+
+  // Debug: Log items khi thay đổi
+  useEffect(() => {
+    console.log("Items changed:", items);
+  }, [items]);
 
   const handleCompleteSession = () => {
     const actualEndTime = customEndTime
@@ -273,6 +513,34 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     setCustomStartTime(e.target.value);
   };
 
+  // Hàm xử lý tăng/giảm số lượng item
+  const handleQuantityChange = (
+    itemId: string,
+    currentQuantity: number,
+    change: number,
+    category: string
+  ) => {
+    console.log("handleQuantityChange called with:", {
+      itemId,
+      currentQuantity,
+      change,
+      category,
+    });
+    const newQuantity = Math.max(0, currentQuantity + change);
+    if (newQuantity === currentQuantity) return;
+
+    console.log("Calling updateItemQuantity with:", {
+      itemId,
+      quantity: newQuantity,
+      category,
+    });
+    updateItemQuantity({
+      itemId,
+      quantity: newQuantity,
+      category,
+    });
+  };
+
   // Sử dụng useMutation để gọi API in hóa đơn
   const { mutate: printBill } = useMutation({
     mutationFn: () =>
@@ -329,7 +597,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-xl">
+        <DialogContent className="max-w-5xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Session Management</DialogTitle>
             <DialogDescription className="text-base">
@@ -396,22 +664,151 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </p>
               </div>
               <div className="border-t-2 border-dashed border-purple-400" />
+
               <div>
                 <div className="grid grid-cols-12 font-bold text-purple-600 gap-1">
-                  <span className="col-span-5">Tên</span>
-                  <span className="col-span-1 text-right">SL</span>
+                  <span className="col-span-4">Tên</span>
+                  <span className="col-span-2 text-center">SL</span>
                   <span className="col-span-3 text-right">Đơn Giá</span>
                   <span className="col-span-3 text-right">Thành Tiền</span>
                 </div>
                 {items.map((item: BillItem, index: number) => (
                   <div key={index}>
-                    <div className="grid grid-cols-12 gap-1">
-                      <span className="col-span-5 truncate">
+                    <div className="grid grid-cols-12 gap-1 items-center">
+                      <span className="col-span-4 truncate">
                         {item.description}
                       </span>
-                      <span className="col-span-1 text-right">
-                        {item.quantity}
-                      </span>
+                      <div className="col-span-2 flex items-center justify-center gap-1">
+                        {item.description
+                          .toLowerCase()
+                          .includes("phi dich vu thu am") ? (
+                          // Chỉ hiển thị số lượng cho phí dịch vụ thu âm
+                          <span className="min-w-[2rem] text-center">
+                            {item.quantity}
+                          </span>
+                        ) : (
+                          // Hiển thị nút + và - cho các item khác
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                console.log(
+                                  "Minus button clicked for item:",
+                                  item
+                                );
+                                console.log(
+                                  "itemId:",
+                                  item.itemId,
+                                  "category:",
+                                  item.category
+                                );
+                                if (item.itemId && item.category) {
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    -1,
+                                    item.category
+                                  );
+                                } else if (menuItems) {
+                                  // Fallback: tìm trong menuItems
+                                  const menuItem = menuItems.find(
+                                    (menuItem) =>
+                                      menuItem.name === item.description
+                                  );
+                                  if (menuItem) {
+                                    console.log(
+                                      "Using menuItem for minus:",
+                                      menuItem
+                                    );
+                                    handleQuantityChange(
+                                      menuItem._id,
+                                      item.quantity,
+                                      -1,
+                                      menuItem.category
+                                    );
+                                  } else {
+                                    console.log(
+                                      "Missing itemId or category for item:",
+                                      item
+                                    );
+                                  }
+                                } else {
+                                  console.log(
+                                    "Missing itemId or category for item:",
+                                    item
+                                  );
+                                }
+                              }}
+                              disabled={
+                                item.quantity <= 0 || isUpdatingQuantity
+                              }
+                              className="w-6 h-6 p-0 text-xs"
+                            >
+                              <Minus className="w-3 h-3" />
+                            </Button>
+                            <span className="min-w-[2rem] text-center">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                console.log(
+                                  "Plus button clicked for item:",
+                                  item
+                                );
+                                console.log(
+                                  "itemId:",
+                                  item.itemId,
+                                  "category:",
+                                  item.category
+                                );
+                                if (item.itemId && item.category) {
+                                  handleQuantityChange(
+                                    item.itemId,
+                                    item.quantity,
+                                    1,
+                                    item.category
+                                  );
+                                } else if (menuItems) {
+                                  // Fallback: tìm trong menuItems
+                                  const menuItem = menuItems.find(
+                                    (menuItem) =>
+                                      menuItem.name === item.description
+                                  );
+                                  if (menuItem) {
+                                    console.log(
+                                      "Using menuItem for plus:",
+                                      menuItem
+                                    );
+                                    handleQuantityChange(
+                                      menuItem._id,
+                                      item.quantity,
+                                      1,
+                                      menuItem.category
+                                    );
+                                  } else {
+                                    console.log(
+                                      "Missing itemId or category for item:",
+                                      item
+                                    );
+                                  }
+                                } else {
+                                  console.log(
+                                    "Missing itemId or category for item:",
+                                    item
+                                  );
+                                }
+                              }}
+                              disabled={isUpdatingQuantity}
+                              className="w-6 h-6 p-0 text-xs"
+                            >
+                              <Plus className="w-3 h-3" />
+                            </Button>
+                          </>
+                        )}
+                      </div>
                       <span className="col-span-3 text-right">
                         {item.price.toLocaleString("vi-VN", {
                           style: "currency",
@@ -451,7 +848,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               {/* Lucky Draw Promotion Section */}
               <div className="flex items-center gap-2 mb-2">
                 <Gift className="w-4 h-4 text-pink-500" />
-                <span>Khuyến mãi bốc thăm:</span>
+                <span>Khuyến mãi:</span>
                 <Select
                   value={selectedPromotion || "none"}
                   onValueChange={handlePromotionChange}
@@ -495,18 +892,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   </div>
                 )}
 
-                {fnbTotal && fnbTotal > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-gray-600">Đồ ăn & thức uống:</span>
-                    <span className="text-gray-800">
-                      {fnbTotal.toLocaleString("vi-VN", {
-                        style: "currency",
-                        currency: "VND",
-                      })}
-                    </span>
-                  </div>
-                )}
-
                 {/* Tính toán giá gốc */}
                 {(() => {
                   const originalTotal = (roomTotal || 0) + (fnbTotal || 0);
@@ -515,19 +900,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
                   return (
                     <>
-                      {/* Giá gốc (nếu có cả phòng và F&B) */}
-                      {originalTotal > 0 && (
-                        <div className="flex justify-between text-sm font-medium">
-                          <span className="text-gray-700">Tổng gốc:</span>
-                          <span className="text-gray-800">
-                            {originalTotal.toLocaleString("vi-VN", {
-                              style: "currency",
-                              currency: "VND",
-                            })}
-                          </span>
-                        </div>
-                      )}
-
                       {/* Giảm giá (nếu có) */}
                       {appliedPromotion && discountAmount > 0 && (
                         <div className="flex justify-between text-sm">
