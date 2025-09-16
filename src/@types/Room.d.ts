@@ -20,6 +20,7 @@ interface IRoom {
   description?: string;
   createdAt?: Date;
   updatedAt?: Date;
+  maxCapacity?: number;
 }
 
 interface IRoomSchedule {
