@@ -64,9 +64,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   const roomsData = queryClient.getQueryData<
     AxiosResponse<HTTPResponse<IRoom[]>>
   >(["rooms"]);
-  console.log("roomsData", roomsData?.data.result);
   const room = roomsData?.data.result?.find((room) => room._id === roomId);
-  console.log("room", room);
 
   // Query lấy order detail
   const { data: orderDetailData } = useQuery<OrderDetail | undefined>({

@@ -13,6 +13,7 @@ interface ITimeSlot {
 
 interface IRoom {
   _id?: ObjectId;
+  roomId: number;
   roomName: string;
   roomType: RoomType;
   status: RoomStatus; // e.g., AVAILABLE, UNAVAILABLE

@@ -69,11 +69,65 @@ export const useSocket = () => {
     socketRef.current?.off("notification", callback);
   };
 
+  const onNewOrderNotification = (
+    callback: (data: {
+      type: string;
+      roomId: string;
+      message: string;
+      timestamp: number;
+      orderData: {
+        orderId: string;
+        items: Array<{
+          itemId: string;
+          name: string;
+          quantity: number;
+          price: number;
+        }>;
+        totalAmount: number;
+        customerInfo: {
+          roomName: string;
+          roomScheduleId: string;
+        };
+        createdAt: string;
+      };
+    }) => void
+  ) => {
+    socketRef.current?.on("new_order_notification", callback);
+  };
+
+  const offNewOrderNotification = (
+    callback: (data: {
+      type: string;
+      roomId: string;
+      message: string;
+      timestamp: number;
+      orderData: {
+        orderId: string;
+        items: Array<{
+          itemId: string;
+          name: string;
+          quantity: number;
+          price: number;
+        }>;
+        totalAmount: number;
+        customerInfo: {
+          roomName: string;
+          roomScheduleId: string;
+        };
+        createdAt: string;
+      };
+    }) => void
+  ) => {
+    socketRef.current?.off("new_order_notification", callback);
+  };
+
   return {
     socket: socketRef.current,
     joinRoom,
     leaveRoom,
     onNotification,
     offNotification,
+    onNewOrderNotification,
+    offNewOrderNotification,
   };
 };

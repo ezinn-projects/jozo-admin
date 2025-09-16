@@ -67,6 +67,11 @@ function RoomsListPage() {
       enableHiding: false,
     },
     {
+      id: "roomId",
+      header: "Room ID",
+      accessorKey: "roomId",
+    },
+    {
       id: "roomName",
       header: "Room Name",
       accessorKey: "roomName",

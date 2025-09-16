@@ -127,6 +127,12 @@ const fnbOrderApis = {
       `${FNB_ORDER_CONTROLLER}/detail/${roomScheduleId}`
     );
   },
+  // Mark order as served
+  markOrderAsServed: (roomId: string, orderId: string) => {
+    return http.post<HTTPResponse<{ success: boolean; message: string }>>(
+      `/rooms/${roomId}/orders/${orderId}/serve`
+    );
+  },
 };
 
 export default fnbOrderApis;

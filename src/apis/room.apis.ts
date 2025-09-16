@@ -6,6 +6,7 @@ const ROOM_CONTROLLER = "/rooms";
 
 // Interface cho RoomRequest (input API)
 export interface IAddRoomRequestBody {
+  roomId: number;
   roomName: string;
   roomType: RoomType;
   description?: string;

@@ -1,8 +1,9 @@
 import React, { useEffect, useRef, useState } from "react";
 import dayjs, { Dayjs } from "dayjs";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery /* , useMutation */ } from "@tanstack/react-query";
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
+// import roomsScheduleApis from "@/apis/roomSchedule.api";
 import {
   useResolveRequest,
   useRoomSchedules,
@@ -24,9 +25,16 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { CalendarIcon, CircleXIcon, BellIcon, EditIcon } from "lucide-react";
+import {
+  CalendarIcon,
+  CircleXIcon,
+  BellIcon,
+  EditIcon,
+  UtensilsCrossed,
+} from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import ProcessInUseModal from "./ProcessInUseModal";
+import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
 import { RoomType } from "@/constants/enum";
@@ -62,11 +70,47 @@ type Modal =
   | "foodDrink"
   | "bill"
   | "editRoomType"
+  | "orderDetails"
   | null;
+
+// interface DragState {
+//   isDragging: boolean;
+//   scheduleId: string | null;
+//   startX: number;
+//   startY: number;
+//   originalRoomId: string;
+//   originalStartTime: string;
+//   originalEndTime: string;
+// }
+
+interface OrderData {
+  orderId: string;
+  items: Array<{
+    itemId: string;
+    name: string;
+    quantity: number;
+    price: number;
+  }>;
+  totalAmount: number;
+  customerInfo: {
+    roomName: string;
+    roomScheduleId: string;
+  };
+  createdAt: string;
+}
+
+export type { OrderData };
 
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
-  const { joinRoom, leaveRoom, onNotification, offNotification } = useSocket();
+  const {
+    joinRoom,
+    leaveRoom,
+    onNotification,
+    offNotification,
+    onNewOrderNotification,
+    offNewOrderNotification,
+  } = useSocket();
   const [date, setDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } = useRoomSchedules(date);
   const {
@@ -91,8 +135,46 @@ const RoomTimelineTable: React.FC = () => {
     null
   );
   const [roomForEdit, setRoomForEdit] = useState<IRoom | null>(null);
+  const [orderData, setOrderData] = useState<OrderData | null>(null);
+  const [orderRoomId, setOrderRoomId] = useState<string>("");
+
+  // Drag and drop state - TẠM THỜI DISABLED
+  /*
+  const [dragState, setDragState] = useState<DragState>({
+    isDragging: false,
+    scheduleId: null,
+    startX: 0,
+    startY: 0,
+    originalRoomId: "",
+    originalStartTime: "",
+    originalEndTime: "",
+  });
+  */
 
   const { mutate: turnOffAllRooms } = useTurnOffAllRooms();
+
+  // Mutation cho việc cập nhật schedule - TẠM THỜI DISABLED
+  /*
+  const { mutate: updateSchedule } = useMutation({
+    mutationFn: (payload: { id: string; schedule: Partial<IRoomSchedule> }) =>
+      roomsScheduleApis.updateSchedule(payload.id, payload.schedule),
+    onSuccess: () => {
+      refetch();
+      toast({
+        title: "Thành công",
+        description: "Đã cập nhật lịch trình",
+      });
+    },
+    onError: (error) => {
+      console.error("Error updating schedule:", error);
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật lịch trình",
+        variant: "destructive",
+      });
+    },
+  });
+  */
 
   // Cập nhật currentTime mỗi giây
   const [currentTime, setCurrentTime] = useState(dayjs());
@@ -168,7 +250,19 @@ const RoomTimelineTable: React.FC = () => {
     [roomId: string]: { message: string; timestamp: number };
   }>({});
 
+  const [orderNotifications, setOrderNotifications] = useState<{
+    [roomId: string]: {
+      message: string;
+      timestamp: number;
+      orderData: OrderData;
+    };
+  }>({});
+
   const [blinkingRooms, setBlinkingRooms] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  const [orderBlinkingRooms, setOrderBlinkingRooms] = useState<{
     [key: string]: boolean;
   }>({});
 
@@ -237,18 +331,74 @@ const RoomTimelineTable: React.FC = () => {
           (r) => r._id === actualRoomId
         )?.roomName;
         // Speak the notification
-        speak(`Phòng ${roomName} ${data.message}`);
+        speak(`${roomName} ${data.message}`);
 
         // Show toast notification
         toast({
           title: "New Support Request",
-          description: `Room ${roomName}: ${data.message}`,
+          description: `${roomName}: ${data.message}`,
         });
+      }
+    };
+
+    // Handle new order notifications
+    const handleNewOrderNotification = (data: {
+      type: string;
+      roomId: string;
+      message: string;
+      timestamp: number;
+      orderData: OrderData;
+    }) => {
+      console.log("New order notification:", data);
+
+      if (data.type === "new_order") {
+        // Convert numeric roomId to actual room ID
+        const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
+
+        if (actualRoomId) {
+          setOrderNotifications((prev) => ({
+            ...prev,
+            [actualRoomId]: {
+              message: data.message,
+              timestamp: data.timestamp,
+              orderData: data.orderData,
+            },
+          }));
+
+          // Start blinking for the room
+          setOrderBlinkingRooms((prev) => ({
+            ...prev,
+            [actualRoomId]: true,
+          }));
+
+          // Stop blinking after 30 seconds
+          setTimeout(() => {
+            setOrderBlinkingRooms((prev) => ({
+              ...prev,
+              [actualRoomId]: false,
+            }));
+          }, 30000);
+
+          const roomName = roomsData?.find(
+            (r) => r._id === actualRoomId
+          )?.roomName;
+
+          // Speak the notification
+          speak(`Đơn hàng mới từ ${roomName}`);
+
+          // Show toast notification
+          toast({
+            title: "Đơn hàng mới",
+            description: `${roomName}: ${data.message}`,
+            variant: "default",
+          });
+        }
       }
     };
 
     // Subscribe to notifications
     onNotification(handleNotification);
+    onNewOrderNotification(handleNewOrderNotification);
 
     // Join room channels for all rooms - using index as room ID (add 1 because backend expects 1-based index)
     roomsData?.forEach((_, index) => {
@@ -258,11 +408,21 @@ const RoomTimelineTable: React.FC = () => {
     // Cleanup
     return () => {
       offNotification(handleNotification);
+      offNewOrderNotification(handleNewOrderNotification);
       roomsData?.forEach((_, index) => {
         leaveRoom((index + 1).toString());
       });
     };
-  }, [roomsData, toast, joinRoom, leaveRoom, onNotification, offNotification]);
+  }, [
+    roomsData,
+    toast,
+    joinRoom,
+    leaveRoom,
+    onNotification,
+    offNotification,
+    onNewOrderNotification,
+    offNewOrderNotification,
+  ]);
 
   // Clear old notifications (older than 5 minutes)
   useEffect(() => {
@@ -273,6 +433,22 @@ const RoomTimelineTable: React.FC = () => {
           (acc, [roomId, notification]) => {
             if (now - notification.timestamp < 5 * 60 * 1000) {
               // Keep notifications less than 5 minutes old
+              acc[roomId] = notification;
+            }
+            return acc;
+          },
+          {} as typeof prev
+        );
+        return filtered;
+      });
+
+      // Clear old order notifications (older than 10 minutes)
+      setOrderNotifications((prev) => {
+        const now = Date.now();
+        const filtered = Object.entries(prev).reduce(
+          (acc, [roomId, notification]) => {
+            if (now - notification.timestamp < 10 * 60 * 1000) {
+              // Keep order notifications less than 10 minutes old
               acc[roomId] = notification;
             }
             return acc;
@@ -312,6 +488,31 @@ const RoomTimelineTable: React.FC = () => {
     setBookedSchedule(null);
     setInUseSchedule(null);
     setRoomForEdit(null);
+    setOrderData(null);
+    setOrderRoomId("");
+  };
+
+  const handleOrderClick = (roomId: string) => {
+    const orderNotification = orderNotifications[roomId];
+    if (orderNotification) {
+      setOrderData(orderNotification.orderData);
+      setOrderRoomId(roomId);
+      setModal("orderDetails");
+      // Stop blinking when clicked
+      setOrderBlinkingRooms((prev) => ({
+        ...prev,
+        [roomId]: false,
+      }));
+    }
+  };
+
+  const handleOrderServed = (roomId: string) => {
+    // Remove order notification after served
+    setOrderNotifications((prev) => {
+      const newNotifications = { ...prev };
+      delete newNotifications[roomId];
+      return newNotifications;
+    });
   };
 
   // Hàm tính toán vị trí và chiều rộng của một event block
@@ -447,6 +648,171 @@ const RoomTimelineTable: React.FC = () => {
     setRoomForEdit(room);
     setModal("editRoomType");
   };
+
+  // Drag and drop handlers - TẠM THỜI DISABLED
+  /*
+  const handleDragStart = (e: React.DragEvent, schedule: IRoomSchedule) => {
+    e.dataTransfer.effectAllowed = "move";
+    e.dataTransfer.setData("text/plain", schedule._id);
+
+    // Tạo một ghost image cho drag
+    const dragImage = e.currentTarget.cloneNode(true) as HTMLElement;
+    dragImage.style.opacity = "0.5";
+    dragImage.style.transform = "rotate(5deg)";
+    dragImage.style.position = "absolute";
+    dragImage.style.top = "-1000px";
+    dragImage.style.left = "-1000px";
+    document.body.appendChild(dragImage);
+    e.dataTransfer.setDragImage(dragImage, 0, 0);
+
+    // Xóa ghost image sau khi drag bắt đầu
+    setTimeout(() => {
+      if (document.body.contains(dragImage)) {
+        document.body.removeChild(dragImage);
+      }
+    }, 0);
+
+    setDragState({
+      isDragging: true,
+      scheduleId: schedule._id,
+      startX: e.clientX,
+      startY: e.clientY,
+      originalRoomId: schedule.roomId,
+      originalStartTime: schedule.startTime,
+      originalEndTime: schedule.endTime || "",
+    });
+  };
+
+  const handleDragEnd = () => {
+    setDragState({
+      isDragging: false,
+      scheduleId: null,
+      startX: 0,
+      startY: 0,
+      originalRoomId: "",
+      originalStartTime: "",
+      originalEndTime: "",
+    });
+  };
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = "move";
+  };
+
+  const handleDragLeave = () => {
+    // Không cần làm gì
+  };
+
+  const handleDrop = (e: React.DragEvent, targetRoomId: string) => {
+    e.preventDefault();
+
+    if (!dragState.isDragging || !dragState.scheduleId) return;
+
+    const schedule = schedules?.find((s) => s._id === dragState.scheduleId);
+    if (!schedule) return;
+
+    // Lấy vị trí chính xác của timeline container
+    const timelineContainer = timelineContainerRef.current;
+    if (!timelineContainer) return;
+
+    const containerRect = timelineContainer.getBoundingClientRect();
+    const scrollLeft = timelineContainer.scrollLeft;
+
+    // Tính toán vị trí chính xác - trừ đi offset của cột phòng và scroll
+    const offsetX = e.clientX - containerRect.left + scrollLeft - 240;
+
+    // Tính toán thời gian mới dựa trên vị trí drop - SNAP VÀO KHUNG 15 PHÚT
+    const rawMinutes = Math.max(0, Math.floor(offsetX / SCALE));
+
+    // Snap vào khung 15 phút gần nhất
+    const snapMinutes = Math.round(rawMinutes / 15) * 15;
+
+    // Đảm bảo không vượt quá 24h
+    const clampedMinutes = Math.min(snapMinutes, 23 * 60 + 45); // 23:45 là khung cuối cùng
+
+    // Tính toán thời gian mới sử dụng cách tương tự như getMarkerStyle
+    const dayStart = dayjs(date).hour(DAY_START_HOUR).minute(0);
+    const newStartTime = dayStart.add(clampedMinutes, "minute");
+
+    // Tính toán thời gian kết thúc mới (giữ nguyên duration)
+    const originalStart = dayjs(dragState.originalStartTime);
+    const originalEnd = dayjs(dragState.originalEndTime);
+    const duration = originalEnd.diff(originalStart, "minute");
+
+    // Đảm bảo duration cũng snap vào khung 15 phút
+    const snapDuration = Math.ceil(duration / 15) * 15;
+    const newEndTime = newStartTime.add(snapDuration, "minute");
+
+    // Kiểm tra xem có conflict không
+    const conflictingSchedules = schedules?.filter(
+      (s) =>
+        s.roomId === targetRoomId &&
+        s._id !== schedule._id &&
+        dayjs(s.startTime).isBefore(newEndTime) &&
+        dayjs(s.endTime || s.startTime).isAfter(newStartTime)
+    );
+
+    if (conflictingSchedules && conflictingSchedules.length > 0) {
+      const conflictingRoom = roomsData?.find((r) => r._id === targetRoomId);
+      toast({
+        title: "Lỗi",
+        description: `Có xung đột lịch trình với phòng ${
+          conflictingRoom?.roomName || targetRoomId
+        }`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Kiểm tra xem thời gian mới có hợp lệ không
+    if (newStartTime.isAfter(newEndTime)) {
+      toast({
+        title: "Lỗi",
+        description: "Thời gian bắt đầu không thể sau thời gian kết thúc",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Kiểm tra xem thời gian có nằm trong khoảng hợp lệ không (0-24h)
+    if (
+      newStartTime.hour() < 0 ||
+      newStartTime.hour() >= 24 ||
+      newEndTime.hour() < 0 ||
+      newEndTime.hour() >= 24
+    ) {
+      toast({
+        title: "Lỗi",
+        description: "Thời gian phải nằm trong khoảng 00:00 - 23:59",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Hiển thị thông báo thành công với thông tin thời gian mới
+    const roomName = roomsData?.find((r) => r._id === targetRoomId)?.roomName;
+    toast({
+      title: "Thành công",
+      description: `Đã di chuyển lịch trình đến phòng ${roomName} lúc ${newStartTime.format(
+        "HH:mm"
+      )}`,
+    });
+
+    // Cập nhật schedule
+    const updateData: Partial<IRoomSchedule> = {
+      roomId: targetRoomId,
+      startTime: newStartTime.toISOString(),
+      endTime: newEndTime.toISOString(),
+    };
+
+    updateSchedule({
+      id: schedule._id,
+      schedule: updateData,
+    });
+  };
+  */
+
   return (
     <div className="container mx-auto p-4 w-full">
       {/* Header: Chọn ngày */}
@@ -564,11 +930,16 @@ const RoomTimelineTable: React.FC = () => {
             const roomSchedules = grouped[room._id] || [];
             const hasNotification = notifications[room._id];
             const isBlinking = blinkingRooms[room._id];
+            const hasOrderNotification = orderNotifications[room._id];
+            const isOrderBlinking = orderBlinkingRooms[room._id];
 
             return (
               <div
                 key={room._id}
-                className="flex border-b hover:bg-gray-50 w-full"
+                className="flex border-b hover:bg-gray-50 w-full transition-colors duration-200"
+                // onDragOver={handleDragOver}
+                // onDragLeave={handleDragLeave}
+                // onDrop={(e) => handleDrop(e, room._id)}
               >
                 <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
                   <div className="flex items-center gap-2">
@@ -595,18 +966,39 @@ const RoomTimelineTable: React.FC = () => {
                       <EditIcon className="h-3 w-3" />
                     </button>
                   </div>
-                  {hasNotification && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <button onClick={() => handleResolveRequest(room._id)}>
-                          <BellIcon className="h-5 w-5 text-red-500 animate-bounce" />
-                        </button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>{hasNotification.message}</p>
-                      </TooltipContent>
-                    </Tooltip>
-                  )}
+                  <div className="flex items-center gap-2">
+                    {hasNotification && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleResolveRequest(room._id)}
+                          >
+                            <BellIcon className="h-5 w-5 text-red-500 animate-bounce" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{hasNotification.message}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {hasOrderNotification && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => handleOrderClick(room._id)}
+                            className={`${
+                              isOrderBlinking ? "animate-pulse" : ""
+                            }`}
+                          >
+                            <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>{hasOrderNotification.message}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                  </div>
                 </div>
                 <div className="flex-1 h-12 relative">
                   {isToday && (
@@ -641,14 +1033,20 @@ const RoomTimelineTable: React.FC = () => {
                   })}
                   {roomSchedules?.map((schedule) => {
                     const { left, width, bgColor } = getMarkerStyle(schedule);
+                    // const isDragging =
+                    //   dragState.isDragging &&
+                    //   dragState.scheduleId === schedule._id;
                     const eventElement = (
                       <div
                         key={schedule._id}
-                        className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-opacity cursor-pointer`}
+                        className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md`}
                         style={{ left, width }}
                         title={`${schedule.status} - ${dayjs(
                           schedule.startTime
                         ).format("HH:mm")}`}
+                        // draggable
+                        // onDragStart={(e) => handleDragStart(e, schedule)}
+                        // onDragEnd={handleDragEnd}
                         onClick={() => {
                           const lowerStatus = schedule.status.toLowerCase();
                           if (lowerStatus === "locked") {
@@ -662,7 +1060,12 @@ const RoomTimelineTable: React.FC = () => {
                             setModal("inUse");
                           }
                         }}
-                      ></div>
+                      >
+                        {/* Hiển thị thời gian trong schedule block */}
+                        <div className="text-xs text-white font-medium px-1 py-0.5 truncate">
+                          {dayjs(schedule.startTime).format("HH:mm")}
+                        </div>
+                      </div>
                     );
                     if (schedule.status.toLowerCase() === "booked") {
                       const eventStart = dayjs(schedule.startTime);
@@ -675,8 +1078,11 @@ const RoomTimelineTable: React.FC = () => {
                             {eventElement}
                           </TooltipTrigger>
                           <TooltipContent>
-                            Start: {eventStart.format("HH:mm")} - End:{" "}
-                            {eventEnd.format("HH:mm")}
+                            <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
+                            <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
+                            {/* <p className="text-xs text-gray-500">
+                              Kéo để di chuyển
+                            </p> */}
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -691,8 +1097,10 @@ const RoomTimelineTable: React.FC = () => {
                             {eventElement}
                           </TooltipTrigger>
                           <TooltipContent>
-                            Locked for {lockedDuration} minute
-                            {lockedDuration !== 1 && "s"}
+                            <p>Đã khóa {lockedDuration} phút</p>
+                            {/* <p className="text-xs text-gray-500">
+                              Kéo để di chuyển
+                            </p> */}
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -703,18 +1111,12 @@ const RoomTimelineTable: React.FC = () => {
                       );
                       let durationLabel = "";
                       if (inUseDuration < 60) {
-                        durationLabel = `In use for ${inUseDuration} minute${
-                          inUseDuration !== 1 ? "s" : ""
-                        }`;
+                        durationLabel = `Đang sử dụng ${inUseDuration} phút`;
                       } else {
                         const hours = Math.floor(inUseDuration / 60);
                         const minutes = inUseDuration % 60;
-                        durationLabel = `In use for ${hours} hour${
-                          hours !== 1 ? "s" : ""
-                        }${
-                          minutes > 0
-                            ? ` ${minutes} minute${minutes !== 1 ? "s" : ""}`
-                            : ""
+                        durationLabel = `Đang sử dụng ${hours} giờ${
+                          minutes > 0 ? ` ${minutes} phút` : ""
                         }`;
                       }
                       return (
@@ -722,7 +1124,12 @@ const RoomTimelineTable: React.FC = () => {
                           <TooltipTrigger asChild>
                             {eventElement}
                           </TooltipTrigger>
-                          <TooltipContent>{durationLabel}</TooltipContent>
+                          <TooltipContent>
+                            <p>{durationLabel}</p>
+                            {/* <p className="text-xs text-gray-500">
+                              Kéo để di chuyển
+                            </p> */}
+                          </TooltipContent>
                         </Tooltip>
                       );
                     }
@@ -783,6 +1190,15 @@ const RoomTimelineTable: React.FC = () => {
           isOpen={true}
           onClose={closeModal}
           room={roomForEdit}
+        />
+      )}
+      {modal === "orderDetails" && orderData && (
+        <OrderDetailsModal
+          isOpen={true}
+          onClose={closeModal}
+          orderData={orderData}
+          roomId={orderRoomId}
+          onOrderServed={() => handleOrderServed(orderRoomId)}
         />
       )}
     </div>

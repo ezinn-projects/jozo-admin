@@ -31,6 +31,7 @@ import { roomStatusOptions, roomTypeOptions } from "../constants";
 
 // FormValues đồng bộ với IRoom tối giản
 type FormValues = {
+  roomId: number;
   roomName: string;
   roomType: RoomType;
   maxCapacity: number;
@@ -46,6 +47,7 @@ function UpsertRoomPage() {
 
   const form = useForm<FormValues>({
     defaultValues: {
+      roomId: 1,
       roomName: "",
       roomType: RoomType.Small,
       maxCapacity: 1,
@@ -69,8 +71,10 @@ function UpsertRoomPage() {
 
     if (data) {
       reset({
+        roomId: data.roomId,
         roomName: data.roomName,
         roomType: data.roomType,
+        maxCapacity: data.maxCapacity || 1,
         description: data.description,
         status: data.status,
       });
@@ -102,6 +106,7 @@ function UpsertRoomPage() {
   const onSubmit = async (values: FormValues) => {
     const payload: IRoom = {
       ...data,
+      roomId: values.roomId,
       roomName: values.roomName,
       roomType: values.roomType,
       description: values.description || "",
@@ -122,6 +127,28 @@ function UpsertRoomPage() {
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-3">
+          {/* Room ID */}
+          <FormField
+            control={form.control}
+            name="roomId"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>
+                  Room ID <Typography variant="span">(*)</Typography>
+                </FormLabel>
+                <FormControl>
+                  <Input
+                    type="number"
+                    placeholder="Enter room ID"
+                    {...field}
+                    onChange={(e) => field.onChange(Number(e.target.value))}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
           {/* Room Name */}
           <FormField
             control={form.control}
