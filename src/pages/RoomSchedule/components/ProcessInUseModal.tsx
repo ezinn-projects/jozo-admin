@@ -85,6 +85,10 @@ interface BillResponse {
   startTime?: string | Date;
 }
 
+interface BillResultWithNote extends BillResponse {
+  note?: string;
+}
+
 interface ProcessInUseModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -105,6 +109,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [customStartTime, setCustomStartTime] = useState<string>("");
+  const [isEditingNote, setIsEditingNote] = useState(false);
+  const [noteValue, setNoteValue] = useState<string>("");
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -146,6 +152,23 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       toast({
         title: "Success",
         description: `Schedule updated to ${variables.status}`,
+      });
+    },
+  });
+
+  // Mutation riêng để cập nhật note
+  const { mutate: updateNote, isPending: isUpdatingNote } = useMutation({
+    mutationFn: (note: string) =>
+      roomsScheduleApis.updateSchedule(schedule._id, { note }),
+    onSuccess: () => {
+      refetchSchedules?.();
+    },
+    onError: (error) => {
+      console.error("Error updating note:", error);
+      toast({
+        title: "Error",
+        description: "Không thể cập nhật ghi chú",
+        variant: "destructive",
       });
     },
   });
@@ -336,6 +359,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     enabled: isOpen && !!customEndTime && !!customStartTime,
   });
 
+  // Set note value when bill data changes
+  useEffect(() => {
+    if (billData?.data.result && "note" in billData.data.result) {
+      setNoteValue((billData.data.result as BillResultWithNote).note || "");
+    }
+  }, [billData?.data.result]);
+
   // Query để lấy order detail để có itemId và category
   const { data: orderDetailData } = useQuery<OrderDetail | undefined>({
     queryKey: ["fnbOrderDetail", schedule._id],
@@ -450,7 +480,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       paymentMethod: paymentMethod,
       startTime: actualStartTime,
       endTime: actualEndTime,
-      note: note,
+      note: noteValue || note,
       promotionId: selectedPromotion || undefined,
     };
 
@@ -513,6 +543,56 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     setCustomStartTime(e.target.value);
   };
 
+  // Functions để xử lý edit note
+  const handleEditNote = () => {
+    setIsEditingNote(true);
+  };
+
+  const handleSaveNote = () => {
+    // Cập nhật note trong query cache
+    queryClient.setQueryData(
+      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
+      (oldData: unknown) => {
+        if (!oldData) return oldData;
+        const typedOldData = oldData as {
+          data?: {
+            result?: {
+              note?: string;
+            };
+          };
+        };
+        return {
+          ...typedOldData,
+          data: {
+            ...typedOldData.data,
+            result: {
+              ...typedOldData.data?.result,
+              note: noteValue,
+            },
+          },
+        };
+      }
+    );
+
+    // Gọi API để cập nhật note trong room schedule
+    updateNote(noteValue);
+
+    setIsEditingNote(false);
+    toast({
+      title: "Success",
+      description: "Ghi chú đã được cập nhật",
+    });
+  };
+
+  const handleCancelEditNote = () => {
+    const currentNote =
+      billData?.data.result && "note" in billData.data.result
+        ? (billData.data.result as BillResultWithNote).note
+        : "";
+    setNoteValue(currentNote || "");
+    setIsEditingNote(false);
+  };
+
   // Hàm xử lý tăng/giảm số lượng item
   const handleQuantityChange = (
     itemId: string,
@@ -520,20 +600,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     change: number,
     category: string
   ) => {
-    console.log("handleQuantityChange called with:", {
-      itemId,
-      currentQuantity,
-      change,
-      category,
-    });
     const newQuantity = Math.max(0, currentQuantity + change);
     if (newQuantity === currentQuantity) return;
 
-    console.log("Calling updateItemQuantity with:", {
-      itemId,
-      quantity: newQuantity,
-      category,
-    });
     updateItemQuantity({
       itemId,
       quantity: newQuantity,
@@ -954,7 +1023,50 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </SelectContent>
                   </Select>
                 </div>
-                {note && <p>📝 Ghi chú: {note}</p>}
+                {/* Note Section */}
+                <div className="flex items-center gap-2">
+                  <span>📝 Ghi chú:</span>
+                  {isEditingNote ? (
+                    <div className="flex items-center gap-2 flex-1">
+                      <Input
+                        value={noteValue}
+                        onChange={(e) => setNoteValue(e.target.value)}
+                        placeholder="Nhập ghi chú..."
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        onClick={handleSaveNote}
+                        disabled={isUpdatingNote}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleCancelEditNote}
+                      >
+                        Hủy
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 flex-1">
+                      <span className="flex-1">
+                        {note || "Chưa có ghi chú"}
+                      </span>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={handleEditNote}
+                        disabled={isUpdatingNote}
+                        className="text-xs"
+                      >
+                        Chỉnh sửa
+                      </Button>
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="border-t-2 border-dashed border-purple-400" />
               <div className="text-center">

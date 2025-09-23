@@ -35,6 +35,15 @@ interface IRoomSchedule {
   createdBy: string;
   updatedBy: string;
   actualEndTime: string | null;
+  // Customer information
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  // Room upgrade information
+  originalRoomType?: string;
+  upgraded?: boolean;
+  // Booking source
+  source?: "customer" | "admin" | "walk-in";
 }
 
 export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };

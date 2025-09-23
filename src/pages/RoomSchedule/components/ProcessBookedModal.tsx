@@ -20,7 +20,19 @@ import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { OrderDetail } from "@/@types/FnbOrder";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Coffee, Utensils, Plus, Minus } from "lucide-react";
+import {
+  Coffee,
+  Utensils,
+  Plus,
+  Minus,
+  User,
+  Phone,
+  Mail,
+  ArrowUpRight,
+  Globe,
+  UserCheck,
+  Building,
+} from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
 interface MenuItem {
@@ -175,6 +187,80 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
 
+  // Hàm lấy thông tin source và màu sắc
+  const getSourceInfo = (source?: string) => {
+    switch (source) {
+      case "customer":
+        return {
+          label: "Khách hàng online",
+          icon: Globe,
+          color: "text-green-600",
+          bgColor: "bg-green-50",
+          borderColor: "border-green-200",
+        };
+      case "admin":
+        return {
+          label: "Admin đặt",
+          icon: UserCheck,
+          color: "text-blue-600",
+          bgColor: "bg-blue-50",
+          borderColor: "border-blue-200",
+        };
+      case "walk-in":
+        return {
+          label: "Walk-in",
+          icon: Building,
+          color: "text-purple-600",
+          bgColor: "bg-purple-50",
+          borderColor: "border-purple-200",
+        };
+      default:
+        return {
+          label: "Đặt bởi Hệ thống",
+          icon: User,
+          color: "text-gray-600",
+          bgColor: "bg-gray-50",
+          borderColor: "border-gray-200",
+        };
+    }
+  };
+
+  // Hàm format note để kết hợp tất cả thông tin
+  const formatNoteWithCustomerInfo = (schedule: IRoomSchedule) => {
+    const parts: string[] = [];
+
+    // Thêm note gốc nếu có
+    if (schedule.note) {
+      parts.push(schedule.note);
+    }
+
+    // Thêm thông tin khách hàng
+    const customerInfo: string[] = [];
+    if (schedule.customerName)
+      customerInfo.push(`KH: ${schedule.customerName}`);
+    if (schedule.customerPhone)
+      customerInfo.push(`SĐT: ${schedule.customerPhone}`);
+    if (schedule.customerEmail)
+      customerInfo.push(`Email: ${schedule.customerEmail}`);
+
+    if (customerInfo.length > 0) {
+      parts.push(`[${customerInfo.join(" | ")}]`);
+    }
+
+    // Thêm thông tin room upgrade
+    if (schedule.upgraded && schedule.originalRoomType) {
+      parts.push(`[UPGRADE: ${schedule.originalRoomType} → Phòng hiện tại]`);
+    }
+
+    // Thêm thông tin source
+    if (schedule.source) {
+      const sourceInfo = getSourceInfo(schedule.source);
+      parts.push(`[${sourceInfo.label}]`);
+    }
+
+    return parts.join(" ");
+  };
+
   // Khởi tạo state khi schedule thay đổi
   React.useEffect(() => {
     if (schedule) {
@@ -313,12 +399,106 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           <p>
             <span className="font-medium">End:</span> {eventEnd.format("HH:mm")}
           </p>
-          {schedule?.note && (
+          {formatNoteWithCustomerInfo(schedule) && (
             <p>
-              <span className="font-medium">Note:</span> {schedule.note}
+              <span className="font-medium">Note:</span>{" "}
+              {formatNoteWithCustomerInfo(schedule)}
             </p>
           )}
         </div>
+
+        {/* Thông tin nguồn booking */}
+        {schedule.source === "customer" && (
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2 flex items-center gap-2">
+              {React.createElement(getSourceInfo(schedule.source).icon, {
+                className: `w-4 h-4 ${getSourceInfo(schedule.source).color}`,
+              })}
+              Nguồn booking
+            </h3>
+            <div
+              className={`${
+                getSourceInfo(schedule.source).bgColor
+              } p-3 rounded-lg border ${
+                getSourceInfo(schedule.source).borderColor
+              }`}
+            >
+              <Badge
+                variant="outline"
+                className={`${getSourceInfo(schedule.source).color} ${
+                  getSourceInfo(schedule.source).borderColor
+                }`}
+              >
+                {getSourceInfo(schedule.source).label}
+              </Badge>
+            </div>
+          </div>
+        )}
+
+        {/* Thông tin khách hàng */}
+        {(schedule.customerName ||
+          schedule.customerPhone ||
+          schedule.customerEmail) && (
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2 flex items-center gap-2">
+              <User className="w-4 h-4" />
+              Thông tin khách hàng
+            </h3>
+            <div className="bg-blue-50 p-3 rounded-lg space-y-1">
+              {schedule.customerName && (
+                <div className="flex items-center gap-2">
+                  <User className="w-3 h-3 text-blue-600" />
+                  <span className="text-sm">
+                    <span className="font-medium">Tên:</span>{" "}
+                    {schedule.customerName}
+                  </span>
+                </div>
+              )}
+              {schedule.customerPhone && (
+                <div className="flex items-center gap-2">
+                  <Phone className="w-3 h-3 text-blue-600" />
+                  <span className="text-sm">
+                    <span className="font-medium">SĐT:</span>{" "}
+                    {schedule.customerPhone}
+                  </span>
+                </div>
+              )}
+              {schedule.customerEmail && (
+                <div className="flex items-center gap-2">
+                  <Mail className="w-3 h-3 text-blue-600" />
+                  <span className="text-sm">
+                    <span className="font-medium">Email:</span>{" "}
+                    {schedule.customerEmail}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Thông tin room upgrade */}
+        {schedule.upgraded && schedule.originalRoomType && (
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2 flex items-center gap-2">
+              <ArrowUpRight className="w-4 h-4 text-orange-500" />
+              Thông tin nâng cấp phòng
+            </h3>
+            <div className="bg-orange-50 p-3 rounded-lg">
+              <div className="flex items-center gap-2">
+                <Badge
+                  variant="outline"
+                  className="text-orange-600 border-orange-200"
+                >
+                  Đã nâng cấp
+                </Badge>
+                <span className="text-sm">
+                  <span className="font-medium">Phòng gốc:</span>{" "}
+                  {schedule.originalRoomType}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Hiển thị thông tin đã đặt snacks và drinks */}
         {hasOrders && (

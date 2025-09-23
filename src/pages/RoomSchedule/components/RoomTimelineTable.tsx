@@ -1,43 +1,46 @@
-import React, { useEffect, useRef, useState } from "react";
-import dayjs, { Dayjs } from "dayjs";
-import { useQuery /* , useMutation */ } from "@tanstack/react-query";
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
+import {
+  useQuery /* , useMutation */,
+  useQueryClient,
+} from "@tanstack/react-query";
+import dayjs, { Dayjs } from "dayjs";
+import React, { useEffect, useRef, useState } from "react";
 // import roomsScheduleApis from "@/apis/roomSchedule.api";
-import {
-  useResolveRequest,
-  useRoomSchedules,
-  useTurnOffAllRooms,
-} from "@/hooks/room-schedule";
+import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
-import ProcessLockedModal from "./ProcessLockedModal";
-import ProcessBookedModal from "./ProcessBookedModal";
-import ExtendSessionModal from "./ExtendSessionModal";
-import EditRoomTypeModal from "./EditRoomTypeModal";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { RoomStatus, RoomType } from "@/constants/enum";
+import {
+  useResolveRequest,
+  useRoomSchedules,
+  useTurnOffAllRooms,
+} from "@/hooks/room-schedule";
+import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
+import {
+  BellIcon,
   CalendarIcon,
   CircleXIcon,
-  BellIcon,
   EditIcon,
   UtensilsCrossed,
 } from "lucide-react";
-import { Calendar } from "@/components/ui/calendar";
+import EditRoomTypeModal from "./EditRoomTypeModal";
+import ExtendSessionModal from "./ExtendSessionModal";
+import ProcessBookedModal from "./ProcessBookedModal";
 import ProcessInUseModal from "./ProcessInUseModal";
-import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
-import { useSocket } from "@/hooks/useSocket";
-import { useToast } from "@/hooks/use-toast";
-import { RoomType } from "@/constants/enum";
+import ProcessLockedModal from "./ProcessLockedModal";
 
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
@@ -103,13 +106,17 @@ export type { OrderData };
 
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const {
+    socket,
     joinRoom,
     leaveRoom,
     onNotification,
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onNewBooking,
+    offNewBooking,
   } = useSocket();
   const [date, setDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } = useRoomSchedules(date);
@@ -300,7 +307,6 @@ const RoomTimelineTable: React.FC = () => {
   useEffect(() => {
     // Handle notifications
     const handleNotification = (data: { roomId: string; message: string }) => {
-      console.log("data", data);
       // Convert numeric roomId to actual room ID (subtract 1 because backend sends 1-based index)
       const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
 
@@ -349,8 +355,6 @@ const RoomTimelineTable: React.FC = () => {
       timestamp: number;
       orderData: OrderData;
     }) => {
-      console.log("New order notification:", data);
-
       if (data.type === "new_order") {
         // Convert numeric roomId to actual room ID
         const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
@@ -396,9 +400,126 @@ const RoomTimelineTable: React.FC = () => {
       }
     };
 
+    // Handle new booking notifications
+    const handleNewBooking = (data: {
+      roomId: string;
+      booking: {
+        bookingId: string;
+        roomId: string;
+        action: string;
+        customerName: string;
+        customerPhone: string;
+        startTime: string;
+        endTime: string;
+        cancelledAt?: string;
+        source: string;
+        note?: string;
+        createdAt: string;
+        updatedAt: string;
+        createdBy: string;
+        updatedBy: string;
+        actualEndTime: string | null;
+        customerEmail?: string;
+        originalRequest?: string;
+        upgraded?: boolean;
+        roomName?: string;
+      };
+    }) => {
+      // Backend gửi data với cấu trúc khác, cần map lại
+      const bookingData = data.booking || data.booking;
+      const roomId = data.roomId;
+
+      if (!bookingData || !roomId) {
+        console.error("Invalid booking data structure:", data);
+        return;
+      }
+
+      // Kiểm tra xem booking có thuộc ngày hiện tại không
+      const bookingDate = dayjs(bookingData.startTime as string);
+
+      if (bookingDate.isSame(date, "day")) {
+        // Tạo IRoomSchedule object từ data backend
+        const newSchedule: IRoomSchedule = {
+          _id: bookingData.bookingId as string,
+          roomId: roomId,
+          startTime: bookingData.startTime as string,
+          endTime: bookingData.endTime as string | null,
+          status: RoomStatus.Booked, // Backend có thể gửi status khác
+          note: bookingData.note as string | undefined,
+          createdAt: bookingData.createdAt as string,
+          updatedAt: bookingData.createdAt as string,
+          createdBy: "system",
+          updatedBy: "system",
+          actualEndTime: null,
+          customerName: bookingData.customerName as string | undefined,
+          customerPhone: bookingData.customerPhone as string | undefined,
+          customerEmail: bookingData.customerEmail as string | undefined,
+          originalRoomType: bookingData.originalRequest as string | undefined,
+          upgraded: Boolean(bookingData.upgraded),
+          source:
+            bookingData.source === "online_booking" ? "customer" : "admin",
+        };
+
+        // Cập nhật query data để thêm booking mới
+        queryClient.setQueryData(
+          ["roomSchedules", date.toISOString()],
+          (oldData: IRoomSchedule[] | undefined) => {
+            if (!oldData) return [newSchedule];
+
+            // Kiểm tra xem booking đã tồn tại chưa (tránh duplicate)
+            const existingBooking = oldData.find(
+              (schedule) => schedule._id === newSchedule._id
+            );
+            if (existingBooking) {
+              return oldData;
+            }
+
+            return [...oldData, newSchedule];
+          }
+        );
+
+        const roomName =
+          roomsData?.find((r) => r._id === roomId)?.roomName ||
+          bookingData.roomName;
+
+        refetch();
+
+        switch (data.booking.action) {
+          case "booked":
+            toast({
+              title: "Booking mới",
+              description: `${roomName}: Đã bị hủy`,
+              variant: "destructive",
+            });
+            speak(`Booking mới từ ${roomName}`);
+            break;
+          case "cancelled":
+            toast({
+              title: "Booking đã bị hủy",
+              description: `${roomName}: Đã được cập nhật`,
+              variant: "default",
+            });
+            speak(`Booking đã bị hủy từ ${roomName}`);
+            break;
+        }
+        // Speak the notification
+      } else {
+        console.log("Booking not for current date, ignoring");
+      }
+    };
+
+    // Type assertion helper
+    const bookingHandler = handleNewBooking as (
+      data: Record<string, unknown>
+    ) => void;
+
     // Subscribe to notifications
     onNotification(handleNotification);
     onNewOrderNotification(handleNewOrderNotification);
+    onNewBooking(bookingHandler);
+
+    // Join admin room để nhận tất cả booking notifications
+    joinRoom("admin");
 
     // Join room channels for all rooms - using index as room ID (add 1 because backend expects 1-based index)
     roomsData?.forEach((_, index) => {
@@ -409,19 +530,27 @@ const RoomTimelineTable: React.FC = () => {
     return () => {
       offNotification(handleNotification);
       offNewOrderNotification(handleNewOrderNotification);
+      offNewBooking(bookingHandler);
+      leaveRoom("admin");
       roomsData?.forEach((_, index) => {
         leaveRoom((index + 1).toString());
       });
     };
   }, [
+    refetch,
     roomsData,
     toast,
+    socket,
     joinRoom,
     leaveRoom,
     onNotification,
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onNewBooking,
+    offNewBooking,
+    queryClient,
+    date,
   ]);
 
   // Clear old notifications (older than 5 minutes)
@@ -559,7 +688,12 @@ const RoomTimelineTable: React.FC = () => {
 
     let bgColor = "";
     if (status === "booked") {
-      bgColor = "bg-blue-500";
+      // Nếu source là customer thì màu cam, còn lại màu xanh dương
+      if (schedule.source === "customer") {
+        bgColor = "bg-orange-500";
+      } else {
+        bgColor = "bg-blue-500";
+      }
     } else if (status === "locked") {
       bgColor = "bg-orange-500";
     } else if (status === "in use") {
@@ -577,7 +711,12 @@ const RoomTimelineTable: React.FC = () => {
     // Nếu sự kiện đã hoàn toàn nằm bên trái now marker (đã qua) thì thay đổi màu thành sắc đậm hơn
     if (isToday && markerLeft >= left + width) {
       if (status === "booked") {
-        bgColor = "bg-blue-700";
+        // Nếu source là customer thì màu cam đậm, còn lại màu xanh dương đậm
+        if (schedule.source === "customer") {
+          bgColor = "bg-orange-700";
+        } else {
+          bgColor = "bg-blue-700";
+        }
       } else if (status === "locked") {
         bgColor = "bg-orange-700";
       } else if (status === "in use") {

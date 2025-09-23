@@ -2,6 +2,42 @@ import { useEffect, useRef } from "react";
 import io, { Socket } from "socket.io-client";
 import { useToast } from "./use-toast";
 
+interface BookingData {
+  roomId: string;
+  booking?: {
+    bookingId?: string;
+    _id?: string;
+    roomId: string;
+    roomName?: string;
+    roomType?: string;
+    originalRequest?: string;
+    upgraded?: boolean;
+    customerName?: string;
+    customerPhone?: string;
+    customerEmail?: string;
+    startTime: string;
+    endTime: string;
+    note?: string;
+    source?: string;
+    createdAt: string;
+  };
+  bookingId?: string;
+  _id?: string;
+  roomName?: string;
+  roomType?: string;
+  originalRequest?: string;
+  upgraded?: boolean;
+  customerName?: string;
+  customerPhone?: string;
+  customerEmail?: string;
+  startTime: string;
+  endTime: string;
+  note?: string;
+  source?: string;
+  createdAt: string;
+  [key: string]: unknown;
+}
+
 export const useSocket = () => {
   const { toast } = useToast();
   const socketRef = useRef<typeof Socket | null>(null);
@@ -22,8 +58,6 @@ export const useSocket = () => {
 
     // Setup reconnection handling
     socketRef.current.on("connect", () => {
-      console.log("Socket connected");
-      // Automatically join admin room when connected
       socketRef.current?.emit("join_room", "admin");
     });
 
@@ -121,6 +155,14 @@ export const useSocket = () => {
     socketRef.current?.off("new_order_notification", callback);
   };
 
+  const onNewBooking = (callback: (data: BookingData) => void) => {
+    socketRef.current?.on("booking_notification", callback);
+  };
+
+  const offNewBooking = (callback: (data: BookingData) => void) => {
+    socketRef.current?.off("booking_notification", callback);
+  };
+
   return {
     socket: socketRef.current,
     joinRoom,
@@ -129,5 +171,7 @@ export const useSocket = () => {
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onNewBooking,
+    offNewBooking,
   };
 };
