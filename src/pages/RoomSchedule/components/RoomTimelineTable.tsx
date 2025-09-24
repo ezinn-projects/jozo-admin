@@ -425,8 +425,7 @@ const RoomTimelineTable: React.FC = () => {
         roomName?: string;
       };
     }) => {
-      // Backend gửi data với cấu trúc khác, cần map lại
-      const bookingData = data.booking || data.booking;
+      const bookingData = data.booking;
       const roomId = data.roomId;
 
       if (!bookingData || !roomId) {
@@ -488,16 +487,16 @@ const RoomTimelineTable: React.FC = () => {
           case "booked":
             toast({
               title: "Booking mới",
-              description: `${roomName}: Đã bị hủy`,
-              variant: "destructive",
+              description: `${roomName}: Đã được đặt`,
+              variant: "default",
             });
             speak(`Booking mới từ ${roomName}`);
             break;
           case "cancelled":
             toast({
               title: "Booking đã bị hủy",
-              description: `${roomName}: Đã được cập nhật`,
-              variant: "default",
+              description: `${roomName}: Đã bị hủy`,
+              variant: "destructive",
             });
             speak(`Booking đã bị hủy từ ${roomName}`);
             break;
