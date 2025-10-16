@@ -550,32 +550,44 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handleSaveNote = () => {
     // Cập nhật note trong query cache
-    queryClient.setQueryData(
-      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
-      (oldData: unknown) => {
-        if (!oldData) return oldData;
-        const typedOldData = oldData as {
-          data?: {
-            result?: {
-              note?: string;
-            };
-          };
-        };
-        return {
-          ...typedOldData,
-          data: {
-            ...typedOldData.data,
-            result: {
-              ...typedOldData.data?.result,
-              note: noteValue,
-            },
-          },
-        };
-      }
-    );
 
     // Gọi API để cập nhật note trong room schedule
-    updateNote(noteValue);
+    updateNote(noteValue, {
+      onSuccess: () => {
+        queryClient.setQueryData(
+          [
+            "bill",
+            schedule._id,
+            selectedPromotion,
+            customEndTime,
+            customStartTime,
+          ],
+          (oldData: AxiosResponse<HTTPResponse<BillResponse>>) => {
+            console.log("oldData", oldData.data.result);
+            if (!oldData) return oldData;
+
+            const updatedData: AxiosResponse<HTTPResponse<BillResponse>> = {
+              ...oldData,
+              data: {
+                ...oldData.data,
+                result: {
+                  ...oldData.data.result,
+                  note: noteValue,
+                },
+              },
+            };
+
+            console.log("updatedData", updatedData);
+
+            return updatedData;
+          }
+        );
+        toast({
+          title: "Success",
+          description: "Ghi chú đã được cập nhật",
+        });
+      },
+    });
 
     setIsEditingNote(false);
     toast({

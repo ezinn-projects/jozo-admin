@@ -276,7 +276,7 @@ const RoomTimelineTable: React.FC = () => {
   // Text-to-speech function
   const speak = async (text: string) => {
     const response = await fetch(
-      "https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyCn-EM3GSXdp-yIUfAmHUeo-asSmNJdTyw",
+      `https://texttospeech.googleapis.com/v1/text:synthesize?key=AIzaSyAZvo9EnZRXquqhuKhsoYedvx0K1M-afOk`,
       {
         method: "POST",
         headers: {

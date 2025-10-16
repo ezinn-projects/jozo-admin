@@ -42,6 +42,8 @@ export const useSocket = () => {
   const { toast } = useToast();
   const socketRef = useRef<typeof Socket | null>(null);
 
+  console.log("SOCKET URL:", import.meta.env.VITE_SOCKET_URL);
+
   useEffect(() => {
     // Initialize socket connection
     socketRef.current = io(import.meta.env.VITE_SOCKET_URL, {
