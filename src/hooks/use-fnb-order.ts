@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import fnbOrderApis from "@/apis/fnbOrder.apis";
+import fnbOrderApis, { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
 import { toast } from "@/hooks/use-toast";
 
 export const useAddItemToOrder = () => {
@@ -18,13 +18,17 @@ export const useAddItemToOrder = () => {
       quantity: number;
       category: "drinks" | "snacks";
       createdBy: string;
-    }) =>
-      fnbOrderApis.addItemToOrder(roomScheduleId, {
-        itemId,
-        quantity,
-        category,
+    }) => {
+      const payload: IAddRemoveItemRequestBody = {
+        order: {
+          ...(category === "drinks"
+            ? { drinks: { [itemId]: quantity } }
+            : { snacks: { [itemId]: quantity } }),
+        },
         createdBy,
-      }),
+      };
+      return fnbOrderApis.addItemToOrder(roomScheduleId, payload);
+    },
     onSuccess: (_data, variables) => {
       // Invalidate và refetch FNB order data
       queryClient.invalidateQueries({
@@ -66,13 +70,17 @@ export const useRemoveItemFromOrder = () => {
       quantity: number;
       category: "drinks" | "snacks";
       createdBy: string;
-    }) =>
-      fnbOrderApis.removeItemFromOrder(roomScheduleId, {
-        itemId,
-        quantity,
-        category,
+    }) => {
+      const payload: IAddRemoveItemRequestBody = {
+        order: {
+          ...(category === "drinks"
+            ? { drinks: { [itemId]: quantity } }
+            : { snacks: { [itemId]: quantity } }),
+        },
         createdBy,
-      }),
+      };
+      return fnbOrderApis.removeItemFromOrder(roomScheduleId, payload);
+    },
     onSuccess: (_data, variables) => {
       // Invalidate và refetch FNB order data
       queryClient.invalidateQueries({
