@@ -32,6 +32,13 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface BillItem {
   description: string;
@@ -42,6 +49,33 @@ interface BillItem {
   discountPercentage?: number;
   promotionId?: string;
 }
+
+const paymentMethodMap: Record<string, string> = {
+  cash: "Tiền mặt",
+  Cash: "Tiền mặt",
+  CASH: "Tiền mặt",
+  bank_transfer: "Chuyển khoản",
+  Bank_Transfer: "Chuyển khoản",
+  BANK_TRANSFER: "Chuyển khoản",
+  transfer: "Chuyển khoản",
+  Transfer: "Chuyển khoản",
+  TRANSFER: "Chuyển khoản",
+  momo: "MoMo",
+  MoMo: "MoMo",
+  MOMO: "MoMo",
+  zalo_pay: "Zalo Pay",
+  Zalo_Pay: "Zalo Pay",
+  ZALO_PAY: "Zalo Pay",
+  vnpay: "VNPay",
+  VNPay: "VNPay",
+  VNPAY: "VNPay",
+  visa: "Visa",
+  Visa: "Visa",
+  VISA: "Visa",
+  mastercard: "Mastercard",
+  Mastercard: "Mastercard",
+  MASTERCARD: "Mastercard",
+};
 
 interface DateInfo {
   date?: string;
@@ -70,6 +104,8 @@ const RevenueStatisticsPage = () => {
   const [activeTab, setActiveTab] = useState<string>("daily");
   const [selectedBill, setSelectedBill] = useState<string | null>(null);
   const [billDetailOpen, setBillDetailOpen] = useState<boolean>(false);
+  const [selectedPaymentMethod, setSelectedPaymentMethod] =
+    useState<string>("all");
 
   const { data: roomsData } = useQuery({
     queryKey: ["rooms"],
@@ -220,10 +256,66 @@ const RevenueStatisticsPage = () => {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
+    // Reset filter khi chuyển tab
+    setSelectedPaymentMethod("all");
   };
 
   const formatBillDate = (dateString: string) => {
     return dayjs(dateString).format("DD/MM/YYYY HH:mm");
+  };
+
+  const formatPaymentMethod = (method: string) => {
+    return paymentMethodMap[method] || method;
+  };
+
+  // Lọc bills theo paymentMethod
+  const filterBillsByPaymentMethod = (bills: IBill[]) => {
+    if (selectedPaymentMethod === "all") return bills;
+    // value có thể là nhiều methods phân cách bởi dấu phẩy
+    const methods = selectedPaymentMethod.split(",");
+    return bills.filter((bill) => methods.includes(bill.paymentMethod));
+  };
+
+  // Lấy tất cả các payment methods để hiển thị trong filter (không phụ thuộc vào dữ liệu)
+  const getAllPaymentMethodOptions = () => {
+    const methods = [
+      { value: ["cash", "Cash", "CASH"], label: "Tiền mặt" },
+      {
+        value: [
+          "bank_transfer",
+          "Bank_Transfer",
+          "BANK_TRANSFER",
+          "transfer",
+          "Transfer",
+          "TRANSFER",
+        ],
+        label: "Chuyển khoản",
+      },
+      { value: ["momo", "MoMo", "MOMO"], label: "MoMo" },
+      { value: ["zalo_pay", "Zalo_Pay", "ZALO_PAY"], label: "Zalo Pay" },
+      { value: ["vnpay", "VNPay", "VNPAY"], label: "VNPay" },
+      { value: ["visa", "Visa", "VISA"], label: "Visa" },
+      {
+        value: ["mastercard", "Mastercard", "MASTERCARD"],
+        label: "Mastercard",
+      },
+    ];
+
+    return methods.map((opt) => ({
+      value: opt.value.join(","),
+      label: opt.label,
+    }));
+  };
+
+  // Tính lại tổng doanh thu và số lượng hóa đơn sau khi filter
+  const calculateFilteredStats = (bills: IBill[]) => {
+    const filteredBills = filterBillsByPaymentMethod(bills);
+    const totalRevenue = filteredBills.reduce(
+      (sum, bill) => sum + bill.totalAmount,
+      0
+    );
+    const billCount = filteredBills.length;
+    return { filteredBills, totalRevenue, billCount };
   };
 
   return (
@@ -265,11 +357,35 @@ const RevenueStatisticsPage = () => {
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid grid-cols-3 mb-8">
-          <TabsTrigger value="daily">Doanh thu ngày</TabsTrigger>
-          <TabsTrigger value="weekly">Doanh thu tuần</TabsTrigger>
-          <TabsTrigger value="monthly">Doanh thu tháng</TabsTrigger>
-        </TabsList>
+        <div className="flex justify-between items-center mb-6">
+          <TabsList className="grid grid-cols-3">
+            <TabsTrigger value="daily">Doanh thu ngày</TabsTrigger>
+            <TabsTrigger value="weekly">Doanh thu tuần</TabsTrigger>
+            <TabsTrigger value="monthly">Doanh thu tháng</TabsTrigger>
+          </TabsList>
+
+          {/* Filter payment method */}
+          {(dailyRevenue.data?.bills ||
+            weeklyRevenue.data?.bills ||
+            monthlyRevenue.data?.bills) && (
+            <Select
+              value={selectedPaymentMethod}
+              onValueChange={setSelectedPaymentMethod}
+            >
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Lọc theo PT thanh toán" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tất cả</SelectItem>
+                {getAllPaymentMethodOptions().map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+        </div>
 
         <TabsContent value="daily">
           {dailyRevenue.loading ? (
@@ -281,89 +397,105 @@ const RevenueStatisticsPage = () => {
               {dailyRevenue.error}
             </div>
           ) : dailyRevenue.data ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">Ngày</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      {dailyRevenue.data.dateInfo.formattedDate}
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Tổng doanh thu
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4" className="text-green-600">
-                      {formatCurrency(dailyRevenue.data.totalRevenue)} VNĐ
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Số lượng hóa đơn
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      {dailyRevenue.data.billCount}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chi tiết hóa đơn</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Mã hóa đơn</TableHead>
-                          <TableHead>Thời gian</TableHead>
-                          <TableHead>Phòng</TableHead>
-                          <TableHead className="text-right">Số tiền</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {dailyRevenue.data.bills.map((bill) => (
-                          <TableRow key={bill._id || "unknown"}>
-                            <TableCell className="font-medium">
-                              <button
-                                className="text-blue-600 hover:underline focus:outline-none"
-                                onClick={() =>
-                                  bill._id && handleBillClick(bill._id)
-                                }
-                              >
-                                {bill.invoiceCode || "N/A"}
-                              </button>
-                            </TableCell>
-                            <TableCell>
-                              {formatBillDate(bill.createdAt.toString())}
-                            </TableCell>
-                            <TableCell>
-                              {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(bill.totalAmount)} VNĐ
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            (() => {
+              const { filteredBills, totalRevenue, billCount } =
+                calculateFilteredStats(dailyRevenue.data.bills);
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Ngày
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">
+                          {dailyRevenue.data.dateInfo.formattedDate}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tổng doanh thu
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4" className="text-green-600">
+                          {formatCurrency(totalRevenue)} VNĐ
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Số lượng hóa đơn
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">{billCount}</Typography>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Chi tiết hóa đơn</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Mã hóa đơn</TableHead>
+                              <TableHead>Thời gian</TableHead>
+                              <TableHead>Phòng</TableHead>
+                              <TableHead>PT thanh toán</TableHead>
+                              <TableHead className="text-right">
+                                Số tiền
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredBills.map((bill) => (
+                              <TableRow key={bill._id || "unknown"}>
+                                <TableCell className="font-medium">
+                                  <button
+                                    className="text-blue-600 hover:underline focus:outline-none"
+                                    onClick={() =>
+                                      bill._id && handleBillClick(bill._id)
+                                    }
+                                  >
+                                    {bill.invoiceCode || "N/A"}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  {formatBillDate(bill.createdAt.toString())}
+                                </TableCell>
+                                <TableCell>
+                                  {roomsData?.[bill.roomId] ||
+                                    bill.roomId ||
+                                    "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {formatPaymentMethod(
+                                    bill.paymentMethod || "N/A"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(bill.totalAmount)} VNĐ
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()
           ) : (
             <div className="text-center p-8">
               Chọn ngày và nhấn "Cập nhật dữ liệu" để xem thống kê
@@ -381,104 +513,118 @@ const RevenueStatisticsPage = () => {
               {weeklyRevenue.error}
             </div>
           ) : weeklyRevenue.data ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Tuần / Năm
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      Tuần {weeklyRevenue.data.dateInfo.week},{" "}
-                      {weeklyRevenue.data.dateInfo.year}
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Khoảng thời gian
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h5">
-                      {weeklyRevenue.data.dateInfo.dateRange}
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Tổng doanh thu
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4" className="text-green-600">
-                      {formatCurrency(weeklyRevenue.data.totalRevenue)} VNĐ
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Số lượng hóa đơn
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      {weeklyRevenue.data.billCount}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chi tiết hóa đơn</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Mã hóa đơn</TableHead>
-                          <TableHead>Thời gian</TableHead>
-                          <TableHead>Phòng</TableHead>
-                          <TableHead className="text-right">Số tiền</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {weeklyRevenue.data.bills.map((bill) => (
-                          <TableRow key={bill._id || "unknown"}>
-                            <TableCell className="font-medium">
-                              <button
-                                className="text-blue-600 hover:underline focus:outline-none"
-                                onClick={() =>
-                                  bill._id && handleBillClick(bill._id)
-                                }
-                              >
-                                {bill.invoiceCode || "N/A"}
-                              </button>
-                            </TableCell>
-                            <TableCell>
-                              {formatBillDate(bill.createdAt.toString())}
-                            </TableCell>
-                            <TableCell>
-                              {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(bill.totalAmount)} VNĐ
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            (() => {
+              const { filteredBills, totalRevenue, billCount } =
+                calculateFilteredStats(weeklyRevenue.data.bills);
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tuần / Năm
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">
+                          Tuần {weeklyRevenue.data.dateInfo.week},{" "}
+                          {weeklyRevenue.data.dateInfo.year}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Khoảng thời gian
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h5">
+                          {weeklyRevenue.data.dateInfo.dateRange}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tổng doanh thu
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4" className="text-green-600">
+                          {formatCurrency(totalRevenue)} VNĐ
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Số lượng hóa đơn
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">{billCount}</Typography>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Chi tiết hóa đơn</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Mã hóa đơn</TableHead>
+                              <TableHead>Thời gian</TableHead>
+                              <TableHead>Phòng</TableHead>
+                              <TableHead>PT thanh toán</TableHead>
+                              <TableHead className="text-right">
+                                Số tiền
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredBills.map((bill) => (
+                              <TableRow key={bill._id || "unknown"}>
+                                <TableCell className="font-medium">
+                                  <button
+                                    className="text-blue-600 hover:underline focus:outline-none"
+                                    onClick={() =>
+                                      bill._id && handleBillClick(bill._id)
+                                    }
+                                  >
+                                    {bill.invoiceCode || "N/A"}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  {formatBillDate(bill.createdAt.toString())}
+                                </TableCell>
+                                <TableCell>
+                                  {roomsData?.[bill.roomId] ||
+                                    bill.roomId ||
+                                    "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {formatPaymentMethod(
+                                    bill.paymentMethod || "N/A"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(bill.totalAmount)} VNĐ
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()
           ) : (
             <div className="text-center p-8">
               Chọn ngày trong tuần và nhấn "Cập nhật dữ liệu" để xem thống kê
@@ -496,104 +642,118 @@ const RevenueStatisticsPage = () => {
               {monthlyRevenue.error}
             </div>
           ) : monthlyRevenue.data ? (
-            <div className="space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Tháng / Năm
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      {monthlyRevenue.data.dateInfo.month}{" "}
-                      {monthlyRevenue.data.dateInfo.year}
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Khoảng thời gian
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h5">
-                      {monthlyRevenue.data.dateInfo.dateRange}
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Tổng doanh thu
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4" className="text-green-600">
-                      {formatCurrency(monthlyRevenue.data.totalRevenue)} VNĐ
-                    </Typography>
-                  </CardContent>
-                </Card>
-                <Card>
-                  <CardHeader className="pb-2">
-                    <CardTitle className="text-sm font-medium">
-                      Số lượng hóa đơn
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Typography variant="h4">
-                      {monthlyRevenue.data.billCount}
-                    </Typography>
-                  </CardContent>
-                </Card>
-              </div>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Chi tiết hóa đơn</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Mã hóa đơn</TableHead>
-                          <TableHead>Thời gian</TableHead>
-                          <TableHead>Phòng</TableHead>
-                          <TableHead className="text-right">Số tiền</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {monthlyRevenue.data.bills.map((bill) => (
-                          <TableRow key={bill._id || "unknown"}>
-                            <TableCell className="font-medium">
-                              <button
-                                className="text-blue-600 hover:underline focus:outline-none"
-                                onClick={() =>
-                                  bill._id && handleBillClick(bill._id)
-                                }
-                              >
-                                {bill.invoiceCode || "N/A"}
-                              </button>
-                            </TableCell>
-                            <TableCell>
-                              {formatBillDate(bill.createdAt.toString())}
-                            </TableCell>
-                            <TableCell>
-                              {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {formatCurrency(bill.totalAmount)} VNĐ
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
+            (() => {
+              const { filteredBills, totalRevenue, billCount } =
+                calculateFilteredStats(monthlyRevenue.data.bills);
+              return (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tháng / Năm
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">
+                          {monthlyRevenue.data.dateInfo.month}{" "}
+                          {monthlyRevenue.data.dateInfo.year}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Khoảng thời gian
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h5">
+                          {monthlyRevenue.data.dateInfo.dateRange}
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Tổng doanh thu
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4" className="text-green-600">
+                          {formatCurrency(totalRevenue)} VNĐ
+                        </Typography>
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">
+                          Số lượng hóa đơn
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <Typography variant="h4">{billCount}</Typography>
+                      </CardContent>
+                    </Card>
                   </div>
-                </CardContent>
-              </Card>
-            </div>
+
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Chi tiết hóa đơn</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Mã hóa đơn</TableHead>
+                              <TableHead>Thời gian</TableHead>
+                              <TableHead>Phòng</TableHead>
+                              <TableHead>PT thanh toán</TableHead>
+                              <TableHead className="text-right">
+                                Số tiền
+                              </TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {filteredBills.map((bill) => (
+                              <TableRow key={bill._id || "unknown"}>
+                                <TableCell className="font-medium">
+                                  <button
+                                    className="text-blue-600 hover:underline focus:outline-none"
+                                    onClick={() =>
+                                      bill._id && handleBillClick(bill._id)
+                                    }
+                                  >
+                                    {bill.invoiceCode || "N/A"}
+                                  </button>
+                                </TableCell>
+                                <TableCell>
+                                  {formatBillDate(bill.createdAt.toString())}
+                                </TableCell>
+                                <TableCell>
+                                  {roomsData?.[bill.roomId] ||
+                                    bill.roomId ||
+                                    "N/A"}
+                                </TableCell>
+                                <TableCell>
+                                  {formatPaymentMethod(
+                                    bill.paymentMethod || "N/A"
+                                  )}
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  {formatCurrency(bill.totalAmount)} VNĐ
+                                </TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+              );
+            })()
           ) : (
             <div className="text-center p-8">
               Chọn ngày trong tháng và nhấn "Cập nhật dữ liệu" để xem thống kê

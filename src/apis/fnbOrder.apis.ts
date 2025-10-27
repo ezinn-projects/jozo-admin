@@ -32,11 +32,12 @@ export interface ICreateFnbOrderRequestBody {
   createdBy: string;
 }
 
-// Interface cho Add/Remove Item
+// Interface cho Add/Remove Item (format mới)
 export interface IAddRemoveItemRequestBody {
-  itemId: string;
-  quantity: number;
-  category: "drinks" | "snacks";
+  order: {
+    drinks?: Record<string, number>;
+    snacks?: Record<string, number>;
+  };
   createdBy: string;
 }
 
@@ -81,23 +82,23 @@ const fnbOrderApis = {
       `${FNB_ORDER_CONTROLLER}/fnb-order/${roomScheduleId}`
     );
   },
-  // Thêm item vào order
+  // Thêm item vào order (API mới)
   addItemToOrder: (
     roomScheduleId: string,
     payload: IAddRemoveItemRequestBody
   ) => {
     return http.post<HTTPResponse<IFnbOrder>>(
-      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/add-item`,
+      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/add`,
       payload
     );
   },
-  // Xóa item khỏi order
+  // Giảm item khỏi order (API mới)
   removeItemFromOrder: (
     roomScheduleId: string,
     payload: IAddRemoveItemRequestBody
   ) => {
     return http.post<HTTPResponse<IFnbOrder>>(
-      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/remove-item`,
+      `${FNB_ORDER_CONTROLLER}/${roomScheduleId}/remove`,
       payload
     );
   },

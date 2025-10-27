@@ -173,7 +173,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  // Mutation để cập nhật số lượng item
+  // Mutation để cập nhật số lượng item (dùng add/remove)
   const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
     useMutation({
       mutationFn: async ({
@@ -185,32 +185,37 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         quantity: number;
         category: string;
       }) => {
-        console.log("Mutation function called with:", {
-          itemId,
-          quantity,
-          category,
-        });
-        if (!schedule._id || !user?._id) {
-          console.log("Missing schedule._id or user._id:", {
-            scheduleId: schedule._id,
-            userId: user?._id,
-          });
-          return;
+        if (!schedule._id || !user?._id) return;
+
+        // Get current quantity
+        const currentQuantity =
+          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          0;
+
+        const diff = quantity - currentQuantity;
+
+        if (diff === 0) return; // Không có thay đổi
+
+        // Tạo payload đúng format API mới
+        // Kiểm tra cả "drink" và "drinks", "snack" và "snacks"
+        const isDrinks = category === "drinks" || category === "drink";
+        const payload = {
+          order: {
+            ...(isDrinks
+              ? { drinks: { [itemId]: Math.abs(diff) } }
+              : { snacks: { [itemId]: Math.abs(diff) } }),
+          },
+          createdBy: user._id,
+        };
+
+        if (diff > 0) {
+          await fnbOrderApis.addItemToOrder(schedule._id, payload);
+        } else if (diff < 0) {
+          await fnbOrderApis.removeItemFromOrder(schedule._id, payload);
         }
-        console.log("Calling fnbOrderApis.upsertItem with:", {
-          roomScheduleId: schedule._id,
-          itemId,
-          quantity,
-          category,
-          createdBy: user._id,
-        });
-        await fnbOrderApis.upsertItem({
-          roomScheduleId: schedule._id,
-          itemId,
-          quantity,
-          category,
-          createdBy: user._id,
-        });
       },
       onMutate: async ({ itemId, quantity }) => {
         // Cancel any outgoing refetches
@@ -224,7 +229,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           ],
         });
 
-        // Snapshot the previous value
+        // Cancel fnbOrderDetail queries
+        await queryClient.cancelQueries({
+          queryKey: ["fnbOrderDetail", schedule._id],
+        });
+
+        // Snapshot the previous values
         const previousBillData = queryClient.getQueryData([
           "bill",
           schedule._id,
@@ -233,7 +243,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           customStartTime,
         ]);
 
-        // Optimistically update to the new value
+        const previousOrderData = queryClient.getQueryData([
+          "fnbOrderDetail",
+          schedule._id,
+        ]);
+
+        // Get current quantity from orderDetailData
+        const currentQuantity =
+          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          0;
+
+        const quantityDiff = quantity - currentQuantity;
+
+        // Optimistically update bill data
         queryClient.setQueryData(
           [
             "bill",
@@ -286,7 +311,63 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           }
         );
 
-        return { previousBillData };
+        // Optimistically update orderDetailData
+        queryClient.setQueryData(
+          ["fnbOrderDetail", schedule._id],
+          (old: OrderDetail | undefined) => {
+            if (!old) return old;
+
+            const newDrinks = old.items.drinks.map((item) =>
+              item.itemId === itemId ? { ...item, quantity } : item
+            );
+            const newSnacks = old.items.snacks.map((item) =>
+              item.itemId === itemId ? { ...item, quantity } : item
+            );
+
+            return {
+              ...old,
+              items: {
+                drinks: newDrinks,
+                snacks: newSnacks,
+              },
+            };
+          }
+        );
+
+        // Optimistically update menuItems inventory
+        queryClient.setQueriesData(
+          { queryKey: ["menuItems"] },
+          (old: { data?: { result?: unknown[] } } | undefined) => {
+            if (!old?.data?.result) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                result: old.data.result.map((item: unknown) => {
+                  const menuItem = item as {
+                    _id: string;
+                    inventory?: { quantity?: number };
+                  };
+                  if (menuItem._id === itemId) {
+                    return {
+                      ...(item as Record<string, unknown>),
+                      inventory: {
+                        ...menuItem.inventory,
+                        quantity: Math.max(
+                          0,
+                          (menuItem.inventory?.quantity || 0) - quantityDiff
+                        ),
+                      },
+                    };
+                  }
+                  return item;
+                }),
+              },
+            };
+          }
+        );
+
+        return { previousBillData, previousOrderData, currentQuantity };
       },
       onError: (_err, _variables, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
@@ -300,6 +381,47 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               customStartTime,
             ],
             context.previousBillData
+          );
+        }
+        if (context?.previousOrderData) {
+          queryClient.setQueryData(
+            ["fnbOrderDetail", schedule._id],
+            context.previousOrderData
+          );
+        }
+        // Rollback menuItems inventory
+        if (context?.currentQuantity !== undefined) {
+          const quantityDiff = _variables.quantity - context.currentQuantity;
+          queryClient.setQueriesData(
+            { queryKey: ["menuItems"] },
+            (old: { data?: { result?: unknown[] } } | undefined) => {
+              if (!old?.data?.result) return old;
+              return {
+                ...old,
+                data: {
+                  ...old.data,
+                  result: old.data.result.map((item: unknown) => {
+                    const menuItem = item as {
+                      _id: string;
+                      inventory?: { quantity?: number };
+                    };
+                    if (menuItem._id === _variables.itemId) {
+                      return {
+                        ...(item as Record<string, unknown>),
+                        inventory: {
+                          ...menuItem.inventory,
+                          quantity: Math.max(
+                            0,
+                            (menuItem.inventory?.quantity || 0) + quantityDiff
+                          ),
+                        },
+                      };
+                    }
+                    return item;
+                  }),
+                },
+              };
+            }
           );
         }
         toast({
@@ -319,6 +441,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             customStartTime,
           ],
         });
+        queryClient.invalidateQueries({
+          queryKey: ["fnbOrderDetail", schedule._id],
+        });
+        // Refetch menuItems để đảm bảo inventory được cập nhật từ server
+        queryClient.invalidateQueries({ queryKey: ["menuItems"] });
       },
     });
 

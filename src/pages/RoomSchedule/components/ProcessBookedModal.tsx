@@ -17,6 +17,7 @@ import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
+import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
 import { OrderDetail } from "@/@types/FnbOrder";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -103,7 +104,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     refetchOnWindowFocus: false,
   });
 
-  // Mutation để cập nhật số lượng
+  // Mutation để cập nhật số lượng (dùng add/remove)
   const { mutate: updateQuantity, isPending: isUpdatingQuantity } = useMutation(
     {
       mutationFn: async ({
@@ -116,13 +117,35 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         category: string;
       }) => {
         if (!schedule._id || !schedule.createdBy) return;
-        await fnbOrderApis.upsertItem({
-          roomScheduleId: schedule._id,
-          itemId,
-          quantity,
-          category,
+
+        // Get current quantity
+        const currentQuantity =
+          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          0;
+
+        const diff = quantity - currentQuantity;
+
+        if (diff === 0) return; // Không có thay đổi
+
+        // Tạo payload đúng format API mới
+        const isDrinks = category === "drinks";
+        const payload: IAddRemoveItemRequestBody = {
+          order: {
+            ...(isDrinks
+              ? { drinks: { [itemId]: Math.abs(diff) } }
+              : { snacks: { [itemId]: Math.abs(diff) } }),
+          },
           createdBy: schedule.createdBy,
-        });
+        };
+
+        if (diff > 0) {
+          await fnbOrderApis.addItemToOrder(schedule._id, payload);
+        } else if (diff < 0) {
+          await fnbOrderApis.removeItemFromOrder(schedule._id, payload);
+        }
       },
       onMutate: async ({ itemId, quantity }) => {
         // Cancel any outgoing refetches
@@ -135,6 +158,16 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           "fnbOrderDetail",
           schedule._id,
         ]);
+
+        // Get current quantity to calculate diff
+        const currentQuantity =
+          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
+            ?.quantity ||
+          0;
+
+        const quantityDiff = quantity - currentQuantity;
 
         // Optimistically update to the new value
         queryClient.setQueryData(
@@ -159,7 +192,40 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           }
         );
 
-        return { previousOrderData };
+        // Optimistically update inventory
+        queryClient.setQueriesData(
+          { queryKey: ["menuItems"] },
+          (old: { data?: { result?: unknown[] } } | undefined) => {
+            if (!old?.data?.result) return old;
+            return {
+              ...old,
+              data: {
+                ...old.data,
+                result: old.data.result.map((item: unknown) => {
+                  const menuItem = item as {
+                    _id: string;
+                    inventory?: { quantity?: number };
+                  };
+                  if (menuItem._id === itemId) {
+                    return {
+                      ...(item as Record<string, unknown>),
+                      inventory: {
+                        ...menuItem.inventory,
+                        quantity: Math.max(
+                          0,
+                          (menuItem.inventory?.quantity || 0) - quantityDiff
+                        ),
+                      },
+                    };
+                  }
+                  return item;
+                }),
+              },
+            };
+          }
+        );
+
+        return { previousOrderData, currentQuantity };
       },
       onError: (_err, _variables, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
@@ -167,6 +233,41 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           queryClient.setQueryData(
             ["fnbOrderDetail", schedule._id],
             context.previousOrderData
+          );
+        }
+        // Rollback inventory
+        if (context?.currentQuantity !== undefined) {
+          const quantityDiff = _variables.quantity - context.currentQuantity;
+          queryClient.setQueriesData(
+            { queryKey: ["menuItems"] },
+            (old: { data?: { result?: unknown[] } } | undefined) => {
+              if (!old?.data?.result) return old;
+              return {
+                ...old,
+                data: {
+                  ...old.data,
+                  result: old.data.result.map((item: unknown) => {
+                    const menuItem = item as {
+                      _id: string;
+                      inventory?: { quantity?: number };
+                    };
+                    if (menuItem._id === _variables.itemId) {
+                      return {
+                        ...(item as Record<string, unknown>),
+                        inventory: {
+                          ...menuItem.inventory,
+                          quantity: Math.max(
+                            0,
+                            (menuItem.inventory?.quantity || 0) + quantityDiff
+                          ),
+                        },
+                      };
+                    }
+                    return item;
+                  }),
+                },
+              };
+            }
           );
         }
         toast({
@@ -180,6 +281,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         queryClient.invalidateQueries({
           queryKey: ["fnbOrderDetail", schedule._id],
         });
+        // Refetch menuItems để đảm bảo inventory được cập nhật từ server
+        queryClient.invalidateQueries({ queryKey: ["menuItems"] });
       },
     }
   );
@@ -280,12 +383,10 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     category: string
   ) => {
     const newQuantity = Math.max(0, currentQuantity + change);
-    // Chuyển đổi category từ số nhiều sang số ít
-    const normalizedCategory = category === "drinks" ? "drink" : "snack";
     updateQuantity({
       itemId,
       quantity: newQuantity,
-      category: normalizedCategory,
+      category, // Giữ nguyên "drinks" hoặc "snacks"
     });
   };
 
@@ -376,6 +477,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // Kiểm tra xem có order nào không
   const hasOrders =
     orderDetailData &&
+    orderDetailData.items &&
     ((orderDetailData.items.drinks &&
       orderDetailData.items.drinks.length > 0) ||
       (orderDetailData.items.snacks &&
@@ -506,7 +608,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {/* Drinks */}
-              {orderDetailData?.items.drinks &&
+              {orderDetailData?.items?.drinks &&
                 orderDetailData.items.drinks.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">
@@ -566,7 +668,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 )}
 
               {/* Snacks */}
-              {orderDetailData?.items.snacks &&
+              {orderDetailData?.items?.snacks &&
                 orderDetailData.items.snacks.length > 0 && (
                   <Card>
                     <CardHeader className="pb-2">

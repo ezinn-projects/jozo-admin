@@ -82,10 +82,10 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   // Lấy quantities từ query data (orderDetailData)
   const quantities = useMemo(() => {
     const q: Record<string, number> = {};
-    orderDetailData?.items.drinks.forEach((item: OrderDetailItem) => {
+    orderDetailData?.items?.drinks?.forEach((item: OrderDetailItem) => {
       q[item.itemId] = item.quantity;
     });
-    orderDetailData?.items.snacks.forEach((item: OrderDetailItem) => {
+    orderDetailData?.items?.snacks?.forEach((item: OrderDetailItem) => {
       q[item.itemId] = item.quantity;
     });
     return q;
@@ -165,8 +165,10 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   // Icon cho từng category
   const getCategoryIcon = (category: string) => {
     switch (category.toLowerCase()) {
+      case "drink":
       case "drinks":
         return <Coffee className="w-4 h-4" />;
+      case "snack":
       case "snacks":
         return <Utensils className="w-4 h-4" />;
       default:
@@ -177,8 +179,10 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   // Label cho category
   const getCategoryLabel = (category: string) => {
     switch (category.toLowerCase()) {
+      case "drink":
       case "drinks":
         return "Đồ Uống";
+      case "snack":
       case "snacks":
         return "Đồ Ăn";
       case "all":
@@ -188,123 +192,153 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     }
   };
 
-  // Mutation cho upsertItem với optimistic update
-  const upsertMutation = useMutation({
-    mutationFn: async ({ key, value }: { key: string; value: number }) => {
-      const item = menuItems.find((i) => i._id === key);
-      if (!item || !scheduleId || !createdBy) return;
-      await fnbOrderApis.upsertItem({
-        roomScheduleId: scheduleId,
-        itemId: item._id,
-        quantity: value,
-        category: item.category,
+  // Hàm optimistic update cho order detail
+  const updateOrderDetailOptimistically = (
+    key: string,
+    quantityChange: number,
+    itemCategory: string
+  ) => {
+    queryClient.setQueryData(
+      ["fnbOrderDetail", scheduleId],
+      (old: OrderDetail | undefined) => {
+        if (!old) return old;
+
+        const isDrinks =
+          itemCategory.toLowerCase() === "drink" ||
+          itemCategory.toLowerCase() === "drinks";
+        const itemsArray = isDrinks ? old.items.drinks : old.items.snacks;
+        const existingItem = itemsArray.find((item) => item.itemId === key);
+
+        let updatedItems;
+        if (existingItem) {
+          // Item đã tồn tại, cập nhật số lượng
+          const newQuantity = Math.max(
+            0,
+            existingItem.quantity + quantityChange
+          );
+          if (newQuantity === 0) {
+            // Nếu số lượng về 0, xóa item khỏi mảng
+            updatedItems = itemsArray.filter((item) => item.itemId !== key);
+          } else {
+            updatedItems = itemsArray.map((item) =>
+              item.itemId === key ? { ...item, quantity: newQuantity } : item
+            );
+          }
+        } else if (quantityChange > 0) {
+          // Item chưa tồn tại, thêm mới
+          updatedItems = [
+            ...itemsArray,
+            {
+              itemId: key,
+              quantity: quantityChange,
+              name: "",
+              price: 0,
+            },
+          ];
+        } else {
+          updatedItems = itemsArray;
+        }
+
+        if (isDrinks) {
+          return {
+            ...old,
+            items: {
+              ...old.items,
+              drinks: updatedItems,
+            },
+          };
+        } else {
+          return {
+            ...old,
+            items: {
+              ...old.items,
+              snacks: updatedItems,
+            },
+          };
+        }
+      }
+    );
+  };
+
+  // Hàm update inventory trong menuItems
+  const updateInventoryOptimistically = (key: string, quantityDiff: number) => {
+    queryClient.setQueriesData(
+      { queryKey: ["menuItems"] },
+      (old: { data?: { result?: MenuItem[] } } | undefined) => {
+        if (!old?.data?.result) return old;
+        return {
+          ...old,
+          data: {
+            ...old.data,
+            result: old.data.result.map((item: MenuItem) => {
+              if (item._id === key) {
+                return {
+                  ...item,
+                  inventory: {
+                    ...item.inventory,
+                    quantity: Math.max(
+                      0,
+                      (item.inventory?.quantity || 0) - quantityDiff
+                    ),
+                  },
+                };
+              }
+              return item;
+            }),
+          },
+        };
+      }
+    );
+  };
+
+  // Mutation cho add item
+  const addMutation = useMutation({
+    mutationFn: async ({
+      key,
+      quantity,
+      category,
+    }: {
+      key: string;
+      quantity: number;
+      category: string;
+    }) => {
+      if (!scheduleId || !createdBy) return;
+      const isDrinks =
+        category.toLowerCase() === "drink" ||
+        category.toLowerCase() === "drinks";
+      const payload = {
+        order: {
+          ...(isDrinks
+            ? { drinks: { [key]: quantity } }
+            : { snacks: { [key]: quantity } }),
+        },
         createdBy,
-      });
+      };
+      await fnbOrderApis.addItemToOrder(scheduleId, payload);
     },
-    onMutate: async ({ key, value }) => {
+    onMutate: async ({ key, quantity, category }) => {
       await queryClient.cancelQueries({
         queryKey: ["fnbOrderDetail", scheduleId],
       });
+
       const previousOrderData = queryClient.getQueryData([
         "fnbOrderDetail",
         scheduleId,
       ]);
 
-      // Optimistic update cho orderDetail
-      queryClient.setQueryData(
-        ["fnbOrderDetail", scheduleId],
-        (old: OrderDetail | undefined) => {
-          console.log("old fnbOrderDetail", old);
-          if (!old) return old;
+      // Optimistic update order detail
+      updateOrderDetailOptimistically(key, quantity, category);
 
-          const newDrinks = old.items.drinks.map((item) =>
-            item.itemId === key ? { ...item, quantity: value } : item
-          );
-          const newSnacks = old.items.snacks.map((item) =>
-            item.itemId === key ? { ...item, quantity: value } : item
-          );
-          return {
-            ...old,
-            items: {
-              drinks: newDrinks,
-              snacks: newSnacks,
-            },
-          };
-        }
-      );
+      // Optimistic update inventory
+      updateInventoryOptimistically(key, quantity);
 
-      // Optimistic update cho menuItems (cập nhật inventory.quantity)
-      const previousQuantity = quantities[key] || 0;
-      const quantityDiff = value - previousQuantity;
-
-      // Cập nhật menuItems trong cache nếu có
-      queryClient.setQueriesData(
-        { queryKey: ["menuItems"] },
-        (old: { data?: { result?: MenuItem[] } } | undefined) => {
-          console.log("old fnbMenu", old);
-          if (!old?.data?.result) return old;
-          return {
-            ...old,
-            data: {
-              ...old.data,
-              result: old.data.result.map((item: MenuItem) => {
-                if (item._id === key) {
-                  return {
-                    ...item,
-                    inventory: {
-                      ...item.inventory,
-                      quantity: Math.max(
-                        0,
-                        (item.inventory?.quantity || 0) - quantityDiff
-                      ),
-                    },
-                  };
-                }
-                return item;
-              }),
-            },
-          };
-        }
-      );
-
-      return { previousOrderData, previousQuantity };
+      return { previousOrderData };
     },
-    onError: (_err, variables, context) => {
+    onError: (_err, _variables, context) => {
       if (context?.previousOrderData) {
         queryClient.setQueryData(
           ["fnbOrderDetail", scheduleId],
           context.previousOrderData
-        );
-      }
-      // Rollback menuItems nếu cần
-      if (context?.previousQuantity !== undefined) {
-        const quantityDiff = variables.value - context.previousQuantity;
-        queryClient.setQueriesData(
-          { queryKey: ["fnbMenu"] },
-          (old: { data?: { result?: MenuItem[] } } | undefined) => {
-            if (!old?.data?.result) return old;
-            return {
-              ...old,
-              data: {
-                ...old.data,
-                result: old.data.result.map((item: MenuItem) => {
-                  if (item._id === variables.key) {
-                    return {
-                      ...item,
-                      inventory: {
-                        ...item.inventory,
-                        quantity: Math.max(
-                          0,
-                          (item.inventory?.quantity || 0) + quantityDiff
-                        ),
-                      },
-                    };
-                  }
-                  return item;
-                }),
-              },
-            };
-          }
         );
       }
     },
@@ -313,15 +347,105 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
         queryClient.invalidateQueries({
           queryKey: ["fnbOrderDetail", scheduleId],
         });
-        // Refetch bill (queryKey phải giống như trong ProcessInUseModal)
         queryClient.invalidateQueries({ queryKey: ["bill", scheduleId] });
       }
     },
   });
 
-  // Khi thay đổi số lượng input, gọi mutation luôn
-  const handleQuantityChange = (key: string, value: number) => {
-    upsertMutation.mutate({ key, value: value < 0 ? 0 : value });
+  // Mutation cho remove item
+  const removeMutation = useMutation({
+    mutationFn: async ({
+      key,
+      quantity,
+      category,
+    }: {
+      key: string;
+      quantity: number;
+      category: string;
+    }) => {
+      if (!scheduleId || !createdBy) return;
+      const isDrinks =
+        category.toLowerCase() === "drink" ||
+        category.toLowerCase() === "drinks";
+      const payload = {
+        order: {
+          ...(isDrinks
+            ? { drinks: { [key]: quantity } }
+            : { snacks: { [key]: quantity } }),
+        },
+        createdBy,
+      };
+      await fnbOrderApis.removeItemFromOrder(scheduleId, payload);
+    },
+    onMutate: async ({ key, quantity, category }) => {
+      await queryClient.cancelQueries({
+        queryKey: ["fnbOrderDetail", scheduleId],
+      });
+
+      const previousOrderData = queryClient.getQueryData([
+        "fnbOrderDetail",
+        scheduleId,
+      ]);
+
+      // Optimistic update order detail
+      updateOrderDetailOptimistically(key, -quantity, category);
+
+      // Optimistic update inventory
+      updateInventoryOptimistically(key, -quantity);
+
+      return { previousOrderData };
+    },
+    onError: (_err, _variables, context) => {
+      if (context?.previousOrderData) {
+        queryClient.setQueryData(
+          ["fnbOrderDetail", scheduleId],
+          context.previousOrderData
+        );
+      }
+    },
+    onSuccess: () => {
+      if (scheduleId) {
+        queryClient.invalidateQueries({
+          queryKey: ["fnbOrderDetail", scheduleId],
+        });
+        queryClient.invalidateQueries({ queryKey: ["bill", scheduleId] });
+      }
+    },
+  });
+
+  // Xử lý khi thay đổi số lượng qua input
+  const handleQuantityChange = (key: string, newValue: number) => {
+    const item = menuItems.find((i) => i._id === key);
+    if (!item) return;
+
+    const currentValue = quantities[key] || 0;
+    const diff = newValue - currentValue;
+
+    if (diff > 0) {
+      // Tăng số lượng
+      addMutation.mutate({ key, quantity: diff, category: item.category });
+    } else if (diff < 0) {
+      // Giảm số lượng
+      removeMutation.mutate({
+        key,
+        quantity: Math.abs(diff),
+        category: item.category,
+      });
+    }
+  };
+
+  // Hàm handle cho nút + (thêm 1)
+  const handleAddOne = (key: string) => {
+    const item = menuItems.find((i) => i._id === key);
+    if (!item) return;
+    addMutation.mutate({ key, quantity: 1, category: item.category });
+  };
+
+  // Hàm handle cho nút - (giảm 1)
+  const handleRemoveOne = (key: string) => {
+    const item = menuItems.find((i) => i._id === key);
+    if (!item) return;
+    removeMutation.mutate({ key, quantity: 1, category: item.category });
   };
 
   // Render lại card: nếu có con thì hiển thị các con, không thì hiển thị như món đơn giản
@@ -389,13 +513,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => {
-                            const currentValue = quantities[key] || 0;
-                            handleQuantityChange(
-                              key,
-                              Math.max(0, currentValue - 1)
-                            );
-                          }}
+                          onClick={() => handleRemoveOne(key)}
                           disabled={Number(quantities[key] || 0) === 0}
                           className="w-8 h-8 p-0"
                         >
@@ -431,7 +549,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                             const currentValue = quantities[key] || 0;
                             const maxAllowed = child.inventory.quantity || 0;
                             if (currentValue < maxAllowed) {
-                              handleQuantityChange(key, currentValue + 1);
+                              handleAddOne(key);
                             }
                           }}
                           disabled={
@@ -490,10 +608,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => {
-                  const currentValue = quantities[key] || 0;
-                  handleQuantityChange(key, Math.max(0, currentValue - 1));
-                }}
+                onClick={() => handleRemoveOne(key)}
                 disabled={Number(quantities[key] || 0) === 0}
                 className="w-8 h-8 p-0"
               >
@@ -529,7 +644,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                   const currentValue = quantities[key] || 0;
                   const maxAllowed = item.inventory?.quantity || 0;
                   if (currentValue < maxAllowed) {
-                    handleQuantityChange(key, currentValue + 1);
+                    handleAddOne(key);
                   }
                 }}
                 disabled={
@@ -552,7 +667,9 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl">Danh Sách Menu Items</DialogTitle>
+          <DialogTitle className="text-2xl">
+            Danh Sách Đồ Ăn & Đồ Uống
+          </DialogTitle>
           <DialogDescription>
             Chọn món ăn hoặc đồ uống để thêm vào phòng
             {roomId && scheduleId && (

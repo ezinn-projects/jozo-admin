@@ -357,6 +357,7 @@ const RoomTimelineTable: React.FC = () => {
       timestamp: number;
       orderData: OrderData;
     }) => {
+      console.log("new order notification data", data);
       if (data.type === "new_order") {
         // Convert numeric roomId to actual room ID
         const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
@@ -1118,6 +1119,9 @@ const RoomTimelineTable: React.FC = () => {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{hasNotification.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">
+                            {dayjs(hasNotification.timestamp).format("HH:mm")}
+                          </p>
                         </TooltipContent>
                       </Tooltip>
                     )}
