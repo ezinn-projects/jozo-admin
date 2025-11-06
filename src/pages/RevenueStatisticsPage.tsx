@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import Typography from "@/components/ui/typography";
 import billAPis from "@/apis/bill.apis";
-import dayjs from "dayjs";
+import dayjs from "@/lib/dayjs";
 // import { formatCurrency } from "@/utils/formatters";
 import { IBill } from "@/@types/Bill";
 import {
@@ -57,6 +57,9 @@ const paymentMethodMap: Record<string, string> = {
   bank_transfer: "Chuyển khoản",
   Bank_Transfer: "Chuyển khoản",
   BANK_TRANSFER: "Chuyển khoản",
+  "bank transfer": "Chuyển khoản",
+  "Bank Transfer": "Chuyển khoản",
+  "BANK TRANSFER": "Chuyển khoản",
   transfer: "Chuyển khoản",
   Transfer: "Chuyển khoản",
   TRANSFER: "Chuyển khoản",
@@ -149,6 +152,7 @@ const RevenueStatisticsPage = () => {
   const fetchDailyRevenue = async () => {
     setDailyRevenue({ ...dailyRevenue, loading: true, error: null });
     try {
+      // Send date in ISO format (UTC) - backend will handle timezone
       const isoDate = dayjs(selectedDate).toISOString();
       const response = await billAPis.getDailyRevenue(isoDate);
 
@@ -183,6 +187,7 @@ const RevenueStatisticsPage = () => {
   const fetchWeeklyRevenue = async () => {
     setWeeklyRevenue({ ...weeklyRevenue, loading: true, error: null });
     try {
+      // Send date in ISO format (UTC) - backend will handle timezone
       const isoDate = dayjs(selectedDate).toISOString();
       const response = await billAPis.getWeeklyRevenue(isoDate);
 
@@ -220,6 +225,7 @@ const RevenueStatisticsPage = () => {
   const fetchMonthlyRevenue = async () => {
     setMonthlyRevenue({ ...monthlyRevenue, loading: true, error: null });
     try {
+      // Send date in ISO format (UTC) - backend will handle timezone
       const isoDate = dayjs(selectedDate).toISOString();
       const response = await billAPis.getMonthlyRevenue(isoDate);
 
@@ -261,7 +267,11 @@ const RevenueStatisticsPage = () => {
   };
 
   const formatBillDate = (dateString: string) => {
-    return dayjs(dateString).format("DD/MM/YYYY HH:mm");
+    // Parse UTC date and convert to Vietnam timezone for display
+    return dayjs
+      .utc(dateString)
+      .tz("Asia/Ho_Chi_Minh")
+      .format("DD/MM/YYYY HH:mm");
   };
 
   const formatPaymentMethod = (method: string) => {
@@ -285,6 +295,9 @@ const RevenueStatisticsPage = () => {
           "bank_transfer",
           "Bank_Transfer",
           "BANK_TRANSFER",
+          "bank transfer",
+          "Bank Transfer",
+          "BANK TRANSFER",
           "transfer",
           "Transfer",
           "TRANSFER",
@@ -764,7 +777,7 @@ const RevenueStatisticsPage = () => {
 
       {/* Modal chi tiết hóa đơn */}
       <Dialog open={billDetailOpen} onOpenChange={setBillDetailOpen}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-3xl">
           <DialogHeader>
             <DialogTitle>Chi tiết hóa đơn</DialogTitle>
             <DialogDescription>Thông tin chi tiết về hóa đơn</DialogDescription>

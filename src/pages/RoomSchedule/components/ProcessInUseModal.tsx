@@ -45,6 +45,7 @@ import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define bill interfaces
 interface BillItem {
@@ -805,32 +806,33 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl">Session Management</DialogTitle>
-            <DialogDescription className="text-base">
-              Session started at {dayjs(schedule.startTime).format("HH:mm")} and
-              end at {dayjs(schedule.endTime).format("HH:mm")}.<br />
-              You can choose to end or extend the current session.
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] sm:max-h-[90vh] p-0 sm:p-6 flex flex-col">
+          <ScrollArea className="flex-1 px-4 sm:px-0">
+            <DialogHeader className="pt-4 sm:pt-0">
+              <DialogTitle className="text-lg sm:text-xl">Session Management</DialogTitle>
+              <DialogDescription className="text-sm sm:text-base">
+                Session started at {dayjs(schedule.startTime).format("HH:mm")} and
+                end at {dayjs(schedule.endTime).format("HH:mm")}.<br />
+                You can choose to end or extend the current session.
+              </DialogDescription>
+            </DialogHeader>
 
-          {/* Bill Preview Section */}
-          <div className="mt-4 p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-sm">
+            {/* Bill Preview Section */}
+            <div className="mt-4 p-3 sm:p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-xs sm:text-sm">
             <h4 className="text-center text-lg text-purple-700 font-bold mb-2">
               🎉 Jozo Bill 🎉
             </h4>
 
             <div className="space-y-2 text-gray-800">
               <div className="text-center">
-                <p>
+                <p className="text-xs sm:text-sm">
                   Phòng: <span className="font-bold">{room?.roomName}</span>
                 </p>
-                <p>
+                <p className="text-xs sm:text-sm">
                   Ngày:{" "}
                   {dayjs(createdAt || new Date()).format("DD/MM/YYYY HH:mm")}
                 </p>
-                <p>
+                <p className="text-xs sm:text-sm break-all">
                   Mã: {room?._id.slice(0, 2)}{" "}
                   {dayjs(createdAt || new Date()).format("HHmmDDMMYYYY")}
                 </p>
@@ -838,204 +840,283 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               <div className="border-t-2 border-dashed border-purple-400" />
               <div>
                 {/* Custom Start Time Input */}
-                <div className="flex items-center gap-2 my-2">
-                  <Clock className="w-4 h-4 text-purple-500" />
-                  <Label htmlFor="start-time" className="text-sm">
-                    Thời gian bắt đầu:
-                  </Label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 my-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Clock className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                    <Label htmlFor="start-time" className="text-xs sm:text-sm whitespace-nowrap">
+                      Thời gian bắt đầu:
+                    </Label>
+                  </div>
                   <Input
                     id="start-time"
                     type="time"
                     value={customStartTime}
                     onChange={handleStartTimeChange}
-                    className="w-36 h-8 text-sm"
+                    className="w-full sm:w-36 h-9 sm:h-8 text-sm"
                   />
                 </div>
 
                 {/* Custom End Time Input */}
-                <div className="flex items-center gap-2 my-2">
-                  <Clock className="w-4 h-4 text-purple-500" />
-                  <Label htmlFor="end-time" className="text-sm">
-                    Thời gian kết thúc:
-                  </Label>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 my-2">
+                  <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <Clock className="w-4 h-4 text-purple-500 flex-shrink-0" />
+                    <Label htmlFor="end-time" className="text-xs sm:text-sm whitespace-nowrap">
+                      Thời gian kết thúc:
+                    </Label>
+                  </div>
                   <Input
                     id="end-time"
                     type="time"
                     value={customEndTime}
                     onChange={handleEndTimeChange}
-                    className="w-36 h-8 text-sm"
+                    className="w-full sm:w-36 h-9 sm:h-8 text-sm"
                   />
                 </div>
 
-                <p>
+                <p className="text-xs sm:text-sm">
                   Người tạo: <span className="font-bold">{user?.name}</span>
                 </p>
               </div>
               <div className="border-t-2 border-dashed border-purple-400" />
 
               <div>
-                <div className="grid grid-cols-12 font-bold text-purple-600 gap-1">
-                  <span className="col-span-4">Tên</span>
-                  <span className="col-span-2 text-center">SL</span>
-                  <span className="col-span-3 text-right">Đơn Giá</span>
-                  <span className="col-span-3 text-right">Thành Tiền</span>
-                </div>
-                {items.map((item: BillItem, index: number) => (
-                  <div key={index}>
-                    <div className="grid grid-cols-12 gap-1 items-center">
-                      <span className="col-span-4 truncate">
-                        {item.description}
-                      </span>
-                      <div className="col-span-2 flex items-center justify-center gap-1">
-                        {item.description
-                          .toLowerCase()
-                          .includes("phi dich vu thu am") ? (
-                          // Chỉ hiển thị số lượng cho phí dịch vụ thu âm
-                          <span className="min-w-[2rem] text-center">
-                            {item.quantity}
-                          </span>
-                        ) : (
-                          // Hiển thị nút + và - cho các item khác
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                console.log(
-                                  "Minus button clicked for item:",
-                                  item
-                                );
-                                console.log(
-                                  "itemId:",
-                                  item.itemId,
-                                  "category:",
-                                  item.category
-                                );
-                                if (item.itemId && item.category) {
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    -1,
-                                    item.category
-                                  );
-                                } else if (menuItems) {
-                                  // Fallback: tìm trong menuItems
-                                  const menuItem = menuItems.find(
-                                    (menuItem) =>
-                                      menuItem.name === item.description
-                                  );
-                                  if (menuItem) {
-                                    console.log(
-                                      "Using menuItem for minus:",
-                                      menuItem
-                                    );
-                                    handleQuantityChange(
-                                      menuItem._id,
-                                      item.quantity,
-                                      -1,
-                                      menuItem.category
-                                    );
-                                  } else {
-                                    console.log(
-                                      "Missing itemId or category for item:",
-                                      item
-                                    );
-                                  }
-                                } else {
-                                  console.log(
-                                    "Missing itemId or category for item:",
-                                    item
-                                  );
-                                }
-                              }}
-                              disabled={
-                                item.quantity <= 0 || isUpdatingQuantity
-                              }
-                              className="w-6 h-6 p-0 text-xs"
-                            >
-                              <Minus className="w-3 h-3" />
-                            </Button>
-                            <span className="min-w-[2rem] text-center">
+                {/* Desktop Layout */}
+                <div className="hidden sm:block">
+                  <div className="grid grid-cols-12 font-bold text-purple-600 gap-1 text-xs sm:text-sm">
+                    <span className="col-span-4">Tên</span>
+                    <span className="col-span-2 text-center">SL</span>
+                    <span className="col-span-3 text-right">Đơn Giá</span>
+                    <span className="col-span-3 text-right">Thành Tiền</span>
+                  </div>
+                  {items.map((item: BillItem, index: number) => (
+                    <div key={index}>
+                      <div className="grid grid-cols-12 gap-1 items-center">
+                        <span className="col-span-4 truncate text-xs sm:text-sm">
+                          {item.description}
+                        </span>
+                        <div className="col-span-2 flex items-center justify-center gap-1">
+                          {item.description
+                            .toLowerCase()
+                            .includes("phi dich vu thu am") ? (
+                            <span className="min-w-[2rem] text-center text-xs sm:text-sm">
                               {item.quantity}
                             </span>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                console.log(
-                                  "Plus button clicked for item:",
-                                  item
-                                );
-                                console.log(
-                                  "itemId:",
-                                  item.itemId,
-                                  "category:",
-                                  item.category
-                                );
-                                if (item.itemId && item.category) {
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    1,
-                                    item.category
-                                  );
-                                } else if (menuItems) {
-                                  // Fallback: tìm trong menuItems
-                                  const menuItem = menuItems.find(
-                                    (menuItem) =>
-                                      menuItem.name === item.description
-                                  );
-                                  if (menuItem) {
-                                    console.log(
-                                      "Using menuItem for plus:",
-                                      menuItem
-                                    );
+                          ) : (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (item.itemId && item.category) {
                                     handleQuantityChange(
-                                      menuItem._id,
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      item.category
+                                    );
+                                  } else if (menuItems) {
+                                    const menuItem = menuItems.find(
+                                      (menuItem) =>
+                                        menuItem.name === item.description
+                                    );
+                                    if (menuItem) {
+                                      handleQuantityChange(
+                                        menuItem._id,
+                                        item.quantity,
+                                        -1,
+                                        menuItem.category
+                                      );
+                                    }
+                                  }
+                                }}
+                                disabled={
+                                  item.quantity <= 0 || isUpdatingQuantity
+                                }
+                                className="w-6 h-6 p-0 text-xs"
+                              >
+                                <Minus className="w-3 h-3" />
+                              </Button>
+                              <span className="min-w-[2rem] text-center text-xs sm:text-sm">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (item.itemId && item.category) {
+                                    handleQuantityChange(
+                                      item.itemId,
                                       item.quantity,
                                       1,
-                                      menuItem.category
+                                      item.category
                                     );
-                                  } else {
-                                    console.log(
-                                      "Missing itemId or category for item:",
-                                      item
+                                  } else if (menuItems) {
+                                    const menuItem = menuItems.find(
+                                      (menuItem) =>
+                                        menuItem.name === item.description
                                     );
+                                    if (menuItem) {
+                                      handleQuantityChange(
+                                        menuItem._id,
+                                        item.quantity,
+                                        1,
+                                        menuItem.category
+                                      );
+                                    }
                                   }
-                                } else {
-                                  console.log(
-                                    "Missing itemId or category for item:",
-                                    item
-                                  );
-                                }
-                              }}
-                              disabled={isUpdatingQuantity}
-                              className="w-6 h-6 p-0 text-xs"
-                            >
-                              <Plus className="w-3 h-3" />
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                      <span className="col-span-3 text-right">
-                        {item.price.toLocaleString("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        })}
-                      </span>
-                      <span className="col-span-3 text-right">
-                        {(item.price * item.quantity).toLocaleString("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        })}
-                      </span>
-                    </div>
-                    {item.discountName && item.discountPercentage ? (
-                      <div className="grid grid-cols-12 gap-1 text-xs text-green-600 italic">
-                        <span className="col-span-9 pl-4">
-                          - {item.discountName} ({item.discountPercentage}%)
+                                }}
+                                disabled={isUpdatingQuantity}
+                                className="w-6 h-6 p-0 text-xs"
+                              >
+                                <Plus className="w-3 h-3" />
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                        <span className="col-span-3 text-right text-xs sm:text-sm">
+                          {item.price.toLocaleString("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          })}
                         </span>
-                        <span className="col-span-3 text-right">
+                        <span className="col-span-3 text-right text-xs sm:text-sm">
+                          {(item.price * item.quantity).toLocaleString("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          })}
+                        </span>
+                      </div>
+                      {item.discountName && item.discountPercentage ? (
+                        <div className="grid grid-cols-12 gap-1 text-xs text-green-600 italic">
+                          <span className="col-span-9 pl-4">
+                            - {item.discountName} ({item.discountPercentage}%)
+                          </span>
+                          <span className="col-span-3 text-right">
+                            {(
+                              (item.price *
+                                item.quantity *
+                                (item.discountPercentage || 0)) /
+                              100
+                            ).toLocaleString("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            })}
+                          </span>
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
+
+                {/* Mobile Layout */}
+                <div className="sm:hidden space-y-2">
+                  {items.map((item: BillItem, index: number) => (
+                    <div key={index} className="border-b border-purple-200 pb-2">
+                      <div className="font-semibold text-purple-700 mb-1 break-words">
+                        {item.description}
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          {!item.description
+                            .toLowerCase()
+                            .includes("phi dich vu thu am") && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (item.itemId && item.category) {
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      item.category
+                                    );
+                                  } else if (menuItems) {
+                                    const menuItem = menuItems.find(
+                                      (menuItem) =>
+                                        menuItem.name === item.description
+                                    );
+                                    if (menuItem) {
+                                      handleQuantityChange(
+                                        menuItem._id,
+                                        item.quantity,
+                                        -1,
+                                        menuItem.category
+                                      );
+                                    }
+                                  }
+                                }}
+                                disabled={
+                                  item.quantity <= 0 || isUpdatingQuantity
+                                }
+                                className="w-8 h-8 p-0"
+                              >
+                                <Minus className="w-4 h-4" />
+                              </Button>
+                              <span className="min-w-[2rem] text-center font-semibold">
+                                {item.quantity}
+                              </span>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => {
+                                  if (item.itemId && item.category) {
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      1,
+                                      item.category
+                                    );
+                                  } else if (menuItems) {
+                                    const menuItem = menuItems.find(
+                                      (menuItem) =>
+                                        menuItem.name === item.description
+                                    );
+                                    if (menuItem) {
+                                      handleQuantityChange(
+                                        menuItem._id,
+                                        item.quantity,
+                                        1,
+                                        menuItem.category
+                                      );
+                                    }
+                                  }
+                                }}
+                                disabled={isUpdatingQuantity}
+                                className="w-8 h-8 p-0"
+                              >
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </>
+                          )}
+                          {item.description
+                            .toLowerCase()
+                            .includes("phi dich vu thu am") && (
+                            <span className="font-semibold">
+                              SL: {item.quantity}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-xs text-gray-600">
+                            {item.price.toLocaleString("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            })}
+                            /cái
+                          </div>
+                          <div className="font-semibold text-purple-700">
+                            {(item.price * item.quantity).toLocaleString("vi-VN", {
+                              style: "currency",
+                              currency: "VND",
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      {item.discountName && item.discountPercentage ? (
+                        <div className="text-xs text-green-600 italic mt-1">
+                          - {item.discountName} ({item.discountPercentage}%):{" "}
                           {(
                             (item.price *
                               item.quantity *
@@ -1045,23 +1126,25 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                             style: "currency",
                             currency: "VND",
                           })}
-                        </span>
-                      </div>
-                    ) : null}
-                  </div>
-                ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="border-t-2 border-dashed border-purple-400" />
 
               {/* Lucky Draw Promotion Section */}
-              <div className="flex items-center gap-2 mb-2">
-                <Gift className="w-4 h-4 text-pink-500" />
-                <span>Khuyến mãi:</span>
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Gift className="w-4 h-4 text-pink-500 flex-shrink-0" />
+                  <span className="text-xs sm:text-sm whitespace-nowrap">Khuyến mãi:</span>
+                </div>
                 <Select
                   value={selectedPromotion || "none"}
                   onValueChange={handlePromotionChange}
                 >
-                  <SelectTrigger className="w-[180px]">
+                  <SelectTrigger className="w-full sm:w-[180px] h-9 sm:h-9">
                     <SelectValue placeholder="Chọn khuyến mãi" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1076,9 +1159,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </div>
 
               {appliedPromotion && (
-                <div className="p-2 bg-green-100 rounded-md text-green-700 text-sm">
+                <div className="p-2 bg-green-100 rounded-md text-green-700 text-xs sm:text-sm">
                   <p className="font-bold">{appliedPromotion.name}</p>
-                  <p>{appliedPromotion.description}</p>
+                  <p className="break-words">{appliedPromotion.description}</p>
                   <p className="text-right font-bold">
                     Giảm: {appliedPromotion.discountPercentage}%
                   </p>
@@ -1089,9 +1172,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               <div className="space-y-2 border-t-2 border-dashed border-purple-400 pt-2">
                 {/* Chi tiết từng khoản */}
                 {roomTotal && roomTotal > 0 && (
-                  <div className="flex justify-between text-sm">
+                  <div className="flex justify-between text-xs sm:text-sm">
                     <span className="text-gray-600">Tiền phòng:</span>
-                    <span className="text-gray-800">
+                    <span className="text-gray-800 break-words ml-2 text-right">
                       {roomTotal.toLocaleString("vi-VN", {
                         style: "currency",
                         currency: "VND",
@@ -1110,12 +1193,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     <>
                       {/* Giảm giá (nếu có) */}
                       {appliedPromotion && discountAmount > 0 && (
-                        <div className="flex justify-between text-sm">
-                          <span className="text-green-600">
+                        <div className="flex justify-between text-xs sm:text-sm">
+                          <span className="text-green-600 break-words">
                             Giảm {appliedPromotion.name} (
                             {appliedPromotion.discountPercentage}%):
                           </span>
-                          <span className="text-green-600 font-medium">
+                          <span className="text-green-600 font-medium break-words ml-2 text-right">
                             -
                             {discountAmount.toLocaleString("vi-VN", {
                               style: "currency",
@@ -1126,9 +1209,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       )}
 
                       {/* Giá cuối cùng */}
-                      <div className="flex justify-between font-bold text-lg text-pink-600 border-t border-gray-300 pt-2">
+                      <div className="flex justify-between font-bold text-base sm:text-lg text-pink-600 border-t border-gray-300 pt-2">
                         <span>Tổng cộng:</span>
-                        <span>
+                        <span className="break-words ml-2 text-right">
                           {finalTotal.toLocaleString("vi-VN", {
                             style: "currency",
                             currency: "VND",
@@ -1140,14 +1223,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 })()}
               </div>
               <div>
-                <div className="flex items-center gap-2">
-                  <span>💳 Thanh toán:</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <span className="text-xs sm:text-sm whitespace-nowrap">💳 Thanh toán:</span>
                   <Select
                     defaultValue={PaymentMethod.Cash}
                     value={paymentMethod}
                     onValueChange={handlePaymentMethodChange}
                   >
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-full sm:w-[180px] h-9 sm:h-9">
                       <SelectValue placeholder="Chọn phương thức" />
                     </SelectTrigger>
                     <SelectContent>
@@ -1163,35 +1246,38 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   </Select>
                 </div>
                 {/* Note Section */}
-                <div className="flex items-center gap-2">
-                  <span>📝 Ghi chú:</span>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mt-2">
+                  <span className="text-xs sm:text-sm whitespace-nowrap">📝 Ghi chú:</span>
                   {isEditingNote ? (
-                    <div className="flex items-center gap-2 flex-1">
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 flex-1 w-full">
                       <Input
                         value={noteValue}
                         onChange={(e) => setNoteValue(e.target.value)}
                         placeholder="Nhập ghi chú..."
-                        className="flex-1"
+                        className="flex-1 h-9 sm:h-9"
                       />
-                      <Button
-                        size="sm"
-                        onClick={handleSaveNote}
-                        disabled={isUpdatingNote}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {isUpdatingNote ? "Đang lưu..." : "Lưu"}
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={handleCancelEditNote}
-                      >
-                        Hủy
-                      </Button>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          onClick={handleSaveNote}
+                          disabled={isUpdatingNote}
+                          className="bg-green-600 hover:bg-green-700 h-9 sm:h-9 flex-1 sm:flex-none"
+                        >
+                          {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={handleCancelEditNote}
+                          className="h-9 sm:h-9 flex-1 sm:flex-none"
+                        >
+                          Hủy
+                        </Button>
+                      </div>
                     </div>
                   ) : (
-                    <div className="flex items-center gap-2 flex-1">
-                      <span className="flex-1">
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 flex-1 w-full">
+                      <span className="flex-1 break-words text-xs sm:text-sm">
                         {note || "Chưa có ghi chú"}
                       </span>
                       <Button
@@ -1199,7 +1285,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         variant="outline"
                         onClick={handleEditNote}
                         disabled={isUpdatingNote}
-                        className="text-xs"
+                        className="text-xs h-9 sm:h-9 w-full sm:w-auto"
                       >
                         Chỉnh sửa
                       </Button>
@@ -1209,30 +1295,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </div>
               <div className="border-t-2 border-dashed border-purple-400" />
               <div className="text-center">
-                <p className="text-purple-700 font-bold">Jozo - Vui Hết Ý!</p>
-                <p className="text-sm italic">Hẹn gặp lại nhé! 😉</p>
+                <p className="text-purple-700 font-bold text-xs sm:text-sm">Jozo - Vui Hết Ý!</p>
+                <p className="text-xs italic">Hẹn gặp lại nhé! 😉</p>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-4 mt-6">
+          <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mt-4 sm:mt-6 px-4 sm:px-0 pb-4 sm:pb-0">
             <Button
               variant="outline"
               onClick={openMenuItemsModal}
-              className="text-base px-5 py-2 h-auto"
+              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
             >
               Thêm Menu Items
             </Button>
             <Button
               onClick={handleExtendSession}
               disabled={isPending}
-              className="text-base px-5 py-2 h-auto"
+              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
             >
               Gia hạn
             </Button>
             <Button
               variant="outline"
-              className="border-purple-400 text-purple-600 hover:bg-purple-200 text-base px-5 py-2 h-auto"
+              className="border-purple-400 text-purple-600 hover:bg-purple-200 text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
               onClick={() => printBill()}
             >
               <Printer className="w-4 h-4 mr-2" />
@@ -1243,21 +1329,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               variant="destructive"
               onClick={() => setIsConfirmEndOpen(true)}
               disabled={isPending || isSavingBill}
-              className="text-base px-5 py-2 h-auto"
+              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
             >
               Kết thúc
             </Button>
           </div>
-          <DialogFooter className="mt-6">
+          <DialogFooter className="px-4 sm:px-0 pb-4 sm:pb-0">
             <Button
               variant="outline"
               onClick={onClose}
               disabled={isPending}
-              className="text-base px-5 py-2 h-auto"
+              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
             >
               Đóng
             </Button>
           </DialogFooter>
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 

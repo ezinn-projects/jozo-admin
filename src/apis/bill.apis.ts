@@ -1,6 +1,6 @@
 import { IBill } from "@/@types/Bill";
 import http from "@/utils/http";
-import dayjs from "dayjs";
+import dayjs from "@/lib/dayjs";
 
 const billAPis = {
   getBillByScheduleId: async (
