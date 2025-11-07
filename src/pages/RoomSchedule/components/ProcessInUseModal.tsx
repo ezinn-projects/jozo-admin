@@ -45,7 +45,6 @@ import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 // Define bill interfaces
 interface BillItem {
@@ -806,9 +805,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] sm:max-h-[90vh] p-0 sm:p-6 flex flex-col">
-          <ScrollArea className="flex-1 px-4 sm:px-0">
-            <DialogHeader className="pt-4 sm:pt-0">
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] sm:max-h-[90vh] p-0 flex flex-col overflow-hidden">
+          <div className="overflow-y-auto flex-1 px-4 sm:px-6 pt-4 sm:pt-6" style={{ WebkitOverflowScrolling: 'touch' }}>
+            <DialogHeader className="pb-4">
               <DialogTitle className="text-lg sm:text-xl">Session Management</DialogTitle>
               <DialogDescription className="text-sm sm:text-base">
                 Session started at {dayjs(schedule.startTime).format("HH:mm")} and
@@ -1300,51 +1299,53 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </div>
             </div>
           </div>
+          
+          {/* Fixed Footer with Buttons */}
+          <div className="border-t bg-background px-4 sm:px-6 py-4 flex-shrink-0">
+            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mb-4">
+              <Button
+                variant="outline"
+                onClick={openMenuItemsModal}
+                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+              >
+                Thêm Menu Items
+              </Button>
+              <Button
+                onClick={handleExtendSession}
+                disabled={isPending}
+                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+              >
+                Gia hạn
+              </Button>
+              <Button
+                variant="outline"
+                className="border-purple-400 text-purple-600 hover:bg-purple-200 text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                onClick={() => printBill()}
+              >
+                <Printer className="w-4 h-4 mr-2" />
+                In hóa đơn
+              </Button>
 
-          <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mt-4 sm:mt-6 px-4 sm:px-0 pb-4 sm:pb-0">
-            <Button
-              variant="outline"
-              onClick={openMenuItemsModal}
-              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-            >
-              Thêm Menu Items
-            </Button>
-            <Button
-              onClick={handleExtendSession}
-              disabled={isPending}
-              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-            >
-              Gia hạn
-            </Button>
-            <Button
-              variant="outline"
-              className="border-purple-400 text-purple-600 hover:bg-purple-200 text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-              onClick={() => printBill()}
-            >
-              <Printer className="w-4 h-4 mr-2" />
-              In hóa đơn
-            </Button>
-
-            <Button
-              variant="destructive"
-              onClick={() => setIsConfirmEndOpen(true)}
-              disabled={isPending || isSavingBill}
-              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-            >
-              Kết thúc
-            </Button>
+              <Button
+                variant="destructive"
+                onClick={() => setIsConfirmEndOpen(true)}
+                disabled={isPending || isSavingBill}
+                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+              >
+                Kết thúc
+              </Button>
+            </div>
+            <DialogFooter className="mt-0">
+              <Button
+                variant="outline"
+                onClick={onClose}
+                disabled={isPending}
+                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+              >
+                Đóng
+              </Button>
+            </DialogFooter>
           </div>
-          <DialogFooter className="px-4 sm:px-0 pb-4 sm:pb-0">
-            <Button
-              variant="outline"
-              onClick={onClose}
-              disabled={isPending}
-              className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-            >
-              Đóng
-            </Button>
-          </DialogFooter>
-          </ScrollArea>
         </DialogContent>
       </Dialog>
 
