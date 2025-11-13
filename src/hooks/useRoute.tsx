@@ -49,6 +49,7 @@ const EditUserPage = lazy(
   () => import("@/pages/UsersManagement/pages/EditUserPage")
 );
 const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
+const StaffSchedulePage = lazy(() => import("@/pages/StaffSchedule"));
 
 function useRoute() {
   return (
@@ -102,6 +103,7 @@ function useRoute() {
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
+                <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
 
                 {/* Users Management Routes */}
                 <Route path={PATHS.USERS_MANAGEMENT}>

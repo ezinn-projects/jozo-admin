@@ -1,6 +1,7 @@
 import {
   BedDouble,
   Calendar,
+  Clock,
   DoorOpenIcon,
   Home,
   PercentIcon,
@@ -50,6 +51,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Staff Management",
         url: PATHS.STAFF_MANAGEMENT,
         icon: Users,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Staff Schedule",
+        url: PATHS.STAFF_SCHEDULE,
+        icon: Clock,
         roles: [Role.Admin],
       },
       {
