@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/utils/formatters";
 import { useQuery } from "@tanstack/react-query";
 import roomApis from "@/apis/room.apis";
+import { useIsStaff } from "@/hooks/usePermission";
 import {
   Dialog,
   DialogContent,
@@ -109,6 +110,14 @@ const RevenueStatisticsPage = () => {
   const [billDetailOpen, setBillDetailOpen] = useState<boolean>(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("all");
+  const isStaff = useIsStaff();
+
+  // Đảm bảo staff chỉ có thể xem tab "daily"
+  useEffect(() => {
+    if (isStaff && activeTab !== "daily") {
+      setActiveTab("daily");
+    }
+  }, [isStaff, activeTab]);
 
   const { data: roomsData } = useQuery({
     queryKey: ["rooms"],
@@ -261,6 +270,10 @@ const RevenueStatisticsPage = () => {
   };
 
   const handleTabChange = (value: string) => {
+    // Nếu là staff, chỉ cho phép tab "daily"
+    if (isStaff && value !== "daily") {
+      return;
+    }
     setActiveTab(value);
     // Reset filter khi chuyển tab
     setSelectedPaymentMethod("all");
@@ -371,10 +384,14 @@ const RevenueStatisticsPage = () => {
         className="w-full"
       >
         <div className="flex justify-between items-center mb-6">
-          <TabsList className="grid grid-cols-3">
+          <TabsList className={isStaff ? "" : "grid grid-cols-3"}>
             <TabsTrigger value="daily">Doanh thu ngày</TabsTrigger>
-            <TabsTrigger value="weekly">Doanh thu tuần</TabsTrigger>
-            <TabsTrigger value="monthly">Doanh thu tháng</TabsTrigger>
+            {!isStaff && (
+              <>
+                <TabsTrigger value="weekly">Doanh thu tuần</TabsTrigger>
+                <TabsTrigger value="monthly">Doanh thu tháng</TabsTrigger>
+              </>
+            )}
           </TabsList>
 
           {/* Filter payment method */}
@@ -415,7 +432,11 @@ const RevenueStatisticsPage = () => {
                 calculateFilteredStats(dailyRevenue.data.bills);
               return (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div
+                    className={`grid grid-cols-1 gap-4 ${
+                      isStaff ? "md:grid-cols-2" : "md:grid-cols-3"
+                    }`}
+                  >
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -428,18 +449,20 @@ const RevenueStatisticsPage = () => {
                         </Typography>
                       </CardContent>
                     </Card>
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Tổng doanh thu
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4" className="text-green-600">
-                          {formatCurrency(totalRevenue)} VNĐ
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    {!isStaff && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">
+                            Tổng doanh thu
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Typography variant="h4" className="text-green-600">
+                            {formatCurrency(totalRevenue)} VNĐ
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -465,9 +488,11 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
-                              <TableHead className="text-right">
-                                Số tiền
-                              </TableHead>
+                              {!isStaff && (
+                                <TableHead className="text-right">
+                                  Số tiền
+                                </TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -496,9 +521,11 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(bill.totalAmount)} VNĐ
-                                </TableCell>
+                                {!isStaff && (
+                                  <TableCell className="text-right">
+                                    {formatCurrency(bill.totalAmount)} VNĐ
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
@@ -531,7 +558,11 @@ const RevenueStatisticsPage = () => {
                 calculateFilteredStats(weeklyRevenue.data.bills);
               return (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div
+                    className={`grid grid-cols-1 gap-4 ${
+                      isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
+                    }`}
+                  >
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -557,18 +588,20 @@ const RevenueStatisticsPage = () => {
                         </Typography>
                       </CardContent>
                     </Card>
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Tổng doanh thu
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4" className="text-green-600">
-                          {formatCurrency(totalRevenue)} VNĐ
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    {!isStaff && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">
+                            Tổng doanh thu
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Typography variant="h4" className="text-green-600">
+                            {formatCurrency(totalRevenue)} VNĐ
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -594,9 +627,11 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
-                              <TableHead className="text-right">
-                                Số tiền
-                              </TableHead>
+                              {!isStaff && (
+                                <TableHead className="text-right">
+                                  Số tiền
+                                </TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -625,9 +660,11 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(bill.totalAmount)} VNĐ
-                                </TableCell>
+                                {!isStaff && (
+                                  <TableCell className="text-right">
+                                    {formatCurrency(bill.totalAmount)} VNĐ
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
@@ -660,7 +697,11 @@ const RevenueStatisticsPage = () => {
                 calculateFilteredStats(monthlyRevenue.data.bills);
               return (
                 <div className="space-y-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div
+                    className={`grid grid-cols-1 gap-4 ${
+                      isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
+                    }`}
+                  >
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -686,18 +727,20 @@ const RevenueStatisticsPage = () => {
                         </Typography>
                       </CardContent>
                     </Card>
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Tổng doanh thu
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4" className="text-green-600">
-                          {formatCurrency(totalRevenue)} VNĐ
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    {!isStaff && (
+                      <Card>
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium">
+                            Tổng doanh thu
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <Typography variant="h4" className="text-green-600">
+                            {formatCurrency(totalRevenue)} VNĐ
+                          </Typography>
+                        </CardContent>
+                      </Card>
+                    )}
                     <Card>
                       <CardHeader className="pb-2">
                         <CardTitle className="text-sm font-medium">
@@ -723,9 +766,11 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
-                              <TableHead className="text-right">
-                                Số tiền
-                              </TableHead>
+                              {!isStaff && (
+                                <TableHead className="text-right">
+                                  Số tiền
+                                </TableHead>
+                              )}
                             </TableRow>
                           </TableHeader>
                           <TableBody>
@@ -754,9 +799,11 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
-                                <TableCell className="text-right">
-                                  {formatCurrency(bill.totalAmount)} VNĐ
-                                </TableCell>
+                                {!isStaff && (
+                                  <TableCell className="text-right">
+                                    {formatCurrency(bill.totalAmount)} VNĐ
+                                  </TableCell>
+                                )}
                               </TableRow>
                             ))}
                           </TableBody>
