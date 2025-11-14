@@ -6,6 +6,7 @@ import { useUsers } from "@/hooks/use-users";
 import { User } from "@/@types/user";
 import { Role, EmployeeScheduleStatus, ShiftType } from "@/constants/enum";
 import StaffScheduleRegistrationModal from "@/pages/RoomSchedule/components/StaffScheduleRegistrationModal";
+import StaffScheduleDetailModal from "./components/StaffScheduleDetailModal";
 import {
   Table,
   TableBody,
@@ -34,30 +35,33 @@ const StaffSchedulePage = () => {
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [selectedStaffName, setSelectedStaffName] = useState<string>("");
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] =
+    useState<IEmployeeSchedule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
 
   const { users, isLoadingUsers } = useUsers();
 
-  // Tính toán startDate và endDate dựa trên viewMode và currentDate
+  // Calculate startDate and endDate based on viewMode and currentDate
   const { startDate, endDate, dates } = useMemo(() => {
     let start: Dayjs;
     let end: Dayjs;
     const dateList: Dayjs[] = [];
 
     if (viewMode === "week") {
-      // Lấy thứ 2 của tuần (dayjs mặc định chủ nhật là đầu tuần, nên thứ 2 = day 1)
-      const dayOfWeek = currentDate.day(); // 0 = Chủ nhật, 1 = Thứ 2, ..., 6 = Thứ 7
+      // Get Monday of the week (dayjs defaults Sunday as start of week, so Monday = day 1)
+      const dayOfWeek = currentDate.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
       if (dayOfWeek === 0) {
-        // Nếu là chủ nhật, lùi về thứ 2 tuần trước
+        // If Sunday, go back to Monday of previous week
         start = currentDate.subtract(6, "day");
       } else {
-        // Tính số ngày cần lùi để về thứ 2 (day 1)
+        // Calculate days to subtract to get to Monday (day 1)
         const daysToSubtract = dayOfWeek - 1;
         start = currentDate.subtract(daysToSubtract, "day");
       }
       end = start.add(6, "day");
 
-      // Tạo danh sách 7 ngày
+      // Create list of 7 days
       for (let i = 0; i < 7; i++) {
         dateList.push(start.add(i, "day"));
       }
@@ -66,7 +70,7 @@ const StaffSchedulePage = () => {
       start = currentDate.startOf("month");
       end = currentDate.endOf("month");
 
-      // Tạo danh sách tất cả ngày trong tháng
+      // Create list of all days in the month
       const daysInMonth = currentDate.daysInMonth();
       for (let i = 0; i < daysInMonth; i++) {
         dateList.push(start.add(i, "day"));
@@ -82,10 +86,10 @@ const StaffSchedulePage = () => {
     refetch,
   } = useStaffSchedules(startDate, endDate, viewMode);
 
-  // Lọc chỉ staff có role "staff"
+  // Filter only staff with role "staff"
   const staffList = users.filter((user: User) => user.role === Role.Staff);
 
-  // Lọc staff theo search term
+  // Filter staff by search term
   const filteredStaff = staffList.filter(
     (user: User) =>
       (user.name || user.full_name || "")
@@ -96,22 +100,25 @@ const StaffSchedulePage = () => {
   );
 
   const getUserName = (user: User) => {
-    return user.name || user.full_name || "Không có tên";
+    return user.name || user.full_name || "No name";
   };
 
-  // Group schedules theo userId, date và shift
+  // Group schedules by userId, date and shift
   const scheduleMap = useMemo(() => {
     const map = new Map<string, IEmployeeSchedule>();
     if (Array.isArray(schedules)) {
       schedules.forEach((schedule) => {
-        const key = `${schedule.userId}-${schedule.date}-${schedule.shift}`;
+        // Use shift if available, otherwise use shiftType, normalize "evening" to "afternoon"
+        const shift = schedule.shift || schedule.shiftType;
+        const normalizedShift = shift === "evening" ? "afternoon" : shift;
+        const key = `${schedule.userId}-${schedule.date}-${normalizedShift}`;
         map.set(key, schedule);
       });
     }
     return map;
   }, [schedules]);
 
-  // Lấy trạng thái của một ca làm việc
+  // Get status of a shift
   const getScheduleStatus = (
     userId: string,
     date: Dayjs,
@@ -121,7 +128,7 @@ const StaffSchedulePage = () => {
     return scheduleMap.get(key) || null;
   };
 
-  // Lấy màu sắc theo trạng thái
+  // Get color by status
   const getStatusColor = (status: EmployeeScheduleStatus | null): string => {
     if (!status) return "bg-white border border-gray-200";
 
@@ -154,6 +161,27 @@ const StaffSchedulePage = () => {
     refetch();
   };
 
+  const handleCellClick = (
+    schedule: IEmployeeSchedule | null,
+    userId: string,
+    staffName: string
+  ) => {
+    if (schedule) {
+      // If schedule exists, open detail modal
+      setSelectedSchedule(schedule);
+      setIsDetailModalOpen(true);
+    } else {
+      // If no schedule, open registration modal
+      handleStaffClick(userId, staffName);
+    }
+  };
+
+  const handleCloseDetailModal = () => {
+    setIsDetailModalOpen(false);
+    setSelectedSchedule(null);
+    refetch();
+  };
+
   const handlePrevious = () => {
     if (viewMode === "week") {
       setCurrentDate(currentDate.subtract(1, "week"));
@@ -177,7 +205,7 @@ const StaffSchedulePage = () => {
   if (isLoadingUsers || isLoadingSchedules) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Đang tải...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
@@ -185,11 +213,10 @@ const StaffSchedulePage = () => {
   return (
     <div className="container mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">
-          Quản lý lịch làm của nhân viên
-        </h1>
+        <h1 className="text-2xl font-bold mb-2">Staff Schedule Management</h1>
         <p className="text-gray-600">
-          Click vào tên nhân viên để đăng ký lịch làm
+          Click on staff name to register schedule, or click on a scheduled cell
+          to view details
         </p>
       </div>
 
@@ -201,8 +228,8 @@ const StaffSchedulePage = () => {
             onValueChange={(value) => setViewMode(value as ViewMode)}
           >
             <TabsList>
-              <TabsTrigger value="week">Tuần</TabsTrigger>
-              <TabsTrigger value="month">Tháng</TabsTrigger>
+              <TabsTrigger value="week">Week</TabsTrigger>
+              <TabsTrigger value="month">Month</TabsTrigger>
             </TabsList>
           </Tabs>
 
@@ -237,7 +264,7 @@ const StaffSchedulePage = () => {
               <ChevronRight className="h-4 w-4" />
             </Button>
             <Button variant="outline" onClick={handleToday}>
-              Hôm nay
+              Today
             </Button>
           </div>
         </div>
@@ -246,7 +273,7 @@ const StaffSchedulePage = () => {
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
-            placeholder="Tìm kiếm nhân viên..."
+            placeholder="Search staff..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="pl-10 w-full sm:w-[300px]"
@@ -260,7 +287,7 @@ const StaffSchedulePage = () => {
           <TableHeader>
             <TableRow>
               <TableHead className="min-w-[250px] sticky left-0 bg-white z-10">
-                Tên nhân viên
+                Staff Name
               </TableHead>
               {dates.map((date) => (
                 <TableHead
@@ -286,9 +313,7 @@ const StaffSchedulePage = () => {
                   colSpan={dates.length + 1}
                   className="text-center py-8 text-gray-500"
                 >
-                  {searchTerm
-                    ? "Không tìm thấy nhân viên nào"
-                    : "Chưa có nhân viên nào"}
+                  {searchTerm ? "No staff found" : "No staff available"}
                 </TableCell>
               </TableRow>
             ) : (
@@ -296,7 +321,7 @@ const StaffSchedulePage = () => {
                 const userName = getUserName(user);
                 return (
                   <>
-                    {/* Hàng ca sáng */}
+                    {/* Morning shift row */}
                     <TableRow key={`${user._id}-${ShiftType.Morning}`}>
                       <TableCell
                         rowSpan={2}
@@ -326,11 +351,14 @@ const StaffSchedulePage = () => {
                               "cursor-pointer transition-colors"
                             )}
                             title={schedule?.note || ""}
+                            onClick={() =>
+                              handleCellClick(schedule, user._id, userName)
+                            }
                           />
                         );
                       })}
                     </TableRow>
-                    {/* Hàng ca chiều */}
+                    {/* Afternoon shift row */}
                     <TableRow key={`${user._id}-${ShiftType.Afternoon}`}>
                       {dates.map((date) => {
                         const schedule = getScheduleStatus(
@@ -350,6 +378,9 @@ const StaffSchedulePage = () => {
                               "cursor-pointer transition-colors"
                             )}
                             title={schedule?.note || ""}
+                            onClick={() =>
+                              handleCellClick(schedule, user._id, userName)
+                            }
                           />
                         );
                       })}
@@ -372,6 +403,14 @@ const StaffSchedulePage = () => {
           refetchSchedules={refetch}
         />
       )}
+
+      {/* Detail Modal */}
+      <StaffScheduleDetailModal
+        isOpen={isDetailModalOpen}
+        onClose={handleCloseDetailModal}
+        schedule={selectedSchedule}
+        refetchSchedules={refetch}
+      />
     </div>
   );
 };

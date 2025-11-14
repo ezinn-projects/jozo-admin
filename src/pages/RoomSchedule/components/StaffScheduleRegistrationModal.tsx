@@ -25,12 +25,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon, CircleXIcon } from "lucide-react";
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,25 @@ const staffScheduleSchema = z.object({
   }),
   shifts: z.array(z.string()).min(1, "Vui lòng chọn ít nhất một ca làm việc"),
   note: z.string().max(500).optional(),
-});
+  customStartTime: z.string().optional(),
+  customEndTime: z.string().optional(),
+}).refine(
+  (data) => {
+    // If both times are provided, validate start < end
+    if (data.customStartTime && data.customEndTime) {
+      const [startHours, startMinutes] = data.customStartTime.split(":").map(Number);
+      const [endHours, endMinutes] = data.customEndTime.split(":").map(Number);
+      const startTotal = startHours * 60 + startMinutes;
+      const endTotal = endHours * 60 + endMinutes;
+      return startTotal < endTotal;
+    }
+    return true;
+  },
+  {
+    message: "Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc",
+    path: ["customEndTime"],
+  }
+);
 
 type FormValues = z.infer<typeof staffScheduleSchema>;
 
@@ -59,16 +78,41 @@ interface StaffScheduleRegistrationModalProps {
 const StaffScheduleRegistrationModal: React.FC<
   StaffScheduleRegistrationModalProps
 > = ({ isOpen, onClose, userId, staffName, refetchSchedules }) => {
+  const [timeError, setTimeError] = useState("");
+
   const form = useForm<FormValues>({
     resolver: zodResolver(staffScheduleSchema),
     defaultValues: {
       date: new Date(),
       shifts: [],
       note: "",
+      customStartTime: "",
+      customEndTime: "",
     },
   });
 
-  const { control, handleSubmit, reset, setError } = form;
+  const { control, handleSubmit, reset, setError, watch } = form;
+  
+  const customStartTime = watch("customStartTime");
+  const customEndTime = watch("customEndTime");
+
+  // Validate time when values change
+  React.useEffect(() => {
+    if (customStartTime && customEndTime) {
+      const [startHours, startMinutes] = customStartTime.split(":").map(Number);
+      const [endHours, endMinutes] = customEndTime.split(":").map(Number);
+      const startTotal = startHours * 60 + startMinutes;
+      const endTotal = endHours * 60 + endMinutes;
+      
+      if (startTotal >= endTotal) {
+        setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
+      } else {
+        setTimeError("");
+      }
+    } else {
+      setTimeError("");
+    }
+  }, [customStartTime, customEndTime]);
 
   const { mutate: registerSchedule, isPending: isSubmitting } = useMutation({
     mutationFn: (data: IRegisterStaffScheduleRequest) =>
@@ -129,11 +173,25 @@ const StaffScheduleRegistrationModal: React.FC<
 
         // Set lỗi vào form fields tương ứng
         Object.entries(fieldErrors).forEach(([field, message]) => {
-          if (field === "shifts" || field === "date" || field === "note") {
-            setError(field as "shifts" | "date" | "note", {
-              type: "server",
-              message: message,
-            });
+          if (
+            field === "shifts" ||
+            field === "date" ||
+            field === "note" ||
+            field === "customStartTime" ||
+            field === "customEndTime"
+          ) {
+            setError(
+              field as
+                | "shifts"
+                | "date"
+                | "note"
+                | "customStartTime"
+                | "customEndTime",
+              {
+                type: "server",
+                message: message,
+              }
+            );
           }
         });
       } else {
@@ -152,12 +210,27 @@ const StaffScheduleRegistrationModal: React.FC<
   });
 
   const onSubmit = (values: FormValues) => {
+    // Validate time before submit
+    if (values.customStartTime && values.customEndTime) {
+      const [startHours, startMinutes] = values.customStartTime.split(":").map(Number);
+      const [endHours, endMinutes] = values.customEndTime.split(":").map(Number);
+      const startTotal = startHours * 60 + startMinutes;
+      const endTotal = endHours * 60 + endMinutes;
+      
+      if (startTotal >= endTotal) {
+        setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
+        return;
+      }
+    }
+
     const dateStr = format(values.date, "yyyy-MM-dd");
     const payload: IRegisterStaffScheduleRequest = {
       userId,
       date: dateStr,
       shifts: values.shifts,
       note: values.note || undefined,
+      customStartTime: values.customStartTime || undefined,
+      customEndTime: values.customEndTime || undefined,
     };
     registerSchedule(payload);
   };
@@ -313,6 +386,46 @@ const StaffScheduleRegistrationModal: React.FC<
               )}
             />
 
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={control}
+                name="customStartTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Thời gian bắt đầu (HH:mm) - Tùy chọn</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="time"
+                        placeholder="08:00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={control}
+                name="customEndTime"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Thời gian kết thúc (HH:mm) - Tùy chọn</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="time"
+                        placeholder="17:00"
+                        {...field}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                    {timeError && (
+                      <p className="text-sm text-red-500 mt-1">{timeError}</p>
+                    )}
+                  </FormItem>
+                )}
+              />
+            </div>
+
             <FormField
               control={control}
               name="note"
@@ -341,7 +454,7 @@ const StaffScheduleRegistrationModal: React.FC<
               >
                 Hủy
               </Button>
-              <Button type="submit" disabled={isSubmitting}>
+              <Button type="submit" disabled={isSubmitting || !!timeError}>
                 {isSubmitting ? "Đang đăng ký..." : "Đăng ký"}
               </Button>
             </DialogFooter>

@@ -6,6 +6,8 @@ export interface IRegisterStaffScheduleRequest {
   date: string; // Format: YYYY-MM-DD
   shifts: string[]; // ["morning", "evening"]
   note?: string;
+  customStartTime?: string; // Format: HH:mm
+  customEndTime?: string; // Format: HH:mm
 }
 
 export interface IShiftInfo {
@@ -30,6 +32,7 @@ export interface IEmployeeSchedule {
   shift?: "morning" | "evening"; // Legacy field
   shiftType?: "morning" | "afternoon" | "evening"; // New field
   customStartTime?: string; // Format: HH:mm
+  customEndTime?: string; // Format: HH:mm
   shiftInfo?: IShiftInfo;
   status: EmployeeScheduleStatus;
   note?: string;
@@ -84,6 +87,19 @@ const staffScheduleApis = {
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules", {
       params,
     }),
+  updateSchedule: (
+    id: string,
+    data: {
+      date?: string; // Format: YYYY-MM-DD
+      shiftType?: "morning" | "afternoon" | "evening";
+      customStartTime?: string; // Format: HH:mm
+      customEndTime?: string; // Format: HH:mm
+      note?: string;
+      status?: EmployeeScheduleStatus;
+    }
+  ) => http.put<HTTPResponse>(`/employee-schedules/${id}`, data),
+  deleteSchedule: (id: string) =>
+    http.delete<HTTPResponse>(`/employee-schedules/${id}`),
 };
 
 export default staffScheduleApis;

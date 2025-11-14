@@ -2,7 +2,7 @@
 import { User } from "@/@types/user";
 import authorizationApis from "@/apis/authorization.apis";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { createContext, ReactNode, useEffect } from "react";
+import { createContext, ReactNode, useEffect, useState } from "react";
 import { AUTH_EVENTS } from "@/constants/events";
 
 type AuthContextValues = {
@@ -25,26 +25,32 @@ export const AuthContext = createContext<AuthContextValues>(
 // Provider component để bọc toàn bộ app
 export function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient();
+  const [accessToken, setAccessToken] = useState(() => localStorage.getItem("access_token"));
 
   const {
     data: userData,
     isLoading,
-    refetch,
   } = useQuery({
-    queryKey: ["user", localStorage.getItem("access_token")],
+    queryKey: ["user", accessToken],
     queryFn: authorizationApis.getMe,
-    enabled: !!localStorage.getItem("access_token"),
+    enabled: !!accessToken,
   });
 
   // Thêm effect để lắng nghe sự kiện đăng nhập và đăng xuất
   useEffect(() => {
     const handleLoginSuccess = () => {
       console.log("Login success event received");
-      refetch();
+      const token = localStorage.getItem("access_token");
+      setAccessToken(token);
+      // useQuery sẽ tự động refetch khi queryKey thay đổi (accessToken thay đổi)
     };
 
     const handleLogoutSuccess = () => {
       console.log("Logout success event received");
+      // Cập nhật state ngay lập tức
+      setAccessToken(null);
+      // Invalidate và remove query user cụ thể
+      queryClient.removeQueries({ queryKey: ["user"] });
       // Reset query cache khi logout
       queryClient.clear();
     };
@@ -59,11 +65,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         handleLogoutSuccess
       );
     };
-  }, [refetch, queryClient]);
-
+  }, [queryClient]);
+  
   const value = {
     user: userData?.data.result || null,
-    isAuthenticated: !!userData?.data.result,
+    isAuthenticated: !!accessToken && !!userData?.data.result,
     isLoading,
   };
 
