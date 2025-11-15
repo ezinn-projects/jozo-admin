@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Search, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
@@ -39,6 +40,10 @@ const StaffSchedulePage = () => {
   const [selectedSchedule, setSelectedSchedule] =
     useState<IEmployeeSchedule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
+  const [initialShift, setInitialShift] = useState<ShiftType | undefined>(
+    undefined
+  );
 
   const { users, isLoadingUsers } = useUsers();
 
@@ -128,29 +133,68 @@ const StaffSchedulePage = () => {
     return scheduleMap.get(key) || null;
   };
 
+  // Check if date is in the past
+  const isPastDate = (date: Dayjs): boolean => {
+    const today = dayjs().startOf("day");
+    return date.startOf("day").isBefore(today);
+  };
+
   // Get color by status
-  const getStatusColor = (status: EmployeeScheduleStatus | null): string => {
-    if (!status) return "bg-white border border-gray-200";
+  const getStatusColor = (
+    status: EmployeeScheduleStatus | null,
+    isPast: boolean
+  ): string => {
+    if (isPast) {
+      if (!status) {
+        return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
+      }
+      // For past dates with status, keep the status color but make it more muted
+      switch (status) {
+        case EmployeeScheduleStatus.Approved:
+          return "bg-blue-500 opacity-60 cursor-not-allowed";
+        case EmployeeScheduleStatus.Completed:
+          return "bg-emerald-500 opacity-60 cursor-not-allowed";
+        case EmployeeScheduleStatus.InProgress:
+          return "bg-purple-500 opacity-60 cursor-not-allowed";
+        case EmployeeScheduleStatus.Rejected:
+        case EmployeeScheduleStatus.Cancelled:
+          return "bg-red-500 opacity-60 cursor-not-allowed";
+        case EmployeeScheduleStatus.Absent:
+          return "bg-gray-400 opacity-60 cursor-not-allowed";
+        case EmployeeScheduleStatus.Pending:
+          return "bg-yellow-400 opacity-60 cursor-not-allowed";
+        default:
+          return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
+      }
+    }
+
+    if (!status)
+      return "bg-gray-100 border border-gray-300 border-dashed hover:bg-gray-200 hover:border-gray-400";
 
     switch (status) {
       case EmployeeScheduleStatus.Approved:
-      case EmployeeScheduleStatus.InProgress:
+        return "bg-blue-500 hover:bg-blue-600";
       case EmployeeScheduleStatus.Completed:
-        return "bg-green-500 hover:bg-green-600";
+        return "bg-emerald-500 hover:bg-emerald-600";
+      case EmployeeScheduleStatus.InProgress:
+        return "bg-purple-500 hover:bg-purple-600";
       case EmployeeScheduleStatus.Rejected:
       case EmployeeScheduleStatus.Cancelled:
+        return "bg-red-500 hover:bg-red-600";
       case EmployeeScheduleStatus.Absent:
         return "bg-gray-400 hover:bg-gray-500";
       case EmployeeScheduleStatus.Pending:
         return "bg-yellow-400 hover:bg-yellow-500";
       default:
-        return "bg-white border border-gray-200";
+        return "bg-gray-100 border border-gray-300 border-dashed hover:bg-gray-200 hover:border-gray-400";
     }
   };
 
   const handleStaffClick = (userId: string, staffName: string) => {
     setSelectedUserId(userId);
     setSelectedStaffName(staffName);
+    setInitialDate(undefined);
+    setInitialShift(undefined);
     setIsModalOpen(true);
   };
 
@@ -158,21 +202,29 @@ const StaffSchedulePage = () => {
     setIsModalOpen(false);
     setSelectedUserId(null);
     setSelectedStaffName("");
+    setInitialDate(undefined);
+    setInitialShift(undefined);
     refetch();
   };
 
   const handleCellClick = (
     schedule: IEmployeeSchedule | null,
     userId: string,
-    staffName: string
+    staffName: string,
+    date: Dayjs,
+    shift: ShiftType
   ) => {
     if (schedule) {
       // If schedule exists, open detail modal
       setSelectedSchedule(schedule);
       setIsDetailModalOpen(true);
     } else {
-      // If no schedule, open registration modal
-      handleStaffClick(userId, staffName);
+      // If no schedule, open registration modal with date and shift pre-filled
+      setSelectedUserId(userId);
+      setSelectedStaffName(staffName);
+      setInitialDate(date.toDate());
+      setInitialShift(shift);
+      setIsModalOpen(true);
     }
   };
 
@@ -286,13 +338,17 @@ const StaffSchedulePage = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="min-w-[250px] sticky left-0 bg-white z-10">
+              <TableHead
+                rowSpan={2}
+                className="min-w-[250px] sticky left-0 bg-white z-10"
+              >
                 Staff Name
               </TableHead>
               {dates.map((date) => (
                 <TableHead
                   key={date.format("YYYY-MM-DD")}
-                  className="min-w-[100px] text-center"
+                  colSpan={2}
+                  className="text-center"
                 >
                   <div className="flex flex-col">
                     <span className="font-semibold">
@@ -305,12 +361,24 @@ const StaffSchedulePage = () => {
                 </TableHead>
               ))}
             </TableRow>
+            <TableRow>
+              {dates.map((date) => (
+                <React.Fragment key={date.format("YYYY-MM-DD")}>
+                  <TableHead className="min-w-[80px] text-center text-xs">
+                    Sáng
+                  </TableHead>
+                  <TableHead className="min-w-[80px] text-center text-xs">
+                    Chiều
+                  </TableHead>
+                </React.Fragment>
+              ))}
+            </TableRow>
           </TableHeader>
           <TableBody>
             {filteredStaff.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={dates.length + 1}
+                  colSpan={dates.length * 2 + 1}
                   className="text-center py-8 text-gray-500"
                 >
                   {searchTerm ? "No staff found" : "No staff available"}
@@ -320,72 +388,86 @@ const StaffSchedulePage = () => {
               filteredStaff.map((user: User) => {
                 const userName = getUserName(user);
                 return (
-                  <>
-                    {/* Morning shift row */}
-                    <TableRow key={`${user._id}-${ShiftType.Morning}`}>
-                      <TableCell
-                        rowSpan={2}
-                        className={cn(
-                          "min-w-[250px] sticky left-0 bg-white z-10 font-medium",
-                          "cursor-pointer hover:text-blue-600 hover:underline py-6"
-                        )}
-                        onClick={() => handleStaffClick(user._id, userName)}
-                      >
-                        {userName}
-                      </TableCell>
-                      {dates.map((date) => {
-                        const schedule = getScheduleStatus(
-                          user._id,
-                          date,
-                          ShiftType.Morning
-                        );
-                        const status = schedule?.status || null;
-                        return (
+                  <TableRow key={user._id}>
+                    <TableCell
+                      className={cn(
+                        "min-w-[250px] sticky left-0 bg-white z-10 font-medium",
+                        "cursor-pointer hover:text-blue-600 hover:underline py-6"
+                      )}
+                      onClick={() => handleStaffClick(user._id, userName)}
+                    >
+                      {userName}
+                    </TableCell>
+                    {dates.map((date) => {
+                      // Morning shift cell
+                      const morningSchedule = getScheduleStatus(
+                        user._id,
+                        date,
+                        ShiftType.Morning
+                      );
+                      const morningStatus = morningSchedule?.status || null;
+                      const isPast = isPastDate(date);
+                      const morningCanClick = morningSchedule || !isPast;
+
+                      // Afternoon shift cell
+                      const afternoonSchedule = getScheduleStatus(
+                        user._id,
+                        date,
+                        ShiftType.Afternoon
+                      );
+                      const afternoonStatus = afternoonSchedule?.status || null;
+                      const afternoonCanClick = afternoonSchedule || !isPast;
+
+                      return (
+                        <React.Fragment key={date.format("YYYY-MM-DD")}>
+                          {/* Morning shift cell */}
                           <TableCell
-                            key={`${user._id}-${date.format("YYYY-MM-DD")}-${
-                              ShiftType.Morning
-                            }`}
                             className={cn(
-                              "px-2 py-6 text-center",
-                              getStatusColor(status),
-                              "cursor-pointer transition-colors"
+                              "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
+                              getStatusColor(morningStatus, isPast),
+                              morningCanClick &&
+                                "cursor-pointer transition-colors"
                             )}
-                            title={schedule?.note || ""}
-                            onClick={() =>
-                              handleCellClick(schedule, user._id, userName)
+                            title={morningSchedule?.note || ""}
+                            onClick={
+                              morningCanClick
+                                ? () =>
+                                    handleCellClick(
+                                      morningSchedule,
+                                      user._id,
+                                      userName,
+                                      date,
+                                      ShiftType.Morning
+                                    )
+                                : undefined
                             }
                           />
-                        );
-                      })}
-                    </TableRow>
-                    {/* Afternoon shift row */}
-                    <TableRow key={`${user._id}-${ShiftType.Afternoon}`}>
-                      {dates.map((date) => {
-                        const schedule = getScheduleStatus(
-                          user._id,
-                          date,
-                          ShiftType.Afternoon
-                        );
-                        const status = schedule?.status || null;
-                        return (
+                          {/* Afternoon shift cell */}
                           <TableCell
-                            key={`${user._id}-${date.format("YYYY-MM-DD")}-${
-                              ShiftType.Afternoon
-                            }`}
                             className={cn(
-                              "px-2 py-6 text-center",
-                              getStatusColor(status),
-                              "cursor-pointer transition-colors"
+                              "px-2 py-6 text-center min-w-[80px]",
+                              getStatusColor(afternoonStatus, isPast),
+                              afternoonCanClick &&
+                                "cursor-pointer transition-colors"
                             )}
-                            title={schedule?.note || ""}
-                            onClick={() =>
-                              handleCellClick(schedule, user._id, userName)
+                            title={afternoonSchedule?.note || ""}
+                            onClick={
+                              afternoonCanClick
+                                ? () =>
+                                    handleCellClick(
+                                      afternoonSchedule,
+                                      user._id,
+                                      userName,
+                                      date,
+                                      ShiftType.Afternoon
+                                    )
+                                : undefined
                             }
                           />
-                        );
-                      })}
-                    </TableRow>
-                  </>
+                        </React.Fragment>
+                      );
+                    })}
+                  </TableRow>
                 );
               })
             )}
@@ -401,6 +483,8 @@ const StaffSchedulePage = () => {
           userId={selectedUserId}
           staffName={selectedStaffName}
           refetchSchedules={refetch}
+          initialDate={initialDate}
+          initialShift={initialShift}
         />
       )}
 

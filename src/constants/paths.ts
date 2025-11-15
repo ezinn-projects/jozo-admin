@@ -52,6 +52,9 @@ const PATHS = {
   // staff schedule management
   STAFF_SCHEDULE: "/staff-schedule",
 
+  // my work - employee view their own schedules
+  MY_WORK: "/my-work",
+
   // total revenue
   TOTAL_REVENUE: "/total-revenue",
 } as const;

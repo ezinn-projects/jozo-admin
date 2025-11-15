@@ -47,11 +47,14 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   refetchSchedules,
 }) => {
   const [cancelNote, setCancelNote] = useState("");
+  const [rejectedReason, setRejectedReason] = useState("");
   const [editMode, setEditMode] = useState(false);
-  
+
   // Form state for editing
   const [editDate, setEditDate] = useState<Date | undefined>(undefined);
-  const [editShiftType, setEditShiftType] = useState<"morning" | "afternoon" | "evening" | "">("");
+  const [editShiftType, setEditShiftType] = useState<
+    "morning" | "afternoon" | "evening" | ""
+  >("");
   const [editCustomStartTime, setEditCustomStartTime] = useState("");
   const [editCustomEndTime, setEditCustomEndTime] = useState("");
   const [editNote, setEditNote] = useState("");
@@ -61,12 +64,20 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   useEffect(() => {
     if (schedule) {
       setEditDate(schedule.date ? dayjs(schedule.date).toDate() : undefined);
-      setEditShiftType((schedule.shiftType || schedule.shift || "") as "morning" | "afternoon" | "evening" | "");
+      setEditShiftType(
+        (schedule.shiftType || schedule.shift || "") as
+          | "morning"
+          | "afternoon"
+          | "evening"
+          | ""
+      );
       setEditCustomStartTime(schedule.customStartTime || "");
       setEditCustomEndTime(schedule.customEndTime || "");
       setEditNote(schedule.note || "");
       setTimeError("");
       setEditMode(false);
+      setCancelNote("");
+      setRejectedReason("");
     }
   }, [schedule]);
 
@@ -89,6 +100,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
         description: "Schedule updated successfully",
       });
       setCancelNote("");
+      setRejectedReason("");
       setEditMode(false);
       refetchSchedules?.();
       onClose();
@@ -112,6 +124,43 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       });
     },
   });
+
+  const { mutate: updateScheduleStatus, isPending: isUpdatingStatus } =
+    useMutation({
+      mutationFn: (data: {
+        status: EmployeeScheduleStatus;
+        rejectedReason?: string;
+      }) => staffScheduleApis.updateScheduleStatus(schedule!._id, data),
+      onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Schedule status updated successfully",
+        });
+        setCancelNote("");
+        setRejectedReason("");
+        setEditMode(false);
+        refetchSchedules?.();
+        onClose();
+      },
+      onError: (error: unknown) => {
+        const axiosError = error as {
+          response?: {
+            data?: {
+              message?: string;
+            };
+          };
+          message?: string;
+        };
+        toast({
+          title: "Error",
+          description:
+            axiosError?.response?.data?.message ||
+            axiosError?.message ||
+            "Failed to update schedule status",
+          variant: "destructive",
+        });
+      },
+    });
 
   const { mutate: deleteSchedule, isPending: isDeleting } = useMutation({
     mutationFn: () => staffScheduleApis.deleteSchedule(schedule!._id),
@@ -203,7 +252,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       updateData.date = format(editDate, "yyyy-MM-dd");
     }
     if (editShiftType) {
-      updateData.shiftType = editShiftType as "morning" | "afternoon" | "evening";
+      updateData.shiftType = editShiftType as
+        | "morning"
+        | "afternoon"
+        | "evening";
     }
     if (editCustomStartTime) {
       updateData.customStartTime = editCustomStartTime;
@@ -225,16 +277,37 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
   const handleApprove = () => {
     if (!schedule) return;
-    updateSchedule({
+    updateScheduleStatus({
       status: EmployeeScheduleStatus.Approved,
     });
   };
 
   const handleReject = () => {
     if (!schedule) return;
-    updateSchedule({
+    updateScheduleStatus({
       status: EmployeeScheduleStatus.Rejected,
-      note: cancelNote || undefined,
+      rejectedReason: rejectedReason || undefined,
+    });
+  };
+
+  const handleStart = () => {
+    if (!schedule) return;
+    updateScheduleStatus({
+      status: EmployeeScheduleStatus.InProgress,
+    });
+  };
+
+  const handleComplete = () => {
+    if (!schedule) return;
+    updateScheduleStatus({
+      status: EmployeeScheduleStatus.Completed,
+    });
+  };
+
+  const handleMarkAbsent = () => {
+    if (!schedule) return;
+    updateScheduleStatus({
+      status: EmployeeScheduleStatus.Absent,
     });
   };
 
@@ -245,11 +318,14 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     schedule.status === EmployeeScheduleStatus.Approved;
   const canApprove = schedule.status === EmployeeScheduleStatus.Pending;
   const canReject = schedule.status === EmployeeScheduleStatus.Pending;
+  const canStart = schedule.status === EmployeeScheduleStatus.Approved;
+  const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
+  const canMarkAbsent = schedule.status === EmployeeScheduleStatus.InProgress;
   const isReadOnly =
     schedule.status === EmployeeScheduleStatus.Completed ||
-    schedule.status === EmployeeScheduleStatus.InProgress ||
     schedule.status === EmployeeScheduleStatus.Cancelled ||
-    schedule.status === EmployeeScheduleStatus.Absent;
+    schedule.status === EmployeeScheduleStatus.Absent ||
+    schedule.status === EmployeeScheduleStatus.Rejected;
 
   const getStatusLabel = (status: EmployeeScheduleStatus) => {
     switch (status) {
@@ -301,8 +377,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               </p>
             </div>
             <div>
-              <Label className="text-sm font-semibold text-gray-500">Status</Label>
-              <p className="mt-1 font-medium">{getStatusLabel(schedule.status)}</p>
+              <Label className="text-sm font-semibold text-gray-500">
+                Status
+              </Label>
+              <p className="mt-1 font-medium">
+                {getStatusLabel(schedule.status)}
+              </p>
             </div>
           </div>
 
@@ -322,7 +402,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                         )}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4" />
-                        {editDate ? format(editDate, "dd/MM/yyyy") : "Select date"}
+                        {editDate
+                          ? format(editDate, "dd/MM/yyyy")
+                          : "Select date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -340,7 +422,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   <Select
                     value={editShiftType}
                     onValueChange={(value) =>
-                      setEditShiftType(value as "morning" | "afternoon" | "evening")
+                      setEditShiftType(
+                        value as "morning" | "afternoon" | "evening"
+                      )
                     }
                   >
                     <SelectTrigger className="mt-1">
@@ -357,7 +441,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="editCustomStartTime">Custom Start Time (HH:mm)</Label>
+                  <Label htmlFor="editCustomStartTime">
+                    Custom Start Time (HH:mm)
+                  </Label>
                   <Input
                     id="editCustomStartTime"
                     type="time"
@@ -368,7 +454,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   />
                 </div>
                 <div>
-                  <Label htmlFor="editCustomEndTime">Custom End Time (HH:mm)</Label>
+                  <Label htmlFor="editCustomEndTime">
+                    Custom End Time (HH:mm)
+                  </Label>
                   <Input
                     id="editCustomEndTime"
                     type="time"
@@ -379,9 +467,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   />
                 </div>
               </div>
-              {timeError && (
-                <p className="text-sm text-red-500">{timeError}</p>
-              )}
+              {timeError && <p className="text-sm text-red-500">{timeError}</p>}
 
               <div>
                 <Label htmlFor="editNote">Note</Label>
@@ -400,7 +486,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               {/* Read-only display */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <Label className="text-sm font-semibold text-gray-500">Date</Label>
+                  <Label className="text-sm font-semibold text-gray-500">
+                    Date
+                  </Label>
                   <p className="mt-1">
                     {schedule.date
                       ? format(dayjs(schedule.date).toDate(), "dd/MM/yyyy")
@@ -408,7 +496,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   </p>
                 </div>
                 <div>
-                  <Label className="text-sm font-semibold text-gray-500">Shift</Label>
+                  <Label className="text-sm font-semibold text-gray-500">
+                    Shift
+                  </Label>
                   <p className="mt-1">
                     {getShiftLabel(schedule.shift || schedule.shiftType)}
                   </p>
@@ -422,13 +512,17 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 </Label>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label className="text-sm text-gray-500">Start Time (HH:mm)</Label>
+                    <Label className="text-sm text-gray-500">
+                      Start Time (HH:mm)
+                    </Label>
                     <p className="mt-1 font-medium">
                       {schedule.customStartTime || "Not set"}
                     </p>
                   </div>
                   <div>
-                    <Label className="text-sm text-gray-500">End Time (HH:mm)</Label>
+                    <Label className="text-sm text-gray-500">
+                      End Time (HH:mm)
+                    </Label>
                     <p className="mt-1 font-medium">
                       {schedule.customEndTime || "Not set"}
                     </p>
@@ -439,7 +533,9 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               {/* Note */}
               {schedule.note && (
                 <div>
-                  <Label className="text-sm font-semibold text-gray-500">Note</Label>
+                  <Label className="text-sm font-semibold text-gray-500">
+                    Note
+                  </Label>
                   <p className="mt-1 text-sm">{schedule.note}</p>
                 </div>
               )}
@@ -454,7 +550,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 <span>{schedule.createdByName}</span>
                 {schedule.createdAt && (
                   <span className="text-gray-400 ml-2">
-                    ({format(dayjs(schedule.createdAt).toDate(), "dd/MM/yyyy HH:mm")})
+                    (
+                    {format(
+                      dayjs(schedule.createdAt).toDate(),
+                      "dd/MM/yyyy HH:mm"
+                    )}
+                    )
                   </span>
                 )}
               </div>
@@ -465,7 +566,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 <span>{schedule.approvedByName}</span>
                 {schedule.approvedAt && (
                   <span className="text-gray-400 ml-2">
-                    ({format(dayjs(schedule.approvedAt).toDate(), "dd/MM/yyyy HH:mm")})
+                    (
+                    {format(
+                      dayjs(schedule.approvedAt).toDate(),
+                      "dd/MM/yyyy HH:mm"
+                    )}
+                    )
                   </span>
                 )}
               </div>
@@ -474,7 +580,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               <div className="text-sm">
                 <span className="text-gray-500">Started at: </span>
                 <span>
-                  {format(dayjs(schedule.startedAt).toDate(), "dd/MM/yyyy HH:mm")}
+                  {format(
+                    dayjs(schedule.startedAt).toDate(),
+                    "dd/MM/yyyy HH:mm"
+                  )}
                 </span>
               </div>
             )}
@@ -482,7 +591,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               <div className="text-sm">
                 <span className="text-gray-500">Completed at: </span>
                 <span>
-                  {format(dayjs(schedule.completedAt).toDate(), "dd/MM/yyyy HH:mm")}
+                  {format(
+                    dayjs(schedule.completedAt).toDate(),
+                    "dd/MM/yyyy HH:mm"
+                  )}
                 </span>
               </div>
             )}
@@ -492,7 +604,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 <span>{schedule.markedAbsentBy}</span>
                 {schedule.markedAbsentAt && (
                   <span className="text-gray-400 ml-2">
-                    ({format(dayjs(schedule.markedAbsentAt).toDate(), "dd/MM/yyyy HH:mm")})
+                    (
+                    {format(
+                      dayjs(schedule.markedAbsentAt).toDate(),
+                      "dd/MM/yyyy HH:mm"
+                    )}
+                    )
                   </span>
                 )}
               </div>
@@ -500,7 +617,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
           </div>
 
           {/* Action Note Input */}
-          {(canCancel || canReject) && !isReadOnly && !editMode && (
+          {canCancel && !isReadOnly && !editMode && (
             <div>
               <Label htmlFor="cancelNote">Note (optional)</Label>
               <Textarea
@@ -513,10 +630,27 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               />
             </div>
           )}
+          {canReject && !isReadOnly && !editMode && (
+            <div>
+              <Label htmlFor="rejectedReason">Rejection Reason</Label>
+              <Textarea
+                id="rejectedReason"
+                placeholder="Enter rejection reason..."
+                value={rejectedReason}
+                onChange={(e) => setRejectedReason(e.target.value)}
+                className="mt-1 resize-none"
+                rows={3}
+              />
+            </div>
+          )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={onClose} disabled={isPending || isDeleting}>
+          <Button
+            variant="outline"
+            onClick={onClose}
+            disabled={isPending || isDeleting || isUpdatingStatus}
+          >
             Close
           </Button>
           {canEdit && !editMode && (
@@ -532,25 +666,41 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   setEditMode(false);
                   // Reset form values
                   if (schedule) {
-                    setEditDate(schedule.date ? dayjs(schedule.date).toDate() : undefined);
-                    setEditShiftType((schedule.shiftType || schedule.shift || "") as "morning" | "afternoon" | "evening" | "");
+                    setEditDate(
+                      schedule.date ? dayjs(schedule.date).toDate() : undefined
+                    );
+                    setEditShiftType(
+                      (schedule.shiftType || schedule.shift || "") as
+                        | "morning"
+                        | "afternoon"
+                        | "evening"
+                        | ""
+                    );
                     setEditCustomStartTime(schedule.customStartTime || "");
                     setEditCustomEndTime(schedule.customEndTime || "");
                     setEditNote(schedule.note || "");
                     setTimeError("");
                   }
                 }}
-                disabled={isPending || isDeleting}
+                disabled={isPending || isDeleting || isUpdatingStatus}
               >
                 Cancel
               </Button>
-              <Button onClick={handleSaveEdit} disabled={isPending || isDeleting || !!timeError}>
+              <Button
+                onClick={handleSaveEdit}
+                disabled={
+                  isPending || isDeleting || isUpdatingStatus || !!timeError
+                }
+              >
                 Save Changes
               </Button>
             </>
           )}
           {canApprove && !editMode && (
-            <Button onClick={handleApprove} disabled={isPending || isDeleting}>
+            <Button
+              onClick={handleApprove}
+              disabled={isPending || isDeleting || isUpdatingStatus}
+            >
               Approve
             </Button>
           )}
@@ -558,16 +708,41 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
             <Button
               variant="destructive"
               onClick={handleReject}
-              disabled={isPending || isDeleting}
+              disabled={isPending || isDeleting || isUpdatingStatus}
             >
               Reject
+            </Button>
+          )}
+          {canStart && !editMode && (
+            <Button
+              onClick={handleStart}
+              disabled={isPending || isDeleting || isUpdatingStatus}
+            >
+              Start
+            </Button>
+          )}
+          {canComplete && !editMode && (
+            <Button
+              onClick={handleComplete}
+              disabled={isPending || isDeleting || isUpdatingStatus}
+            >
+              Complete
+            </Button>
+          )}
+          {canMarkAbsent && !editMode && (
+            <Button
+              variant="destructive"
+              onClick={handleMarkAbsent}
+              disabled={isPending || isDeleting || isUpdatingStatus}
+            >
+              Mark Absent
             </Button>
           )}
           {canCancel && !editMode && (
             <Button
               variant="destructive"
               onClick={handleCancel}
-              disabled={isPending || isDeleting}
+              disabled={isPending || isDeleting || isUpdatingStatus}
             >
               Cancel Schedule
             </Button>

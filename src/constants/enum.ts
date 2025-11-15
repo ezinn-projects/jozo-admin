@@ -94,6 +94,7 @@ export enum FnBCategory {
  * @property {string} Cancelled - Schedule is cancelled
  */
 export enum EmployeeScheduleStatus {
+  All = "all",
   Pending = "pending",
   Approved = "approved",
   InProgress = "in-progress",
@@ -110,6 +111,7 @@ export enum EmployeeScheduleStatus {
  * @property {string} Afternoon - Ca Chiều: 17:00 - 22:00
  */
 export enum ShiftType {
+  All = "all",
   Morning = "morning", // Ca Sáng: 12:00 - 17:00
   Afternoon = "afternoon", // Ca Chiều: 17:00 - 22:00
 }

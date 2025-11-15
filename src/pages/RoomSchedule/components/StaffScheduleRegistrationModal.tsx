@@ -31,7 +31,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { CalendarIcon, CircleXIcon } from "lucide-react";
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { cn } from "@/lib/utils";
@@ -39,31 +39,37 @@ import { Portal } from "@radix-ui/react-portal";
 import { ShiftType } from "@/constants/enum";
 
 // Define schema using zod
-const staffScheduleSchema = z.object({
-  date: z.date({
-    required_error: "Ngày là bắt buộc",
-  }),
-  shifts: z.array(z.string()).min(1, "Vui lòng chọn ít nhất một ca làm việc"),
-  note: z.string().max(500).optional(),
-  customStartTime: z.string().optional(),
-  customEndTime: z.string().optional(),
-}).refine(
-  (data) => {
-    // If both times are provided, validate start < end
-    if (data.customStartTime && data.customEndTime) {
-      const [startHours, startMinutes] = data.customStartTime.split(":").map(Number);
-      const [endHours, endMinutes] = data.customEndTime.split(":").map(Number);
-      const startTotal = startHours * 60 + startMinutes;
-      const endTotal = endHours * 60 + endMinutes;
-      return startTotal < endTotal;
+const staffScheduleSchema = z
+  .object({
+    date: z.date({
+      required_error: "Ngày là bắt buộc",
+    }),
+    shifts: z.array(z.string()).min(1, "Vui lòng chọn ít nhất một ca làm việc"),
+    note: z.string().max(500).optional(),
+    customStartTime: z.string().optional(),
+    customEndTime: z.string().optional(),
+  })
+  .refine(
+    (data) => {
+      // If both times are provided, validate start < end
+      if (data.customStartTime && data.customEndTime) {
+        const [startHours, startMinutes] = data.customStartTime
+          .split(":")
+          .map(Number);
+        const [endHours, endMinutes] = data.customEndTime
+          .split(":")
+          .map(Number);
+        const startTotal = startHours * 60 + startMinutes;
+        const endTotal = endHours * 60 + endMinutes;
+        return startTotal < endTotal;
+      }
+      return true;
+    },
+    {
+      message: "Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc",
+      path: ["customEndTime"],
     }
-    return true;
-  },
-  {
-    message: "Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc",
-    path: ["customEndTime"],
-  }
-);
+  );
 
 type FormValues = z.infer<typeof staffScheduleSchema>;
 
@@ -73,37 +79,89 @@ interface StaffScheduleRegistrationModalProps {
   userId: string;
   staffName?: string;
   refetchSchedules?: () => void;
+  initialDate?: Date;
+  initialShift?: ShiftType;
 }
 
 const StaffScheduleRegistrationModal: React.FC<
   StaffScheduleRegistrationModalProps
-> = ({ isOpen, onClose, userId, staffName, refetchSchedules }) => {
+> = ({
+  isOpen,
+  onClose,
+  userId,
+  staffName,
+  refetchSchedules,
+  initialDate,
+  initialShift,
+}) => {
   const [timeError, setTimeError] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(staffScheduleSchema),
     defaultValues: {
-      date: new Date(),
-      shifts: [],
+      date: initialDate || new Date(),
+      shifts: initialShift ? [initialShift] : [],
       note: "",
       customStartTime: "",
       customEndTime: "",
     },
   });
 
-  const { control, handleSubmit, reset, setError, watch } = form;
-  
+  const { control, handleSubmit, reset, setError, watch, setValue } = form;
+
   const customStartTime = watch("customStartTime");
   const customEndTime = watch("customEndTime");
+  const shifts = watch("shifts");
+
+  // Update form when modal opens with initial values
+  useEffect(() => {
+    if (isOpen) {
+      if (initialDate) {
+        setValue("date", initialDate);
+      }
+      if (initialShift) {
+        setValue("shifts", [initialShift]);
+      } else if (!initialShift && initialDate) {
+        // Reset shifts if no initial shift provided
+        setValue("shifts", []);
+      }
+    }
+  }, [isOpen, initialDate, initialShift, setValue]);
+
+  // Auto-fill time based on selected shifts
+  useEffect(() => {
+    if (shifts && shifts.length > 0) {
+      const hasMorning = shifts.includes(ShiftType.Morning);
+      const hasAfternoon = shifts.includes(ShiftType.Afternoon);
+
+      // Nếu chọn cả 2 ca: start ca sáng (12:00) và end ca chiều (22:00)
+      if (hasMorning && hasAfternoon) {
+        setValue("customStartTime", "12:00");
+        setValue("customEndTime", "22:00");
+      } else if (hasMorning) {
+        // Chỉ chọn ca sáng
+        setValue("customStartTime", "12:00");
+        setValue("customEndTime", "17:00");
+      } else if (hasAfternoon) {
+        // Chỉ chọn ca chiều
+        setValue("customStartTime", "17:00");
+        setValue("customEndTime", "22:00");
+      }
+    } else {
+      // Nếu không có ca nào được chọn, clear thời gian
+      setValue("customStartTime", "");
+      setValue("customEndTime", "");
+    }
+  }, [shifts, setValue]);
 
   // Validate time when values change
-  React.useEffect(() => {
+  useEffect(() => {
     if (customStartTime && customEndTime) {
       const [startHours, startMinutes] = customStartTime.split(":").map(Number);
       const [endHours, endMinutes] = customEndTime.split(":").map(Number);
       const startTotal = startHours * 60 + startMinutes;
       const endTotal = endHours * 60 + endMinutes;
-      
+
       if (startTotal >= endTotal) {
         setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
       } else {
@@ -212,11 +270,15 @@ const StaffScheduleRegistrationModal: React.FC<
   const onSubmit = (values: FormValues) => {
     // Validate time before submit
     if (values.customStartTime && values.customEndTime) {
-      const [startHours, startMinutes] = values.customStartTime.split(":").map(Number);
-      const [endHours, endMinutes] = values.customEndTime.split(":").map(Number);
+      const [startHours, startMinutes] = values.customStartTime
+        .split(":")
+        .map(Number);
+      const [endHours, endMinutes] = values.customEndTime
+        .split(":")
+        .map(Number);
       const startTotal = startHours * 60 + startMinutes;
       const endTotal = endHours * 60 + endMinutes;
-      
+
       if (startTotal >= endTotal) {
         setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
         return;
@@ -236,7 +298,13 @@ const StaffScheduleRegistrationModal: React.FC<
   };
 
   const handleClose = () => {
-    reset();
+    reset({
+      date: new Date(),
+      shifts: [],
+      note: "",
+      customStartTime: "",
+      customEndTime: "",
+    });
     onClose();
   };
 
@@ -394,11 +462,7 @@ const StaffScheduleRegistrationModal: React.FC<
                   <FormItem>
                     <FormLabel>Thời gian bắt đầu (HH:mm) - Tùy chọn</FormLabel>
                     <FormControl>
-                      <Input
-                        type="time"
-                        placeholder="08:00"
-                        {...field}
-                      />
+                      <Input type="time" placeholder="08:00" {...field} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -411,11 +475,7 @@ const StaffScheduleRegistrationModal: React.FC<
                   <FormItem>
                     <FormLabel>Thời gian kết thúc (HH:mm) - Tùy chọn</FormLabel>
                     <FormControl>
-                      <Input
-                        type="time"
-                        placeholder="17:00"
-                        {...field}
-                      />
+                      <Input type="time" placeholder="17:00" {...field} />
                     </FormControl>
                     <FormMessage />
                     {timeError && (

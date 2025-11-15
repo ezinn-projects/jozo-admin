@@ -9,6 +9,7 @@ import {
   UtensilsCrossed,
   Users,
   UserPlus,
+  Briefcase,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -27,6 +28,13 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.HOME,
     icon: Home,
     subItems: [], // No sub-items for Home
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+  },
+  {
+    title: "My Work",
+    url: PATHS.MY_WORK,
+    icon: Briefcase,
+    subItems: [], // No sub-items for My Work
     roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {

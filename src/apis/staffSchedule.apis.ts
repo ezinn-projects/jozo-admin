@@ -87,6 +87,10 @@ const staffScheduleApis = {
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules", {
       params,
     }),
+  getMySchedules: (params?: IGetEmployeeSchedulesParams) =>
+    http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules/me", {
+      params,
+    }),
   updateSchedule: (
     id: string,
     data: {
@@ -98,6 +102,13 @@ const staffScheduleApis = {
       status?: EmployeeScheduleStatus;
     }
   ) => http.put<HTTPResponse>(`/employee-schedules/${id}`, data),
+  updateScheduleStatus: (
+    id: string,
+    data: {
+      status: EmployeeScheduleStatus;
+      rejectedReason?: string; // Chỉ cần khi status = rejected
+    }
+  ) => http.put<HTTPResponse>(`/employee-schedules/${id}/status`, data),
   deleteSchedule: (id: string) =>
     http.delete<HTTPResponse>(`/employee-schedules/${id}`),
 };

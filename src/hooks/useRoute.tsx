@@ -50,6 +50,7 @@ const EditUserPage = lazy(
 );
 const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
 const StaffSchedulePage = lazy(() => import("@/pages/StaffSchedule"));
+const MyWorkPage = lazy(() => import("@/pages/MyWork"));
 
 function useRoute() {
   return (
@@ -82,6 +83,7 @@ function useRoute() {
                   element={<RevenueStatisticsPage />}
                 />
                 <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
+                <Route path={PATHS.MY_WORK} element={<MyWorkPage />} />
               </Route>
 
               {/* Routes chỉ cho Admin */}
