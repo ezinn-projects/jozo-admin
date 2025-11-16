@@ -44,7 +44,7 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 
-const MyWorkPage = () => {
+const MySchedulePage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
   const [selectedStatus, setSelectedStatus] = useState<
@@ -599,4 +599,4 @@ const MyWorkPage = () => {
   );
 };
 
-export default MyWorkPage;
+export default MySchedulePage;
