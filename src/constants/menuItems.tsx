@@ -1,6 +1,7 @@
 import {
   BedDouble,
   Calendar,
+  Clock,
   DoorOpenIcon,
   Home,
   PercentIcon,
@@ -8,6 +9,7 @@ import {
   UtensilsCrossed,
   Users,
   UserPlus,
+  Briefcase,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -29,6 +31,13 @@ const MENU_ITEMS: MenuItem[] = [
     roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {
+    title: "My Schedule",
+    url: PATHS.MY_SCHEDULE,
+    icon: Briefcase,
+    subItems: [], // No sub-items for My Schedule
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+  },
+  {
     title: "Rooms management",
     url: PATHS.ROOMS,
     icon: DoorOpenIcon,
@@ -36,7 +45,7 @@ const MENU_ITEMS: MenuItem[] = [
     roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {
-    title: "Gerenral management",
+    title: "General management",
     icon: Settings2,
     roles: [Role.Admin], // Chỉ admin mới có thể truy cập
     subItems: [
@@ -50,6 +59,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Staff Management",
         url: PATHS.STAFF_MANAGEMENT,
         icon: Users,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Staff Schedule",
+        url: PATHS.STAFF_SCHEDULE,
+        icon: Clock,
         roles: [Role.Admin],
       },
       {

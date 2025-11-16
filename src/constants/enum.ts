@@ -81,3 +81,37 @@ export enum FnBCategory {
   SNACK = "snack",
   DRINK = "drink",
 }
+
+/**
+ * Enum for employee schedule status.
+ * @enum {string}
+ * @property {string} Pending - Schedule is pending approval
+ * @property {string} Approved - Schedule is approved
+ * @property {string} InProgress - Schedule is in progress
+ * @property {string} Completed - Schedule is completed
+ * @property {string} Absent - Employee is absent
+ * @property {string} Rejected - Schedule is rejected
+ * @property {string} Cancelled - Schedule is cancelled
+ */
+export enum EmployeeScheduleStatus {
+  All = "all",
+  Pending = "pending",
+  Approved = "approved",
+  InProgress = "in-progress",
+  Completed = "completed",
+  Absent = "absent",
+  Rejected = "rejected",
+  Cancelled = "cancelled",
+}
+
+/**
+ * Enum for shift types.
+ * @enum {string}
+ * @property {string} Morning - Ca Sáng: 12:00 - 17:00
+ * @property {string} Afternoon - Ca Chiều: 17:00 - 22:00
+ */
+export enum ShiftType {
+  All = "all",
+  Morning = "morning", // Ca Sáng: 12:00 - 17:00
+  Afternoon = "afternoon", // Ca Chiều: 17:00 - 22:00
+}

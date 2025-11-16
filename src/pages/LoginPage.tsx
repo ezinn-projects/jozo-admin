@@ -50,7 +50,7 @@ export default function LoginPage() {
 
   const { mutate } = useMutation({
     mutationFn: authorizationApis.login,
-    onSuccess: async ({ data }) => {
+    onSuccess: ({ data }) => {
       localStorage.setItem("access_token", data.result?.access_token || "");
       localStorage.setItem("refresh_token", data.result?.refresh_token || "");
 
@@ -61,14 +61,8 @@ export default function LoginPage() {
         title: data.message,
       });
 
-      // Tăng thời gian chờ để đảm bảo context được cập nhật
-      await new Promise((resolve) => setTimeout(resolve, 500));
-
-      // Kiểm tra lại trạng thái authentication trước khi navigate
-      const authState = await authorizationApis.getMe();
-      if (authState.data.result) {
-        navigate(PATHS.HOME, { replace: true });
-      }
+      // Navigate sẽ được xử lý bởi useEffect khi isAuthenticated thay đổi
+      // Không cần gọi getMe() trực tiếp vì useQuery trong AuthContext sẽ tự động fetch
     },
     onError: (error) => {
       toast({
