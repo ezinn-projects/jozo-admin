@@ -29,7 +29,7 @@ export interface IEmployeeSchedule {
     phone_number?: string;
   };
   date: string; // Format: YYYY-MM-DD hoặc ISO string
-  shift?: "morning" | "evening"; // Legacy field
+  shift?: "morning" | "afternoon" | "evening"; // Legacy field (supports afternoon for backward compatibility)
   shiftType?: "morning" | "afternoon" | "evening"; // New field
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -114,12 +114,4 @@ const staffScheduleApis = {
 };
 
 export default staffScheduleApis;
-export type {
-  IRegisterStaffScheduleRequest,
-  IEmployeeSchedule,
-  IGetEmployeeSchedulesParams,
-  IEmployeeSchedulesResponse,
-  IEmployeeSchedulesSummary,
-  IShiftInfo,
-};
 
