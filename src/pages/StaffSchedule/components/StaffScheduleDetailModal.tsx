@@ -32,6 +32,7 @@ import dayjs from "dayjs";
 import { format } from "date-fns";
 import { CalendarIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useIsStaff } from "@/hooks/usePermission";
 
 interface StaffScheduleDetailModalProps {
   isOpen: boolean;
@@ -46,6 +47,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   schedule,
   refetchSchedules,
 }) => {
+  const isStaff = useIsStaff();
   const [cancelNote, setCancelNote] = useState("");
   const [rejectedReason, setRejectedReason] = useState("");
   const [editMode, setEditMode] = useState(false);
@@ -59,6 +61,11 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const [editCustomEndTime, setEditCustomEndTime] = useState("");
   const [editNote, setEditNote] = useState("");
   const [timeError, setTimeError] = useState("");
+
+  // State for adjusting working hours (separate from edit mode)
+  const [adjustedStartTime, setAdjustedStartTime] = useState("");
+  const [adjustedEndTime, setAdjustedEndTime] = useState("");
+  const [adjustTimeError, setAdjustTimeError] = useState("");
 
   // Initialize form values when schedule changes
   useEffect(() => {
@@ -78,6 +85,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       setEditMode(false);
       setCancelNote("");
       setRejectedReason("");
+      // Initialize adjusted times with current custom times
+      setAdjustedStartTime(schedule.customStartTime || "");
+      setAdjustedEndTime(schedule.customEndTime || "");
+      setAdjustTimeError("");
     }
   }, [schedule]);
 
@@ -120,6 +131,41 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
           axiosError?.response?.data?.message ||
           axiosError?.message ||
           "Failed to update schedule",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Separate mutation for updating time only (doesn't close modal)
+  const { mutate: updateTimeOnly, isPending: isUpdatingTime } = useMutation({
+    mutationFn: (data: { customStartTime?: string; customEndTime?: string }) =>
+      staffScheduleApis.updateSchedule(schedule!._id, data),
+    onSuccess: () => {
+      toast({
+        title: "Thành công",
+        description: "Thời gian làm việc đã được cập nhật",
+      });
+      refetchSchedules?.();
+      // Update adjusted times from the updated schedule
+      if (schedule) {
+        // The schedule will be updated via refetch, useEffect will handle the rest
+      }
+    },
+    onError: (error: unknown) => {
+      const axiosError = error as {
+        response?: {
+          data?: {
+            message?: string;
+          };
+        };
+        message?: string;
+      };
+      toast({
+        title: "Lỗi",
+        description:
+          axiosError?.response?.data?.message ||
+          axiosError?.message ||
+          "Không thể cập nhật thời gian",
         variant: "destructive",
       });
     },
@@ -230,6 +276,99 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     }
   };
 
+  // Calculate working minutes from adjusted times
+  const calculateWorkingMinutes = (
+    startTime: string,
+    endTime: string
+  ): number | null => {
+    if (!startTime || !endTime) return null;
+
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [endHours, endMinutes] = endTime.split(":").map(Number);
+
+    const startTotal = startHours * 60 + startMinutes;
+    const endTotal = endHours * 60 + endMinutes;
+
+    if (startTotal >= endTotal) return null;
+
+    return endTotal - startTotal;
+  };
+
+  // Validate adjusted time
+  const validateAdjustedTime = (
+    startTime: string,
+    endTime: string
+  ): boolean => {
+    if (!startTime || !endTime) {
+      setAdjustTimeError("");
+      return true; // Allow empty times
+    }
+
+    const [startHours, startMinutes] = startTime.split(":").map(Number);
+    const [endHours, endMinutes] = endTime.split(":").map(Number);
+
+    const startTotal = startHours * 60 + startMinutes;
+    const endTotal = endHours * 60 + endMinutes;
+
+    if (startTotal >= endTotal) {
+      setAdjustTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
+      return false;
+    }
+
+    setAdjustTimeError("");
+    return true;
+  };
+
+  const handleAdjustedStartTimeChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = e.target.value;
+    setAdjustedStartTime(value);
+    if (adjustedEndTime) {
+      validateAdjustedTime(value, adjustedEndTime);
+    }
+  };
+
+  const handleAdjustedEndTimeChange = (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const value = e.target.value;
+    setAdjustedEndTime(value);
+    if (adjustedStartTime) {
+      validateAdjustedTime(adjustedStartTime, value);
+    }
+  };
+
+  const handleSaveAdjustedTime = () => {
+    if (!schedule) return;
+
+    // Validate time if both are provided
+    if (adjustedStartTime && adjustedEndTime) {
+      if (!validateAdjustedTime(adjustedStartTime, adjustedEndTime)) {
+        return;
+      }
+    }
+
+    const updateData: {
+      customStartTime?: string;
+      customEndTime?: string;
+    } = {};
+
+    if (adjustedStartTime) {
+      updateData.customStartTime = adjustedStartTime;
+    } else {
+      updateData.customStartTime = undefined;
+    }
+
+    if (adjustedEndTime) {
+      updateData.customEndTime = adjustedEndTime;
+    } else {
+      updateData.customEndTime = undefined;
+    }
+
+    updateTimeOnly(updateData);
+  };
+
   const handleSaveEdit = () => {
     if (!schedule) return;
 
@@ -314,11 +453,13 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   if (!schedule) return null;
 
   const canCancel =
-    schedule.status === EmployeeScheduleStatus.Pending ||
-    schedule.status === EmployeeScheduleStatus.Approved;
+    !isStaff &&
+    (schedule.status === EmployeeScheduleStatus.Pending ||
+      schedule.status === EmployeeScheduleStatus.Approved);
   const canApprove = schedule.status === EmployeeScheduleStatus.Pending;
   const canReject = schedule.status === EmployeeScheduleStatus.Pending;
-  const canStart = schedule.status === EmployeeScheduleStatus.Approved;
+  const canStart =
+    !isStaff && schedule.status === EmployeeScheduleStatus.Approved;
   const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
   const canMarkAbsent = schedule.status === EmployeeScheduleStatus.InProgress;
   const isReadOnly =
@@ -505,29 +646,173 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 </div>
               </div>
 
-              {/* Custom Time Section */}
+              {/* Custom Time Section - Editable or Read-only */}
               <div className="border-t pt-4">
                 <Label className="text-sm font-semibold text-gray-500 mb-2 block">
-                  Custom Working Hours
+                  {isReadOnly
+                    ? "Thời gian làm việc"
+                    : "Điều chỉnh thời gian làm việc"}
                 </Label>
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <Label className="text-sm text-gray-500">
-                      Start Time (HH:mm)
-                    </Label>
-                    <p className="mt-1 font-medium">
-                      {schedule.customStartTime || "Not set"}
-                    </p>
+                {isReadOnly ? (
+                  // Read-only view for Completed status
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm text-gray-500">
+                          Thời gian bắt đầu (HH:mm)
+                        </Label>
+                        <p className="mt-1 font-medium">
+                          {schedule.customStartTime || "Not set"}
+                        </p>
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">
+                          Thời gian kết thúc (HH:mm)
+                        </Label>
+                        <p className="mt-1 font-medium">
+                          {schedule.customEndTime || "Not set"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Display working minutes and salary for read-only */}
+                    {schedule.customStartTime && schedule.customEndTime && (
+                      <div className="bg-blue-50 p-3 rounded-md space-y-1">
+                        {(() => {
+                          const minutes = calculateWorkingMinutes(
+                            schedule.customStartTime!,
+                            schedule.customEndTime!
+                          );
+                          if (minutes === null) return null;
+                          const hours = Math.floor(minutes / 60);
+                          const mins = minutes % 60;
+                          const hourlyRate = 22000; // 22k VND per hour
+                          const salary = (minutes / 60) * hourlyRate;
+
+                          return (
+                            <>
+                              <div className="text-sm">
+                                <span className="text-gray-600">
+                                  Tổng thời gian:{" "}
+                                </span>
+                                <span className="font-semibold">
+                                  {hours > 0 && `${hours} giờ `}
+                                  {mins > 0 && `${mins} phút`}
+                                  {hours === 0 && mins === 0 && "0 phút"}
+                                </span>
+                                <span className="text-gray-500 ml-2">
+                                  ({minutes} phút)
+                                </span>
+                              </div>
+                              <div className="text-sm">
+                                <span className="text-gray-600">
+                                  Ước tính lương:{" "}
+                                </span>
+                                <span className="font-semibold text-green-600">
+                                  {salary.toLocaleString("vi-VN")} VNĐ
+                                </span>
+                              </div>
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  <div>
-                    <Label className="text-sm text-gray-500">
-                      End Time (HH:mm)
-                    </Label>
-                    <p className="mt-1 font-medium">
-                      {schedule.customEndTime || "Not set"}
-                    </p>
+                ) : (
+                  // Editable view for other statuses
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-sm text-gray-500">
+                          Thời gian bắt đầu (HH:mm)
+                        </Label>
+                        <Input
+                          type="time"
+                          value={adjustedStartTime}
+                          onChange={handleAdjustedStartTimeChange}
+                          className="mt-1"
+                          placeholder="08:00"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-sm text-gray-500">
+                          Thời gian kết thúc (HH:mm)
+                        </Label>
+                        <Input
+                          type="time"
+                          value={adjustedEndTime}
+                          onChange={handleAdjustedEndTimeChange}
+                          className="mt-1"
+                          placeholder="17:00"
+                        />
+                      </div>
+                    </div>
+                    {adjustTimeError && (
+                      <p className="text-sm text-red-500">{adjustTimeError}</p>
+                    )}
+
+                    {/* Display working minutes and estimated salary */}
+                    {adjustedStartTime &&
+                      adjustedEndTime &&
+                      !adjustTimeError && (
+                        <div className="bg-blue-50 p-3 rounded-md space-y-1">
+                          {(() => {
+                            const minutes = calculateWorkingMinutes(
+                              adjustedStartTime,
+                              adjustedEndTime
+                            );
+                            if (minutes === null) return null;
+                            const hours = Math.floor(minutes / 60);
+                            const mins = minutes % 60;
+                            const hourlyRate = 22000; // 22k VND per hour
+                            const salary = (minutes / 60) * hourlyRate;
+
+                            return (
+                              <>
+                                <div className="text-sm">
+                                  <span className="text-gray-600">
+                                    Tổng thời gian:{" "}
+                                  </span>
+                                  <span className="font-semibold">
+                                    {hours > 0 && `${hours} giờ `}
+                                    {mins > 0 && `${mins} phút`}
+                                    {hours === 0 && mins === 0 && "0 phút"}
+                                  </span>
+                                  <span className="text-gray-500 ml-2">
+                                    ({minutes} phút)
+                                  </span>
+                                </div>
+                                <div className="text-sm">
+                                  <span className="text-gray-600">
+                                    Ước tính lương:{" "}
+                                  </span>
+                                  <span className="font-semibold text-green-600">
+                                    {salary.toLocaleString("vi-VN")} VNĐ
+                                  </span>
+                                </div>
+                              </>
+                            );
+                          })()}
+                        </div>
+                      )}
+
+                    {!isStaff && (
+                      <Button
+                        onClick={handleSaveAdjustedTime}
+                        disabled={
+                          isPending ||
+                          isDeleting ||
+                          isUpdatingStatus ||
+                          isUpdatingTime ||
+                          !!adjustTimeError
+                        }
+                        className="w-full"
+                      >
+                        {isUpdatingTime ? "Đang lưu..." : "Lưu thời gian"}
+                      </Button>
+                    )}
                   </div>
-                </div>
+                )}
               </div>
 
               {/* Note */}

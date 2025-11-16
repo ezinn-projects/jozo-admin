@@ -37,6 +37,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
+  DollarSign,
   Loader2,
   PlayCircle,
   TrendingUp,
@@ -138,6 +139,13 @@ const MySchedulePage = () => {
     refetch,
   } = useMySchedules(options);
 
+  // Get all schedules for current month (for salary calculation, no filters)
+  const { data: { schedules: monthSchedules = [] } = { schedules: [] } } =
+    useMySchedules({
+      filterType: "month",
+      date: currentDate,
+    });
+
   // Group schedules by date
   const schedulesByDate = useMemo(() => {
     const map = new Map<string, IEmployeeSchedule[]>();
@@ -224,8 +232,8 @@ const MySchedulePage = () => {
     if (schedule.customStartTime && schedule.customEndTime) {
       return `${schedule.customStartTime} - ${schedule.customEndTime}`;
     }
-    if (shift === "morning") return "Ca Sáng (12:00 - 17:00)";
-    if (shift === "afternoon") return "Ca Chiều (17:00 - 22:00)";
+    if (shift === "morning") return "Morning (12:00 - 17:00)";
+    if (shift === "afternoon") return "Afternoon (17:00 - 22:00)";
     return shift || "Custom";
   };
 
@@ -236,6 +244,53 @@ const MySchedulePage = () => {
     return "bg-gray-100 text-gray-800";
   };
 
+  // Calculate salary information based on current month (not filtered)
+  const salaryInfo = useMemo(() => {
+    const hourlyRate = 22000; // 22k VND per hour
+    const completedSchedules = monthSchedules.filter(
+      (s) => s.status === EmployeeScheduleStatus.Completed
+    );
+
+    // Calculate total hours for completed shifts
+    let totalHours = 0;
+    completedSchedules.forEach((schedule) => {
+      if (schedule.customStartTime && schedule.customEndTime) {
+        // Calculate hours from custom times
+        const [startHour, startMin] = schedule.customStartTime
+          .split(":")
+          .map(Number);
+        const [endHour, endMin] = schedule.customEndTime.split(":").map(Number);
+        const startTotal = startHour * 60 + startMin;
+        const endTotal = endHour * 60 + endMin;
+        const diffMinutes = endTotal - startTotal;
+        totalHours += diffMinutes / 60;
+      } else {
+        // Default shift hours (5 hours per shift)
+        const shift = schedule.shift || schedule.shiftType;
+        if (shift === "morning" || shift === "afternoon") {
+          totalHours += 5; // 5 hours per shift
+        } else {
+          // Default to 5 hours if unknown
+          totalHours += 5;
+        }
+      }
+    });
+
+    const totalSalary = totalHours * hourlyRate;
+    const totalRegistered = monthSchedules.length;
+    const totalCompleted = completedSchedules.length;
+    const completionRate =
+      totalRegistered > 0 ? (totalCompleted / totalRegistered) * 100 : 0;
+
+    return {
+      totalRegistered,
+      totalCompleted,
+      totalHours: Math.round(totalHours * 10) / 10, // Round to 1 decimal
+      totalSalary,
+      completionRate: Math.round(completionRate * 10) / 10,
+    };
+  }, [monthSchedules]);
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
@@ -243,65 +298,35 @@ const MySchedulePage = () => {
         <div>
           <h1 className="md:text-3xl text-xl font-bold flex items-center gap-2">
             <Briefcase className="h-8 w-8" />
-            Lịch Làm Việc Của Tôi
+            My Work Schedule
           </h1>
           <p className="text-muted-foreground mt-1">
-            Xem và quản lý lịch làm việc của bạn
+            View and manage your work schedule
           </p>
         </div>
       </div>
 
       {/* Summary Cards */}
       {summary && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Tổng Ca Làm</CardTitle>
+              <CardTitle className="text-sm font-medium">
+                Total Shifts
+              </CardTitle>
               <Clock className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold">{summary.totalShifts}</div>
               <p className="text-xs text-muted-foreground">
-                {summary.totalDays} ngày
+                {summary.totalDays} days
               </p>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                Đã Hoàn Thành
-              </CardTitle>
-              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-emerald-600">
-                {summary.completed}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {summary.byStatus.completed} ca hoàn thành
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Đang Làm</CardTitle>
-              <PlayCircle className="h-4 w-4 text-purple-600" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-purple-600">
-                {summary.inProgress}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {summary.byStatus["in-progress"]} ca đang làm
-              </p>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Sắp Tới</CardTitle>
+              <CardTitle className="text-sm font-medium">Upcoming</CardTitle>
               <TrendingUp className="h-4 w-4 text-blue-600" />
             </CardHeader>
             <CardContent>
@@ -309,8 +334,73 @@ const MySchedulePage = () => {
                 {summary.upcoming}
               </div>
               <p className="text-xs text-muted-foreground">
-                {summary.byStatus.approved} ca đã duyệt
+                {summary.byStatus.approved} approved shifts
               </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">In Progress</CardTitle>
+              <PlayCircle className="h-4 w-4 text-purple-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-purple-600">
+                {summary.inProgress}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {summary.byStatus["in-progress"]} active shifts
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Completed</CardTitle>
+              <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-emerald-600">
+                {summary.completed}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                {summary.byStatus.completed} completed shifts
+              </p>
+            </CardContent>
+          </Card>
+
+          {/* Salary Card */}
+          <Card className="border-green-200 bg-green-50/50">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <div>
+                <CardTitle className="text-sm font-medium">Earnings</CardTitle>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {currentDate.format("MM/YYYY")}
+                </p>
+              </div>
+              <DollarSign className="h-4 w-4 text-green-600" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-green-600">
+                {salaryInfo.totalSalary.toLocaleString("vi-VN")}₫
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                {salaryInfo.totalCompleted} completed shifts
+              </p>
+              <div className="mt-2">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-muted-foreground">Progress</span>
+                  <span className="font-medium">
+                    {salaryInfo.totalCompleted}/{salaryInfo.totalRegistered}
+                  </span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all"
+                    style={{ width: `${salaryInfo.completionRate}%` }}
+                  />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
@@ -319,9 +409,9 @@ const MySchedulePage = () => {
       {/* Controls */}
       <Card>
         <CardHeader>
-          <CardTitle>Bộ Lọc & Xem</CardTitle>
+          <CardTitle>Filters & View</CardTitle>
           <CardDescription>
-            Chọn khoảng thời gian và bộ lọc để xem lịch làm việc
+            Select time range and filters to view your work schedule
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -332,9 +422,9 @@ const MySchedulePage = () => {
                 onValueChange={(value) => setViewMode(value as ViewMode)}
               >
                 <TabsList>
-                  <TabsTrigger value="day">Ngày</TabsTrigger>
-                  <TabsTrigger value="week">Tuần</TabsTrigger>
-                  <TabsTrigger value="month">Tháng</TabsTrigger>
+                  <TabsTrigger value="day">Day</TabsTrigger>
+                  <TabsTrigger value="week">Week</TabsTrigger>
+                  <TabsTrigger value="month">Month</TabsTrigger>
                 </TabsList>
               </Tabs>
 
@@ -381,30 +471,30 @@ const MySchedulePage = () => {
                 }
               >
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Trạng thái" />
+                  <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tất cả trạng thái</SelectItem>
+                  <SelectItem value="all">All Status</SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Pending}>
-                    Chờ duyệt
+                    Pending
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Approved}>
-                    Đã duyệt
+                    Approved
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.InProgress}>
-                    Đang làm
+                    In Progress
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Completed}>
-                    Hoàn thành
+                    Completed
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Absent}>
-                    Vắng mặt
+                    Absent
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Rejected}>
-                    Từ chối
+                    Rejected
                   </SelectItem>
                   <SelectItem value={EmployeeScheduleStatus.Cancelled}>
-                    Hủy
+                    Cancelled
                   </SelectItem>
                 </SelectContent>
               </Select>
@@ -416,13 +506,13 @@ const MySchedulePage = () => {
                 }
               >
                 <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Loại ca" />
+                  <SelectValue placeholder="Shift Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tất cả ca</SelectItem>
-                  <SelectItem value="morning">Ca Sáng</SelectItem>
-                  <SelectItem value="afternoon">Ca Chiều</SelectItem>
-                  <SelectItem value="custom">Ca Tùy Chỉnh</SelectItem>
+                  <SelectItem value="all">All Shifts</SelectItem>
+                  <SelectItem value="morning">Morning Shift</SelectItem>
+                  <SelectItem value="afternoon">Afternoon Shift</SelectItem>
+                  <SelectItem value="custom">Custom Shift</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -433,15 +523,15 @@ const MySchedulePage = () => {
       {/* Calendar View */}
       <Card>
         <CardHeader>
-          <CardTitle>Lịch Làm Việc</CardTitle>
+          <CardTitle>Work Schedule</CardTitle>
           <CardDescription>
             {viewMode === "day"
-              ? `Lịch làm việc ngày ${currentDate.format("DD/MM/YYYY")}`
+              ? `Work schedule for ${currentDate.format("DD/MM/YYYY")}`
               : viewMode === "week"
-              ? `Lịch làm việc tuần từ ${startDate.format(
+              ? `Work schedule from ${startDate.format(
                   "DD/MM"
-                )} đến ${endDate.format("DD/MM/YYYY")}`
-              : `Lịch làm việc tháng ${currentDate.format("MM/YYYY")}`}
+                )} to ${endDate.format("DD/MM/YYYY")}`
+              : `Work schedule for ${currentDate.format("MM/YYYY")}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -453,10 +543,10 @@ const MySchedulePage = () => {
             <div className="flex flex-col items-center justify-center h-64 text-center">
               <CalendarIcon className="h-12 w-12 text-muted-foreground mb-4" />
               <p className="text-lg font-medium text-muted-foreground">
-                Không có ca làm việc nào
+                No work shifts found
               </p>
               <p className="text-sm text-muted-foreground mt-2">
-                Hãy thử chọn khoảng thời gian khác hoặc thay đổi bộ lọc
+                Try selecting a different time range or change the filters
               </p>
             </div>
           ) : (
@@ -497,18 +587,19 @@ const MySchedulePage = () => {
                             variant="default"
                             className="bg-blue-600 whitespace-nowrap"
                           >
-                            Hôm Nay
+                            Today
                           </Badge>
                         )}
                       </div>
                       <Badge variant="outline" className="whitespace-nowrap">
-                        {daySchedules.length} ca
+                        {daySchedules.length} shift
+                        {daySchedules.length !== 1 ? "s" : ""}
                       </Badge>
                     </div>
 
                     {daySchedules.length === 0 ? (
                       <p className="text-sm text-muted-foreground italic">
-                        Không có ca làm việc
+                        No work shifts
                       </p>
                     ) : (
                       <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
@@ -540,25 +631,25 @@ const MySchedulePage = () => {
                               >
                                 {schedule.status ===
                                 EmployeeScheduleStatus.Pending
-                                  ? "Chờ duyệt"
+                                  ? "Pending"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.Approved
-                                  ? "Đã duyệt"
+                                  ? "Approved"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.InProgress
-                                  ? "Đang làm"
+                                  ? "In Progress"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.Completed
-                                  ? "Hoàn thành"
+                                  ? "Completed"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.Absent
-                                  ? "Vắng mặt"
+                                  ? "Absent"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.Rejected
-                                  ? "Từ chối"
+                                  ? "Rejected"
                                   : schedule.status ===
                                     EmployeeScheduleStatus.Cancelled
-                                  ? "Hủy"
+                                  ? "Cancelled"
                                   : schedule.status}
                               </Badge>
                             </div>
