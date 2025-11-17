@@ -10,7 +10,7 @@ import {
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
-import dayjs, { Dayjs } from "dayjs";
+import { Dayjs } from "dayjs";
 import { CalendarIcon, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 

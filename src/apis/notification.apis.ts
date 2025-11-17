@@ -9,14 +9,14 @@ import http from "@/utils/http";
 const notificationApis = {
   // Lấy danh sách notifications
   getNotifications: (params?: INotificationQuery) => {
-    return http.get<INotificationListResponse>("/notifications", {
+    return http.get<HTTPResponse<INotificationListResponse>>("/notifications", {
       params,
     });
   },
 
   // Lấy số lượng notifications chưa đọc
   getUnreadCount: () => {
-    return http.get<IUnreadCountResponse>("/notifications/unread-count");
+    return http.get<HTTPResponse<IUnreadCountResponse>>("/notifications/unread-count");
   },
 
   // Đánh dấu một notification đã đọc
