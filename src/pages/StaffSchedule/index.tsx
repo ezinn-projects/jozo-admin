@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,8 @@ import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
+import { useSocket } from "@/hooks/useSocket";
+import { useToast } from "@/hooks/use-toast";
 
 const StaffSchedulePage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -46,6 +48,8 @@ const StaffSchedulePage = () => {
   );
 
   const { users, isLoadingUsers } = useUsers();
+  const { toast } = useToast();
+  const { onNewScheduleRegistration, offNewScheduleRegistration } = useSocket();
 
   // Calculate startDate and endDate based on viewMode and currentDate
   const { startDate, endDate, dates } = useMemo(() => {
@@ -90,6 +94,42 @@ const StaffSchedulePage = () => {
     isLoading: isLoadingSchedules,
     refetch,
   } = useStaffSchedules(startDate, endDate, viewMode);
+
+  // Socket listener for new schedule registration
+  useEffect(() => {
+    const handleNewScheduleRegistration = (data: {
+      userId: string;
+      userName?: string;
+      schedules: Array<{
+        date: string;
+        shiftType: string;
+        status: string;
+      }>;
+      message: string;
+    }) => {
+      console.log("Có nhân viên đăng ký ca mới:", data);
+
+      // Show toast notification
+      toast({
+        title: "Đăng ký ca mới",
+        description:
+          data.message ||
+          `${data.userName || "Nhân viên"} vừa đăng ký ${
+            data.schedules.length
+          } ca làm việc`,
+        duration: 5000,
+      });
+
+      // Refetch schedules to update the table
+      refetch();
+    };
+
+    onNewScheduleRegistration(handleNewScheduleRegistration);
+
+    return () => {
+      offNewScheduleRegistration(handleNewScheduleRegistration);
+    };
+  }, [onNewScheduleRegistration, offNewScheduleRegistration, refetch, toast]);
 
   // Filter only staff with role "staff"
   const staffList = users.filter((user: User) => user.role === Role.Staff);

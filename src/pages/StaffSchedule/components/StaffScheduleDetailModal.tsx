@@ -93,8 +93,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   }, [schedule]);
 
   const canEdit =
-    schedule?.status === EmployeeScheduleStatus.Pending ||
-    schedule?.status === EmployeeScheduleStatus.Rejected;
+    schedule?.status === EmployeeScheduleStatus.Pending && !isStaff;
 
   const { mutate: updateSchedule, isPending } = useMutation({
     mutationFn: (data: {
@@ -456,8 +455,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     !isStaff &&
     (schedule.status === EmployeeScheduleStatus.Pending ||
       schedule.status === EmployeeScheduleStatus.Approved);
-  const canApprove = schedule.status === EmployeeScheduleStatus.Pending;
-  const canReject = schedule.status === EmployeeScheduleStatus.Pending;
+  const canApprove =
+    schedule.status === EmployeeScheduleStatus.Pending && !isStaff;
+  const canReject =
+    schedule.status === EmployeeScheduleStatus.Pending && !isStaff;
   const canStart =
     !isStaff && schedule.status === EmployeeScheduleStatus.Approved;
   const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
@@ -816,14 +817,24 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               </div>
 
               {/* Note */}
-              {schedule.note && (
-                <div>
-                  <Label className="text-sm font-semibold text-gray-500">
-                    Note
-                  </Label>
-                  <p className="mt-1 text-sm">{schedule.note}</p>
-                </div>
-              )}
+              {schedule.status === EmployeeScheduleStatus.Rejected &&
+                schedule.rejectedReason && (
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-500">
+                      Lý do từ chối
+                    </Label>
+                    <p className="mt-1 text-sm">{schedule.rejectedReason}</p>
+                  </div>
+                )}
+              {schedule.status !== EmployeeScheduleStatus.Rejected &&
+                schedule.note && (
+                  <div>
+                    <Label className="text-sm font-semibold text-gray-500">
+                      Note
+                    </Label>
+                    <p className="mt-1 text-sm">{schedule.note}</p>
+                  </div>
+                )}
             </>
           )}
 

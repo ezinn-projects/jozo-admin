@@ -10,6 +10,14 @@ export interface IRegisterStaffScheduleRequest {
   customEndTime?: string; // Format: HH:mm
 }
 
+export interface IEmployeeSelfRegisterRequest {
+  date: string; // Format: YYYY-MM-DD
+  shifts: string[]; // ["morning", "afternoon"]
+  note?: string;
+  customStartTime?: string; // Format: HH:mm
+  customEndTime?: string; // Format: HH:mm
+}
+
 export interface IShiftInfo {
   name: string;
   startTime: string;
@@ -41,6 +49,10 @@ export interface IEmployeeSchedule {
   approvedBy?: string;
   approvedByName?: string;
   approvedAt?: string;
+  rejectedBy?: string;
+  rejectedByName?: string;
+  rejectedAt?: string;
+  rejectedReason?: string;
   startedAt?: string;
   completedAt?: string;
   markedAbsentBy?: string;
@@ -83,6 +95,8 @@ export interface IGetEmployeeSchedulesParams {
 const staffScheduleApis = {
   registerStaffSchedule: (data: IRegisterStaffScheduleRequest) =>
     http.post<HTTPResponse>("/employee-schedules/admin", data),
+  registerMySchedule: (data: IEmployeeSelfRegisterRequest) =>
+    http.post<HTTPResponse>("/employee-schedules", data),
   getEmployeeSchedules: (params?: IGetEmployeeSchedulesParams) =>
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules", {
       params,
