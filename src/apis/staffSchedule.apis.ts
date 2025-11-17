@@ -4,7 +4,15 @@ import { EmployeeScheduleStatus } from "@/constants/enum";
 export interface IRegisterStaffScheduleRequest {
   userId: string;
   date: string; // Format: YYYY-MM-DD
-  shifts: string[]; // ["morning", "evening"]
+  shifts: string[]; // ["morning", "afternoon", "all"]
+  note?: string;
+  customStartTime?: string; // Format: HH:mm
+  customEndTime?: string; // Format: HH:mm
+}
+
+export interface IEmployeeSelfRegisterRequest {
+  date: string; // Format: YYYY-MM-DD
+  shifts: string[]; // ["morning", "afternoon", "all"]
   note?: string;
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -29,8 +37,8 @@ export interface IEmployeeSchedule {
     phone_number?: string;
   };
   date: string; // Format: YYYY-MM-DD hoặc ISO string
-  shift?: "morning" | "afternoon" | "evening"; // Legacy field (supports afternoon for backward compatibility)
-  shiftType?: "morning" | "afternoon" | "evening"; // New field
+  shift?: "morning" | "afternoon" | "evening" | "all"; // Legacy field (supports afternoon for backward compatibility)
+  shiftType?: "morning" | "afternoon" | "evening" | "all"; // New field
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
   shiftInfo?: IShiftInfo;
@@ -41,6 +49,10 @@ export interface IEmployeeSchedule {
   approvedBy?: string;
   approvedByName?: string;
   approvedAt?: string;
+  rejectedBy?: string;
+  rejectedByName?: string;
+  rejectedAt?: string;
+  rejectedReason?: string;
   startedAt?: string;
   completedAt?: string;
   markedAbsentBy?: string;
@@ -83,6 +95,8 @@ export interface IGetEmployeeSchedulesParams {
 const staffScheduleApis = {
   registerStaffSchedule: (data: IRegisterStaffScheduleRequest) =>
     http.post<HTTPResponse>("/employee-schedules/admin", data),
+  registerMySchedule: (data: IEmployeeSelfRegisterRequest) =>
+    http.post<HTTPResponse>("/employee-schedules", data),
   getEmployeeSchedules: (params?: IGetEmployeeSchedulesParams) =>
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules", {
       params,
@@ -91,6 +105,8 @@ const staffScheduleApis = {
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules/me", {
       params,
     }),
+  getScheduleById: (id: string) =>
+    http.get<HTTPResponse<IEmployeeSchedule>>(`/employee-schedules/${id}`),
   updateSchedule: (
     id: string,
     data: {

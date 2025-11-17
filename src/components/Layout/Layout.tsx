@@ -3,6 +3,7 @@ import { Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "../ui/button";
 import { AppSidebar } from "./AppSideBar";
+import { NotificationBell } from "../shared/NotificationBell";
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -34,18 +35,21 @@ export default function Layout({ children }: { children: React.ReactNode }) {
             <SidebarTrigger />
           </div>
 
-          <Button
-            variant="ghost"
-            size="icon"
-            title="Toggle Theme"
-            onClick={toggleDarkMode}
-          >
-            {isDarkMode ? (
-              <Moon className="w-5 h-5" />
-            ) : (
-              <Sun className="w-5 h-5" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <NotificationBell />
+            <Button
+              variant="ghost"
+              size="icon"
+              title="Toggle Theme"
+              onClick={toggleDarkMode}
+            >
+              {isDarkMode ? (
+                <Moon className="w-5 h-5" />
+              ) : (
+                <Sun className="w-5 h-5" />
+              )}
+            </Button>
+          </div>
         </div>
         {children}
       </main>

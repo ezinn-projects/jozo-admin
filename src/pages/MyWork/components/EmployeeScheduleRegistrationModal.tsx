@@ -1,9 +1,8 @@
 import staffScheduleApis, {
-  IRegisterStaffScheduleRequest,
+  IEmployeeSelfRegisterRequest,
 } from "@/apis/staffSchedule.apis";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -24,6 +23,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
@@ -39,7 +39,7 @@ import { Portal } from "@radix-ui/react-portal";
 import { ShiftType } from "@/constants/enum";
 
 // Define schema using zod
-const staffScheduleSchema = z
+const employeeScheduleSchema = z
   .object({
     date: z.date({
       required_error: "Ngày là bắt buộc",
@@ -73,25 +73,21 @@ const staffScheduleSchema = z
     }
   );
 
-type FormValues = z.infer<typeof staffScheduleSchema>;
+type FormValues = z.infer<typeof employeeScheduleSchema>;
 
-interface StaffScheduleRegistrationModalProps {
+interface EmployeeScheduleRegistrationModalProps {
   isOpen: boolean;
   onClose: () => void;
-  userId: string;
-  staffName?: string;
   refetchSchedules?: () => void;
   initialDate?: Date;
   initialShift?: ShiftType;
 }
 
-const StaffScheduleRegistrationModal: React.FC<
-  StaffScheduleRegistrationModalProps
+const EmployeeScheduleRegistrationModal: React.FC<
+  EmployeeScheduleRegistrationModalProps
 > = ({
   isOpen,
   onClose,
-  userId,
-  staffName,
   refetchSchedules,
   initialDate,
   initialShift,
@@ -99,7 +95,7 @@ const StaffScheduleRegistrationModal: React.FC<
   const [timeError, setTimeError] = useState("");
 
   const form = useForm<FormValues>({
-    resolver: zodResolver(staffScheduleSchema),
+    resolver: zodResolver(employeeScheduleSchema),
     defaultValues: {
       date: initialDate || new Date(),
       shift: initialShift || undefined,
@@ -169,12 +165,12 @@ const StaffScheduleRegistrationModal: React.FC<
   }, [customStartTime, customEndTime]);
 
   const { mutate: registerSchedule, isPending: isSubmitting } = useMutation({
-    mutationFn: (data: IRegisterStaffScheduleRequest) =>
-      staffScheduleApis.registerStaffSchedule(data),
+    mutationFn: (data: IEmployeeSelfRegisterRequest) =>
+      staffScheduleApis.registerMySchedule(data),
     onSuccess: () => {
       toast({
         title: "Thành công",
-        description: "Đăng ký lịch làm thành công",
+        description: "Đăng ký lịch thành công, chờ admin phê duyệt",
       });
       reset();
       refetchSchedules?.();
@@ -282,8 +278,7 @@ const StaffScheduleRegistrationModal: React.FC<
     }
 
     const dateStr = format(values.date, "yyyy-MM-dd");
-    const payload: IRegisterStaffScheduleRequest = {
-      userId,
+    const payload: IEmployeeSelfRegisterRequest = {
       date: dateStr,
       shifts: [values.shift], // Send as array with single shift value
       note: values.note || undefined,
@@ -308,9 +303,7 @@ const StaffScheduleRegistrationModal: React.FC<
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>
-            Đăng ký lịch làm {staffName ? `cho ${staffName}` : ""}
-          </DialogTitle>
+          <DialogTitle>Đăng ký lịch làm</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -484,4 +477,5 @@ const StaffScheduleRegistrationModal: React.FC<
   );
 };
 
-export default StaffScheduleRegistrationModal;
+export default EmployeeScheduleRegistrationModal;
+
