@@ -3,7 +3,7 @@ import staffScheduleApis, {
 } from "@/apis/staffSchedule.apis";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import {
   Dialog,
   DialogContent,
@@ -44,7 +44,9 @@ const staffScheduleSchema = z
     date: z.date({
       required_error: "Ngày là bắt buộc",
     }),
-    shifts: z.array(z.string()).min(1, "Vui lòng chọn ít nhất một ca làm việc"),
+    shift: z.enum([ShiftType.Morning, ShiftType.Afternoon, ShiftType.All], {
+      required_error: "Vui lòng chọn ca làm việc",
+    }),
     note: z.string().max(500).optional(),
     customStartTime: z.string().optional(),
     customEndTime: z.string().optional(),
@@ -100,7 +102,7 @@ const StaffScheduleRegistrationModal: React.FC<
     resolver: zodResolver(staffScheduleSchema),
     defaultValues: {
       date: initialDate || new Date(),
-      shifts: initialShift ? [initialShift] : [],
+      shift: initialShift || undefined,
       note: "",
       customStartTime: "",
       customEndTime: "",
@@ -111,7 +113,7 @@ const StaffScheduleRegistrationModal: React.FC<
 
   const customStartTime = watch("customStartTime");
   const customEndTime = watch("customEndTime");
-  const shifts = watch("shifts");
+  const shift = watch("shift");
 
   // Update form when modal opens with initial values
   useEffect(() => {
@@ -120,31 +122,25 @@ const StaffScheduleRegistrationModal: React.FC<
         setValue("date", initialDate);
       }
       if (initialShift) {
-        setValue("shifts", [initialShift]);
-      } else if (!initialShift && initialDate) {
-        // Reset shifts if no initial shift provided
-        setValue("shifts", []);
+        setValue("shift", initialShift);
       }
     }
   }, [isOpen, initialDate, initialShift, setValue]);
 
-  // Auto-fill time based on selected shifts
+  // Auto-fill time based on selected shift
   useEffect(() => {
-    if (shifts && shifts.length > 0) {
-      const hasMorning = shifts.includes(ShiftType.Morning);
-      const hasAfternoon = shifts.includes(ShiftType.Afternoon);
-
-      // Nếu chọn cả 2 ca: start ca sáng (12:00) và end ca chiều (22:00)
-      if (hasMorning && hasAfternoon) {
-        setValue("customStartTime", "12:00");
-        setValue("customEndTime", "22:00");
-      } else if (hasMorning) {
-        // Chỉ chọn ca sáng
+    if (shift) {
+      if (shift === ShiftType.Morning) {
+        // Ca sáng: 12:00 - 17:00
         setValue("customStartTime", "12:00");
         setValue("customEndTime", "17:00");
-      } else if (hasAfternoon) {
-        // Chỉ chọn ca chiều
+      } else if (shift === ShiftType.Afternoon) {
+        // Ca chiều: 17:00 - 22:00
         setValue("customStartTime", "17:00");
+        setValue("customEndTime", "22:00");
+      } else if (shift === ShiftType.All) {
+        // Cả ngày: 12:00 - 22:00
+        setValue("customStartTime", "12:00");
         setValue("customEndTime", "22:00");
       }
     } else {
@@ -152,7 +148,7 @@ const StaffScheduleRegistrationModal: React.FC<
       setValue("customStartTime", "");
       setValue("customEndTime", "");
     }
-  }, [shifts, setValue]);
+  }, [shift, setValue]);
 
   // Validate time when values change
   useEffect(() => {
@@ -232,7 +228,7 @@ const StaffScheduleRegistrationModal: React.FC<
         // Set lỗi vào form fields tương ứng
         Object.entries(fieldErrors).forEach(([field, message]) => {
           if (
-            field === "shifts" ||
+            field === "shift" ||
             field === "date" ||
             field === "note" ||
             field === "customStartTime" ||
@@ -240,7 +236,7 @@ const StaffScheduleRegistrationModal: React.FC<
           ) {
             setError(
               field as
-                | "shifts"
+                | "shift"
                 | "date"
                 | "note"
                 | "customStartTime"
@@ -289,7 +285,7 @@ const StaffScheduleRegistrationModal: React.FC<
     const payload: IRegisterStaffScheduleRequest = {
       userId,
       date: dateStr,
-      shifts: values.shifts,
+      shifts: [values.shift], // Send as array with single shift value
       note: values.note || undefined,
       customStartTime: values.customStartTime || undefined,
       customEndTime: values.customEndTime || undefined,
@@ -300,7 +296,7 @@ const StaffScheduleRegistrationModal: React.FC<
   const handleClose = () => {
     reset({
       date: new Date(),
-      shifts: [],
+      shift: undefined,
       note: "",
       customStartTime: "",
       customEndTime: "",
@@ -376,79 +372,42 @@ const StaffScheduleRegistrationModal: React.FC<
 
             <FormField
               control={control}
-              name="shifts"
-              render={() => (
-                <FormItem>
-                  <div className="mb-4">
-                    <FormLabel className="text-base">Ca làm việc</FormLabel>
-                  </div>
-                  <div className="space-y-2">
-                    <FormField
-                      control={control}
-                      name="shifts"
-                      render={({ field }) => {
-                        return (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(
-                                  ShiftType.Morning
-                                )}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([
-                                        ...field.value,
-                                        ShiftType.Morning,
-                                      ])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) => value !== ShiftType.Morning
-                                        )
-                                      );
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal cursor-pointer">
-                              Ca Sáng: 12:00 - 17:00
-                            </FormLabel>
-                          </FormItem>
-                        );
-                      }}
-                    />
-                    <FormField
-                      control={control}
-                      name="shifts"
-                      render={({ field }) => {
-                        return (
-                          <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(
-                                  ShiftType.Afternoon
-                                )}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([
-                                        ...field.value,
-                                        ShiftType.Afternoon,
-                                      ])
-                                    : field.onChange(
-                                        field.value?.filter(
-                                          (value) =>
-                                            value !== ShiftType.Afternoon
-                                        )
-                                      );
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal cursor-pointer">
-                              Ca Chiều: 17:00 - 22:00
-                            </FormLabel>
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  </div>
+              name="shift"
+              render={({ field }) => (
+                <FormItem className="space-y-3">
+                  <FormLabel className="text-base">Ca làm việc</FormLabel>
+                  <FormControl>
+                    <RadioGroup
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      className="flex flex-col space-y-1"
+                    >
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value={ShiftType.Morning} />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          Ca Sáng: 12:00 - 17:00
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value={ShiftType.Afternoon} />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          Ca Chiều: 17:00 - 22:00
+                        </FormLabel>
+                      </FormItem>
+                      <FormItem className="flex items-center space-x-3 space-y-0">
+                        <FormControl>
+                          <RadioGroupItem value={ShiftType.All} />
+                        </FormControl>
+                        <FormLabel className="font-normal cursor-pointer">
+                          Cả ngày: 12:00 - 22:00
+                        </FormLabel>
+                      </FormItem>
+                    </RadioGroup>
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}

@@ -34,6 +34,8 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useDeleteNotification } from "@/hooks/use-notifications";
+import { useNavigate } from "react-router-dom";
+import PATHS from "@/constants/paths";
 
 dayjs.extend(relativeTime);
 dayjs.locale("vi");
@@ -42,6 +44,7 @@ export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   // Fetch notifications
   const { data: unreadCountData } = useUnreadCount();
@@ -49,6 +52,11 @@ export const NotificationBell = () => {
     page: 1,
     limit: 10,
   });
+
+  // Debug logs
+  console.log("🔔 Unread Count Data:", unreadCountData);
+  console.log("🔔 Notifications Data:", notificationsData);
+  console.log("🔔 Is Loading:", isLoading);
 
   // Mutations
   const { mutate: markAsRead } = useMarkAsRead();
@@ -91,10 +99,12 @@ export const NotificationBell = () => {
       markAsRead(notification._id);
     }
 
-    // Optional: Navigate to related page if needed
+    // Navigate to my-schedule page with scheduleId if available
     if (notification.data?.scheduleId) {
-      // You can add navigation logic here
-      console.log("Navigate to schedule:", notification.data.scheduleId);
+      setIsOpen(false); // Close dropdown
+      navigate(
+        `${PATHS.MY_SCHEDULE}?scheduleId=${notification.data.scheduleId}`
+      );
     }
   };
 
@@ -121,6 +131,7 @@ export const NotificationBell = () => {
         return <CalendarX className="h-4 w-4 text-red-600" />;
       case "schedule_assigned":
       case "schedule_registered":
+      case "schedule_created_by_employee":
       case "schedule_status_updated":
         return <CalendarClock className="h-4 w-4 text-blue-600" />;
       default:
@@ -174,7 +185,7 @@ export const NotificationBell = () => {
         ) : (
           <ScrollArea className="h-[400px]">
             <div className="space-y-1 p-2">
-              {notifications.map((notification) => (
+              {notifications.map((notification: INotification) => (
                 <div
                   key={notification._id}
                   onClick={() => handleNotificationClick(notification)}
@@ -245,4 +256,3 @@ export const NotificationBell = () => {
     </DropdownMenu>
   );
 };
-

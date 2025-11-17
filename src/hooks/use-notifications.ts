@@ -14,7 +14,8 @@ export const useNotifications = (params?: INotificationQuery) => {
     queryKey: NOTIFICATION_QUERY_KEYS.list(params),
     queryFn: async () => {
       const response = await notificationApis.getNotifications(params);
-      return response.data;
+      // API trả về { message, result: { notifications, total, page, limit, totalPages } }
+      return response.data.result || response.data;
     },
   });
 };
@@ -25,7 +26,8 @@ export const useUnreadCount = () => {
     queryKey: NOTIFICATION_QUERY_KEYS.unreadCount(),
     queryFn: async () => {
       const response = await notificationApis.getUnreadCount();
-      return response.data;
+      // API có thể trả về { message, result: { unreadCount } } hoặc { unreadCount }
+      return response.data.result || response.data;
     },
     refetchInterval: 30000, // Refetch mỗi 30 giây
   });

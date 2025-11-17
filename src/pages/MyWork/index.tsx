@@ -1,4 +1,5 @@
 import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
+import staffScheduleApis from "@/apis/staffSchedule.apis";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -55,6 +56,8 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
+import { useSearchParams } from "react-router-dom";
+import { useQuery } from "@tanstack/react-query";
 
 const MySchedulePage = () => {
   const [viewMode, setViewMode] = useState<ViewMode>("week");
@@ -85,6 +88,10 @@ const MySchedulePage = () => {
     onScheduleAssigned,
     offScheduleAssigned,
   } = useSocket();
+
+  // Deeplink support: read scheduleId from URL
+  const [searchParams, setSearchParams] = useSearchParams();
+  const scheduleIdFromUrl = searchParams.get("scheduleId");
 
   // Calculate date range based on view mode
   const { startDate, endDate, dates } = useMemo(() => {
@@ -184,6 +191,43 @@ const MySchedulePage = () => {
     filterType: "month",
     date: calendarDate,
   });
+
+  // Fetch schedule detail from URL (deeplink support)
+  const { data: scheduleDetailResponse, error: scheduleDetailError } = useQuery(
+    {
+      queryKey: ["schedule-detail", scheduleIdFromUrl],
+      queryFn: async () => {
+        if (!scheduleIdFromUrl) return null;
+        const response = await staffScheduleApis.getScheduleById(
+          scheduleIdFromUrl
+        );
+        return response.data.result;
+      },
+      enabled: !!scheduleIdFromUrl,
+      retry: false,
+    }
+  );
+
+  // Handle schedule detail loaded from URL
+  useEffect(() => {
+    if (scheduleDetailResponse && scheduleIdFromUrl) {
+      setSelectedSchedule(scheduleDetailResponse);
+      setIsDetailModalOpen(true);
+    }
+  }, [scheduleDetailResponse, scheduleIdFromUrl]);
+
+  // Handle schedule detail error
+  useEffect(() => {
+    if (scheduleDetailError && scheduleIdFromUrl) {
+      toast({
+        title: "Lỗi",
+        description: "Không tìm thấy thông tin ca làm việc",
+        variant: "destructive",
+      });
+      // Clear invalid scheduleId from URL
+      setSearchParams({});
+    }
+  }, [scheduleDetailError, scheduleIdFromUrl, toast, setSearchParams]);
 
   // Socket listener for schedule status updates
   useEffect(() => {
@@ -323,11 +367,15 @@ const MySchedulePage = () => {
   const handleScheduleClick = (schedule: IEmployeeSchedule) => {
     setSelectedSchedule(schedule);
     setIsDetailModalOpen(true);
+    // Update URL with scheduleId for deeplink support
+    setSearchParams({ scheduleId: schedule._id });
   };
 
   const handleCloseDetailModal = () => {
     setIsDetailModalOpen(false);
     setSelectedSchedule(null);
+    // Clear scheduleId from URL
+    setSearchParams({});
     refetch();
     refetchMonthSchedules();
     refetchCalendarSchedules();
@@ -370,6 +418,8 @@ const MySchedulePage = () => {
     setIsDateSchedulesModalOpen(false);
     setSelectedSchedule(schedule);
     setIsDetailModalOpen(true);
+    // Update URL with scheduleId for deeplink support
+    setSearchParams({ scheduleId: schedule._id });
   };
 
   const handleRegisterNewFromDateModal = () => {
@@ -424,6 +474,7 @@ const MySchedulePage = () => {
     }
     if (shift === "morning") return "Morning (12:00 - 17:00)";
     if (shift === "afternoon") return "Afternoon (17:00 - 22:00)";
+    if (shift === "all") return "All Day (12:00 - 22:00)";
     return shift || "Custom";
   };
 
@@ -431,6 +482,7 @@ const MySchedulePage = () => {
     const shift = schedule.shift || schedule.shiftType;
     if (shift === "morning") return "bg-orange-100 text-orange-800";
     if (shift === "afternoon") return "bg-indigo-100 text-indigo-800";
+    if (shift === "all") return "bg-green-100 text-green-800";
     return "bg-gray-100 text-gray-800";
   };
 

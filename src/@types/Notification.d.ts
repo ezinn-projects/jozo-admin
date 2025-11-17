@@ -1,5 +1,6 @@
 export enum NotificationType {
   ScheduleRegistered = "schedule_registered",
+  ScheduleCreatedByEmployee = "schedule_created_by_employee",
   ScheduleApproved = "schedule_approved",
   ScheduleRejected = "schedule_rejected",
   ScheduleAssigned = "schedule_assigned",
@@ -31,7 +32,6 @@ export interface INotificationListResponse {
   page: number;
   limit: number;
   totalPages: number;
-  unreadCount: number;
 }
 
 export interface INotificationQuery {

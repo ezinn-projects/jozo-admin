@@ -104,6 +104,8 @@ export function ShiftRegistrationCalendar({
         shiftTypes.add("Ca Sáng");
       } else if (shift === "afternoon" || shift === "evening") {
         shiftTypes.add("Ca Chiều");
+      } else if (shift === "all") {
+        shiftTypes.add("Cả ngày");
       } else if (schedule.customStartTime && schedule.customEndTime) {
         shiftTypes.add("Ca Tùy chỉnh");
       }
@@ -205,6 +207,7 @@ export function ShiftRegistrationCalendar({
                             "h-1.5 w-1.5 rounded-full",
                             shiftType === "Ca Sáng" && "bg-orange-500",
                             shiftType === "Ca Chiều" && "bg-indigo-500",
+                            shiftType === "Cả ngày" && "bg-green-500",
                             shiftType === "Ca Tùy chỉnh" && "bg-gray-400"
                           )}
                         />
@@ -223,6 +226,8 @@ export function ShiftRegistrationCalendar({
                               "bg-orange-100 text-orange-800 border-orange-200",
                             shiftType === "Ca Chiều" &&
                               "bg-indigo-100 text-indigo-800 border-indigo-200",
+                            shiftType === "Cả ngày" &&
+                              "bg-green-100 text-green-800 border-green-200",
                             shiftType === "Ca Tùy chỉnh" &&
                               "bg-gray-100 text-gray-800 border-gray-200"
                           )}

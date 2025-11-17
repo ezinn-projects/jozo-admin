@@ -117,17 +117,19 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
             // Normalize shift - convert to ShiftType enum
             let normalizedShiftType: ShiftType | undefined = undefined;
 
-            // First, try to get from shift field (legacy: "morning" | "evening")
+            // First, try to get from shift field (legacy: "morning" | "evening" | "all")
             const shiftValue = schedule.shift;
             if (shiftValue) {
               if (shiftValue === "evening") {
                 normalizedShiftType = ShiftType.Afternoon;
               } else if (shiftValue === "morning") {
                 normalizedShiftType = ShiftType.Morning;
+              } else if (shiftValue === "all") {
+                normalizedShiftType = ShiftType.All;
               }
             }
 
-            // If no shift, try to get from shiftType field (new: "morning" | "afternoon" | "evening")
+            // If no shift, try to get from shiftType field (new: "morning" | "afternoon" | "evening" | "all")
             if (!normalizedShiftType && schedule.shiftType) {
               const shiftTypeValue = schedule.shiftType;
               if (
@@ -137,16 +139,20 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
                 normalizedShiftType = ShiftType.Afternoon;
               } else if (shiftTypeValue === "morning") {
                 normalizedShiftType = ShiftType.Morning;
+              } else if (shiftTypeValue === "all") {
+                normalizedShiftType = ShiftType.All;
               }
             }
 
             // Convert ShiftType back to legacy shift format for backward compatibility
-            // shift field expects "morning" | "evening" (legacy)
-            let normalizedShift: "morning" | "evening" | undefined = undefined;
+            // shift field expects "morning" | "evening" | "all" (legacy)
+            let normalizedShift: "morning" | "evening" | "all" | undefined = undefined;
             if (normalizedShiftType === ShiftType.Morning) {
               normalizedShift = "morning";
             } else if (normalizedShiftType === ShiftType.Afternoon) {
               normalizedShift = "evening"; // Legacy format uses "evening" instead of "afternoon"
+            } else if (normalizedShiftType === ShiftType.All) {
+              normalizedShift = "all";
             }
 
             const normalizedSchedule: IEmployeeSchedule = {
@@ -158,6 +164,8 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
                   ? "morning"
                   : normalizedShiftType === ShiftType.Afternoon
                   ? "afternoon"
+                  : normalizedShiftType === ShiftType.All
+                  ? "all"
                   : schedule.shiftType,
             };
             schedules.push(normalizedSchedule);

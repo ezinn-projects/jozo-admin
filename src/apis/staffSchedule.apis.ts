@@ -4,7 +4,7 @@ import { EmployeeScheduleStatus } from "@/constants/enum";
 export interface IRegisterStaffScheduleRequest {
   userId: string;
   date: string; // Format: YYYY-MM-DD
-  shifts: string[]; // ["morning", "evening"]
+  shifts: string[]; // ["morning", "afternoon", "all"]
   note?: string;
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -12,7 +12,7 @@ export interface IRegisterStaffScheduleRequest {
 
 export interface IEmployeeSelfRegisterRequest {
   date: string; // Format: YYYY-MM-DD
-  shifts: string[]; // ["morning", "afternoon"]
+  shifts: string[]; // ["morning", "afternoon", "all"]
   note?: string;
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -37,8 +37,8 @@ export interface IEmployeeSchedule {
     phone_number?: string;
   };
   date: string; // Format: YYYY-MM-DD hoặc ISO string
-  shift?: "morning" | "afternoon" | "evening"; // Legacy field (supports afternoon for backward compatibility)
-  shiftType?: "morning" | "afternoon" | "evening"; // New field
+  shift?: "morning" | "afternoon" | "evening" | "all"; // Legacy field (supports afternoon for backward compatibility)
+  shiftType?: "morning" | "afternoon" | "evening" | "all"; // New field
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
   shiftInfo?: IShiftInfo;
@@ -105,6 +105,8 @@ const staffScheduleApis = {
     http.get<HTTPResponse<IEmployeeSchedulesResponse>>("/employee-schedules/me", {
       params,
     }),
+  getScheduleById: (id: string) =>
+    http.get<HTTPResponse<IEmployeeSchedule>>(`/employee-schedules/${id}`),
   updateSchedule: (
     id: string,
     data: {

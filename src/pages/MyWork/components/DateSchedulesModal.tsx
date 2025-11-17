@@ -80,6 +80,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
     if (shift === "morning") return "Ca Sáng (12:00 - 17:00)";
     if (shift === "afternoon" || shift === "evening")
       return "Ca Chiều (17:00 - 22:00)";
+    if (shift === "all") return "Cả ngày (12:00 - 22:00)";
     return shift || "Custom";
   };
 
@@ -88,6 +89,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
     if (shift === "morning") return "bg-orange-100 text-orange-800";
     if (shift === "afternoon" || shift === "evening")
       return "bg-indigo-100 text-indigo-800";
+    if (shift === "all") return "bg-green-100 text-green-800";
     return "bg-gray-100 text-gray-800";
   };
 
