@@ -4,10 +4,6 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ['Cascadia Code', 'monospace'],
-        mono: ['Cascadia Code', 'monospace'],
-      },
       borderRadius: {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
@@ -83,18 +79,18 @@ export default {
           },
         },
         blink: {
-          '0%, 100%': {
-            opacity: '1',
+          "0%, 100%": {
+            opacity: "1",
           },
-          '50%': {
-            opacity: '0.3',
+          "50%": {
+            opacity: "0.3",
           },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "blink": "blink 1s ease-in-out infinite",
+        blink: "blink 1s ease-in-out infinite",
       },
     },
   },
