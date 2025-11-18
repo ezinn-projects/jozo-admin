@@ -50,7 +50,13 @@ const EditUserPage = lazy(
 );
 const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
 const StaffSchedulePage = lazy(() => import("@/pages/StaffSchedule"));
+const StaffEarningsDetailPage = lazy(
+  () => import("@/pages/StaffSchedule/StaffEarningsDetailPage")
+);
 const MySchedulePage = lazy(() => import("@/pages/MyWork"));
+const MyEarningsDetailPage = lazy(
+  () => import("@/pages/MyWork/MyEarningsDetailPage")
+);
 
 function useRoute() {
   return (
@@ -84,6 +90,10 @@ function useRoute() {
                 />
                 <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
                 <Route path={PATHS.MY_SCHEDULE} element={<MySchedulePage />} />
+                <Route
+                  path={PATHS.MY_EARNINGS_DETAIL}
+                  element={<MyEarningsDetailPage />}
+                />
               </Route>
 
               {/* Routes chỉ cho Admin */}
@@ -106,6 +116,10 @@ function useRoute() {
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
                 <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
+                <Route
+                  path={PATHS.STAFF_EARNINGS_DETAIL}
+                  element={<StaffEarningsDetailPage />}
+                />
 
                 {/* Users Management Routes */}
                 <Route path={PATHS.USERS_MANAGEMENT}>

@@ -31,8 +31,11 @@ import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
+import { useNavigate } from "react-router-dom";
+import PATHS from "@/constants/paths";
 
 const StaffSchedulePage = () => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
@@ -238,12 +241,9 @@ const StaffSchedulePage = () => {
     }
   };
 
-  const handleStaffClick = (userId: string, staffName: string) => {
-    setSelectedUserId(userId);
-    setSelectedStaffName(staffName);
-    setInitialDate(undefined);
-    setInitialShift(undefined);
-    setIsModalOpen(true);
+  const handleStaffClick = (userId: string) => {
+    // Navigate to staff earnings detail page
+    navigate(PATHS.STAFF_EARNINGS_DETAIL.replace(":userId", userId));
   };
 
   const handleCloseModal = () => {
@@ -315,8 +315,8 @@ const StaffSchedulePage = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Staff Schedule Management</h1>
         <p className="text-gray-600">
-          Click on staff name to register schedule, or click on a scheduled cell
-          to view details
+          Click on staff name to view earnings details, or click on a cell to
+          view/register schedule
         </p>
       </div>
 
@@ -442,7 +442,7 @@ const StaffSchedulePage = () => {
                         "min-w-[250px] sticky left-0 bg-white z-10 font-medium",
                         "cursor-pointer hover:text-blue-600 hover:underline py-6"
                       )}
-                      onClick={() => handleStaffClick(user._id, userName)}
+                      onClick={() => handleStaffClick(user._id)}
                     >
                       {userName}
                     </TableCell>
