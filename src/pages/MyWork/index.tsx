@@ -56,10 +56,12 @@ import {
 import { useMemo, useState, useEffect } from "react";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
+import PATHS from "@/constants/paths";
 
 const MySchedulePage = () => {
+  const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
   const [selectedStatus, setSelectedStatus] = useState<
@@ -612,7 +614,10 @@ const MySchedulePage = () => {
           </Card>
 
           {/* Salary Card */}
-          <Card className="border-green-200 bg-green-50/50">
+          <Card
+            className="border-green-200 bg-green-50/50 cursor-pointer transition-all hover:shadow-lg hover:border-green-300"
+            onClick={() => navigate(PATHS.MY_EARNINGS_DETAIL)}
+          >
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <div>
                 <CardTitle className="text-sm font-medium">Earnings</CardTitle>
@@ -643,6 +648,9 @@ const MySchedulePage = () => {
                   />
                 </div>
               </div>
+              <p className="text-xs text-green-600 mt-2 font-medium">
+                Click để xem chi tiết →
+              </p>
             </CardContent>
           </Card>
         </div>
@@ -833,10 +841,14 @@ const MySchedulePage = () => {
                   <div
                     key={dateKey}
                     className={cn(
-                      "border rounded-lg p-4 transition-colors",
+                      "border rounded-lg p-4 transition-colors cursor-pointer hover:shadow-lg",
                       isToday && "border-blue-500 bg-blue-50/50",
                       isPast && !isToday && "opacity-60"
                     )}
+                    onClick={() => {
+                      setSelectedDateForRegistration(date.toDate());
+                      setIsRegistrationModalOpen(true);
+                    }}
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div className="flex items-center gap-2">
@@ -872,7 +884,10 @@ const MySchedulePage = () => {
                         {sortedSchedules.map((schedule) => (
                           <div
                             key={schedule._id}
-                            onClick={() => handleScheduleClick(schedule)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleScheduleClick(schedule);
+                            }}
                             className={cn(
                               "border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-primary",
                               getStatusColor(schedule.status)
