@@ -11,6 +11,7 @@ const PATHS = {
   REGISTER: "/register",
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
+  CHANGE_PASSWORD: "/change-password",
   STAFF: "/staff",
   ADMIN: "/admin",
   UNAUTHORIZED: "/unauthorized",

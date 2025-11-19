@@ -4,6 +4,8 @@ import {
   UpdateUserRequest,
   UsersResponse,
   UserResponse,
+  ChangePasswordRequestBody,
+  ChangePasswordResponse,
 } from "@/@types/user";
 
 export const userApis = {
@@ -30,5 +32,10 @@ export const userApis = {
   // Xóa user
   deleteUser: (id: string) => {
     return http.delete(`/users/${id}`);
+  },
+
+  // Đổi mật khẩu
+  changePassword: (data: ChangePasswordRequestBody) => {
+    return http.post<ChangePasswordResponse>("/users/change-password", data);
   },
 };

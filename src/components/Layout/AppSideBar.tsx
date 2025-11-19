@@ -10,6 +10,7 @@ import {
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import useAuth from "@/hooks/useAuth";
 import { useMenuItems } from "@/hooks/useMenuItems";
@@ -22,6 +23,7 @@ import { LogoutButton } from "../shared/LogoutButton";
 
 export function AppSidebar() {
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+  const { setOpenMobile } = useSidebar();
 
   const { user } = useAuth();
   const menuItems = useMenuItems();
@@ -29,6 +31,11 @@ export function AppSidebar() {
   // Toggle function to expand or collapse a menu item
   const toggleExpand = (title: string) => {
     setExpanded((prev) => ({ ...prev, [title]: !prev[title] }));
+  };
+
+  // Function to close sidebar on menu item click (for mobile)
+  const handleMenuItemClick = () => {
+    setOpenMobile(false);
   };
 
   return (
@@ -51,7 +58,11 @@ export function AppSidebar() {
                       className="flex items-center justify-between cursor-pointer"
                       onClick={() => toggleExpand(item.title)}
                     >
-                      <Link to={item.url || "#"} className="flex items-center">
+                      <Link 
+                        to={item.url || "#"} 
+                        className="flex items-center"
+                        onClick={handleMenuItemClick}
+                      >
                         <item.icon className="w-5 h-5" />
                         <span className="ml-2">{item.title}</span>
                       </Link>
@@ -73,7 +84,10 @@ export function AppSidebar() {
                         {item.subItems.map((subItem: MenuItem) => (
                           <SidebarMenuItem key={subItem.title}>
                             <SidebarMenuButton asChild>
-                              <Link to={subItem.url || "#"}>
+                              <Link 
+                                to={subItem.url || "#"}
+                                onClick={handleMenuItemClick}
+                              >
                                 <span>{subItem.title}</span>
                               </Link>
                             </SidebarMenuButton>

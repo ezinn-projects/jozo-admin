@@ -10,6 +10,7 @@ import {
   Users,
   UserPlus,
   Briefcase,
+  KeyRound,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -125,6 +126,14 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.TOTAL_REVENUE,
     icon: PercentIcon,
     subItems: [], // No sub-items for Total Revenue
+    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+  },
+  // change password
+  {
+    title: "Change Password",
+    url: PATHS.CHANGE_PASSWORD,
+    icon: KeyRound,
+    subItems: [], // No sub-items for Change Password
     roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
 ];

@@ -310,7 +310,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
   const canMarkAbsent = schedule.status === EmployeeScheduleStatus.InProgress;
   const isReadOnly =
-    schedule.status === EmployeeScheduleStatus.Completed ||
     schedule.status === EmployeeScheduleStatus.Cancelled ||
     schedule.status === EmployeeScheduleStatus.Absent ||
     schedule.status === EmployeeScheduleStatus.Rejected;
