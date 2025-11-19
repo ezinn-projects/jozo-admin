@@ -20,9 +20,7 @@ import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import relativeTime from "dayjs/plugin/relativeTime";
-import "dayjs/locale/vi";
+import { timeAgo } from "@/lib/dayjs";
 import {
   Bell,
   CalendarCheck,
@@ -37,9 +35,6 @@ import { useDeleteNotification } from "@/hooks/use-notifications";
 import { useNavigate } from "react-router-dom";
 import PATHS from "@/constants/paths";
 
-dayjs.extend(relativeTime);
-dayjs.locale("vi");
-
 export const NotificationBell = () => {
   const [isOpen, setIsOpen] = useState(false);
   const { toast } = useToast();
@@ -48,15 +43,11 @@ export const NotificationBell = () => {
 
   // Fetch notifications
   const { data: unreadCountData } = useUnreadCount();
+  const unreadCount = unreadCountData?.count || 0;
   const { data: notificationsData, isLoading } = useNotifications({
     page: 1,
     limit: 10,
   });
-
-  // Debug logs
-  console.log("🔔 Unread Count Data:", unreadCountData);
-  console.log("🔔 Notifications Data:", notificationsData);
-  console.log("🔔 Is Loading:", isLoading);
 
   // Mutations
   const { mutate: markAsRead } = useMarkAsRead();
@@ -91,7 +82,6 @@ export const NotificationBell = () => {
     };
   }, [onNewNotification, offNewNotification, toast, queryClient]);
 
-  const unreadCount = unreadCountData?.unreadCount || 0;
   const notifications = notificationsData?.notifications || [];
 
   const handleNotificationClick = (notification: INotification) => {
@@ -217,7 +207,7 @@ export const NotificationBell = () => {
                       </p>
                       <div className="flex items-center justify-between mt-2">
                         <p className="text-xs text-muted-foreground">
-                          {dayjs(notification.createdAt).fromNow()}
+                          {timeAgo(notification.createdAt)}
                         </p>
                         <Button
                           variant="ghost"
@@ -245,7 +235,7 @@ export const NotificationBell = () => {
               className="justify-center cursor-pointer"
               onClick={() => {
                 setIsOpen(false);
-                // Optional: Navigate to full notifications page
+                navigate(PATHS.NOTIFICATIONS);
               }}
             >
               <span className="text-sm text-primary">Xem tất cả</span>

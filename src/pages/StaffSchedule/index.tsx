@@ -26,8 +26,6 @@ import { Calendar } from "@/components/ui/calendar";
 import dayjs, { Dayjs } from "dayjs";
 import { useStaffSchedules, ViewMode } from "@/hooks/use-staff-schedules";
 import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
-import { format } from "date-fns";
-import { vi } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { useSocket } from "@/hooks/useSocket";
 import { useToast } from "@/hooks/use-toast";
@@ -51,6 +49,9 @@ const StaffSchedulePage = () => {
   );
 
   const { users, isLoadingUsers } = useUsers();
+  
+  // Array mapping for day names in Vietnamese
+  const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const { toast } = useToast();
   const { onNewScheduleRegistration, offNewScheduleRegistration } = useSocket();
 
@@ -400,7 +401,7 @@ const StaffSchedulePage = () => {
                 >
                   <div className="flex flex-col">
                     <span className="font-semibold">
-                      {format(date.toDate(), "EEE", { locale: vi })}
+                      {dayNames[date.day()]}
                     </span>
                     <span className="text-xs text-muted-foreground">
                       {date.format("DD/MM")}

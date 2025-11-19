@@ -58,6 +58,9 @@ const PATHS = {
   MY_SCHEDULE: "/my-schedule",
   MY_EARNINGS_DETAIL: "/my-schedule/earnings",
 
+  // notifications
+  NOTIFICATIONS: "/notifications",
+
   // total revenue
   TOTAL_REVENUE: "/total-revenue",
 } as const;

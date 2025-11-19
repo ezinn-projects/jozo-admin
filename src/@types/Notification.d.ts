@@ -42,6 +42,5 @@ export interface INotificationQuery {
 }
 
 export interface IUnreadCountResponse {
-  unreadCount: number;
+  count: number;
 }
-

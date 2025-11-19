@@ -1,5 +1,6 @@
 import Typography from "../ui/typography";
 import { LogoutButton } from "../shared/LogoutButton";
+import { NotificationBell } from "../shared/NotificationBell";
 
 type Props = {
   title: string;
@@ -24,11 +25,14 @@ function Header(props: Props) {
           )}
         </div>
 
-        {showLogout && (
-          <LogoutButton variant="outline" size="sm" showIcon={false}>
-            Đăng xuất
-          </LogoutButton>
-        )}
+        <div className="flex items-center gap-2">
+          <NotificationBell />
+          {showLogout && (
+            <LogoutButton variant="outline" size="sm" showIcon={false}>
+              Đăng xuất
+            </LogoutButton>
+          )}
+        </div>
       </div>
 
       <div className="w-full h-[1px] bg-gray-200 mt-4" />
