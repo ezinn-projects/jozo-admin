@@ -47,6 +47,17 @@ const StaffEarningsDetailPage = () => {
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
   const hourlyRate = 22000; // 22k VND per hour
 
+  // Array mapping for day names in Vietnamese (0 = Sunday, 1 = Monday, ...)
+  const dayNames = [
+    "Chủ Nhật",
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
+  ];
+
   // Calculate startDate and endDate from selected month
   const startDate = useMemo(
     () => selectedMonth.startOf("month"),
@@ -544,21 +555,7 @@ const StaffEarningsDetailPage = () => {
                           {index + 1}
                         </TableCell>
                         <TableCell>{item.date.format("DD/MM/YYYY")}</TableCell>
-                        <TableCell>
-                          {item.date.format("dddd") === "Monday"
-                            ? "Thứ 2"
-                            : item.date.format("dddd") === "Tuesday"
-                            ? "Thứ 3"
-                            : item.date.format("dddd") === "Wednesday"
-                            ? "Thứ 4"
-                            : item.date.format("dddd") === "Thursday"
-                            ? "Thứ 5"
-                            : item.date.format("dddd") === "Friday"
-                            ? "Thứ 6"
-                            : item.date.format("dddd") === "Saturday"
-                            ? "Thứ 7"
-                            : "Chủ Nhật"}
-                        </TableCell>
+                        <TableCell>{dayNames[item.date.day()]}</TableCell>
                         <TableCell
                           className={`font-medium ${
                             isNotRegistered ? "text-gray-400" : ""

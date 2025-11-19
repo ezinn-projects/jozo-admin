@@ -57,6 +57,8 @@ const MySchedulePage = lazy(() => import("@/pages/MyWork"));
 const MyEarningsDetailPage = lazy(
   () => import("@/pages/MyWork/MyEarningsDetailPage")
 );
+const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
+const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 
 function useRoute() {
   return (
@@ -93,6 +95,14 @@ function useRoute() {
                 <Route
                   path={PATHS.MY_EARNINGS_DETAIL}
                   element={<MyEarningsDetailPage />}
+                />
+                <Route
+                  path={PATHS.NOTIFICATIONS}
+                  element={<NotificationsPage />}
+                />
+                <Route
+                  path={PATHS.CHANGE_PASSWORD}
+                  element={<ChangePasswordPage />}
                 />
               </Route>
 

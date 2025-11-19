@@ -11,6 +11,7 @@ const PATHS = {
   REGISTER: "/register",
   FORGOT_PASSWORD: "/forgot-password",
   RESET_PASSWORD: "/reset-password",
+  CHANGE_PASSWORD: "/change-password",
   STAFF: "/staff",
   ADMIN: "/admin",
   UNAUTHORIZED: "/unauthorized",
@@ -56,6 +57,9 @@ const PATHS = {
   // my schedule - employee view their own schedules
   MY_SCHEDULE: "/my-schedule",
   MY_EARNINGS_DETAIL: "/my-schedule/earnings",
+
+  // notifications
+  NOTIFICATIONS: "/notifications",
 
   // total revenue
   TOTAL_REVENUE: "/total-revenue",

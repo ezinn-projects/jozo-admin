@@ -56,3 +56,13 @@ export type UserResponse = {
   message: string;
   result: User;
 };
+
+export type ChangePasswordRequestBody = {
+  old_password: string;
+  password: string;
+  confirm_password: string;
+};
+
+export type ChangePasswordResponse = {
+  message: string;
+};

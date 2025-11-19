@@ -297,6 +297,11 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
   if (!schedule) return null;
 
+  // Check if schedule date is in the past
+  const isPastSchedule = schedule.date
+    ? dayjs(schedule.date).isBefore(dayjs(), "day")
+    : false;
+
   const canCancel =
     !isStaff &&
     (schedule.status === EmployeeScheduleStatus.Pending ||
@@ -309,8 +314,8 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     !isStaff && schedule.status === EmployeeScheduleStatus.Approved;
   const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
   const canMarkAbsent = schedule.status === EmployeeScheduleStatus.InProgress;
+  const canDelete = !isStaff && !isPastSchedule; // Admin can delete if schedule is not in the past
   const isReadOnly =
-    schedule.status === EmployeeScheduleStatus.Completed ||
     schedule.status === EmployeeScheduleStatus.Cancelled ||
     schedule.status === EmployeeScheduleStatus.Absent ||
     schedule.status === EmployeeScheduleStatus.Rejected;
@@ -737,6 +742,15 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
               disabled={isPending || isDeleting || isUpdatingStatus}
             >
               Cancel Schedule
+            </Button>
+          )}
+          {canDelete && (
+            <Button
+              variant="destructive"
+              onClick={handleCancel}
+              disabled={isPending || isDeleting || isUpdatingStatus}
+            >
+              Xóa
             </Button>
           )}
         </DialogFooter>
