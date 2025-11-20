@@ -58,6 +58,7 @@ const MyEarningsDetailPage = lazy(
   () => import("@/pages/MyWork/MyEarningsDetailPage")
 );
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
+const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 
 function useRoute() {
@@ -104,6 +105,7 @@ function useRoute() {
                   path={PATHS.CHANGE_PASSWORD}
                   element={<ChangePasswordPage />}
                 />
+                <Route path={PATHS.PROFILE} element={<ProfilePage />} />
               </Route>
 
               {/* Routes chỉ cho Admin */}

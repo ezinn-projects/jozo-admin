@@ -1,5 +1,7 @@
 import React, { useState } from "react";
 import { useRecruitments, useRecruitmentStats } from "@/hooks/use-recruitment";
+import { PageHeader } from "@/components/shared";
+import { Users } from "lucide-react";
 import StatsCards from "./components/StatsCards";
 import FiltersContainer from "./components/FiltersContainer";
 import DataTableContainer from "./components/DataTableContainer";
@@ -71,14 +73,12 @@ const RecruitmentPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Quản lý tuyển dụng</h1>
-          <p className="text-gray-600">Quản lý danh sách ứng viên tuyển dụng</p>
-        </div>
-        <RefreshButton onRefresh={handleRefresh} isLoading={isLoading} />
-      </div>
+      <PageHeader
+        title="Quản lý tuyển dụng"
+        description="Quản lý danh sách ứng viên tuyển dụng"
+        icon={Users}
+        actions={<RefreshButton onRefresh={handleRefresh} isLoading={isLoading} />}
+      />
 
       {/* Stats Cards */}
       <StatsCards stats={stats} />

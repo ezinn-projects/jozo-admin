@@ -38,4 +38,10 @@ export const userApis = {
   changePassword: (data: ChangePasswordRequestBody) => {
     return http.post<ChangePasswordResponse>("/users/change-password", data);
   },
+
+  // Cập nhật profile với avatar (FormData)
+  updateUserProfile: (id: string, data: FormData) => {
+    // Không cần set Content-Type, axios sẽ tự động set với boundary khi data là FormData
+    return http.put<UserResponse>(`/users/${id}`, data);
+  },
 };

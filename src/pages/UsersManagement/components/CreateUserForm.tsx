@@ -1,9 +1,11 @@
+import { PageHeader } from "@/components/shared";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
+import { UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
@@ -76,12 +78,16 @@ const CreateUserForm = () => {
   };
 
   return (
-    <div className="container mx-auto p-6">
+    <div className="space-y-6">
+      <PageHeader
+        title="Thêm User mới"
+        description="Tạo tài khoản người dùng mới"
+        icon={UserPlus}
+        showBackButton
+        backUrl={PATHS.USERS_MANAGEMENT}
+      />
       <Card className="max-w-2xl mx-auto">
-        <CardHeader>
-          <CardTitle>Thêm User mới</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="pt-6">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Tên */}
             <div className="space-y-2">

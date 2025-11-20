@@ -1,9 +1,10 @@
 import { FnbMenu } from "@/@types/FnBMenu";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import { useDeleteMenu, useGetAllMenus } from "@/hooks/use-fnb-menu";
 import { useToast } from "@/hooks/use-toast";
-import { Plus } from "lucide-react";
+import { Plus, UtensilsCrossed } from "lucide-react";
 import { useState, useEffect } from "react";
 import { FnbModal } from "./components/FnbModal";
 import { createColumns } from "./components/columns";
@@ -59,27 +60,30 @@ const FnBPage = () => {
 
   return (
     <div className="container mx-auto py-10">
-      <div className="flex justify-between items-center mb-8">
-        <h2 className="text-3xl font-bold tracking-tight">
-          Food & Beverage Menu
-        </h2>
-        <div className="flex items-center gap-4">
-          {isLoading && (
-            <span className="text-sm text-muted-foreground">Loading...</span>
-          )}
-          {error && (
-            <span className="text-sm text-red-500">Error loading data</span>
-          )}
-          <span className="text-sm text-muted-foreground">
-            Total items: {menus?.length || 0}
-          </span>
-          <Button onClick={() => refetch()}>Refresh</Button>
-          <Button onClick={handleCreate}>
-            <Plus className="mr-2 h-4 w-4" />
-            Add New Menu Item
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Food & Beverage Menu"
+        description={`Quản lý thực đơn đồ ăn và thức uống${
+          menus ? ` • ${menus.length} món` : ""
+        }`}
+        icon={UtensilsCrossed}
+        actions={
+          <div className="flex items-center gap-2">
+            {isLoading && (
+              <span className="text-sm text-muted-foreground">Loading...</span>
+            )}
+            {error && (
+              <span className="text-sm text-red-500">Error loading data</span>
+            )}
+            <Button variant="outline" onClick={() => refetch()}>
+              Refresh
+            </Button>
+            <Button onClick={handleCreate}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add New Menu Item
+            </Button>
+          </div>
+        }
+      />
 
       <DataTable columns={columns} data={menus || []} />
 

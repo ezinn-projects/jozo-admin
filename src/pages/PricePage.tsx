@@ -1,9 +1,10 @@
 import { Price } from "@/@types/general-management";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import {
   default as UpdatePricingModal,
   default as UpsertPricingModal,
 } from "@/components/modules/Pricing/UpsertPriceModal";
+import { DollarSign } from "lucide-react";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -127,11 +128,12 @@ function PricePage() {
 
   return (
     <div>
-      {/* Header */}
-      <Header title="Pricing" subtitle="List of pricing" />
-
-      {/* Nút thêm giá mới (nếu cần) */}
-      <UpsertPricingModal />
+      <PageHeader
+        title="Pricing"
+        description="Quản lý bảng giá phòng theo loại và khung giờ"
+        icon={DollarSign}
+        actions={<UpsertPricingModal />}
+      />
 
       {/* Modal xóa giá */}
       <DeleteModal

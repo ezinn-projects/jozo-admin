@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, UserCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUsers } from "@/hooks/use-users";
 import { User } from "@/@types/user";
@@ -57,14 +58,19 @@ const UsersManagementPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Quản lý Users</h1>
-        <Button onClick={() => navigate(PATHS.USERS_MANAGEMENT_NEW)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm User
-        </Button>
-      </div>
+    <div>
+      <PageHeader
+        title="Quản lý Users"
+        description="Quản lý danh sách người dùng"
+        icon={UserCircle}
+        actions={
+          <Button onClick={() => navigate(PATHS.USERS_MANAGEMENT_NEW)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm User
+          </Button>
+        }
+        className="mb-6"
+      />
 
       {/* Search Bar */}
       <Card className="mb-6">

@@ -7,6 +7,7 @@ import {
 import dayjs, { Dayjs } from "dayjs";
 import React, { useEffect, useRef, useState } from "react";
 // import roomsScheduleApis from "@/apis/roomSchedule.api";
+import { PageHeader } from "@/components/shared";
 import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
 import { Button } from "@/components/ui/button";
@@ -29,6 +30,7 @@ import {
 } from "@/hooks/room-schedule";
 import { useToast } from "@/hooks/use-toast";
 import { useSocket } from "@/hooks/useSocket";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   BellIcon,
   CalendarIcon,
@@ -41,6 +43,7 @@ import ExtendSessionModal from "./ExtendSessionModal";
 import ProcessBookedModal from "./ProcessBookedModal";
 import ProcessInUseModal from "./ProcessInUseModal";
 import ProcessLockedModal from "./ProcessLockedModal";
+import MobileTimelineView from "./MobileTimelineView";
 
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
@@ -107,6 +110,7 @@ export type { OrderData };
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const isMobile = useIsMobile();
   const {
     socket,
     joinRoom,
@@ -646,6 +650,20 @@ const RoomTimelineTable: React.FC = () => {
     });
   };
 
+  const handleScheduleClick = (schedule: IRoomSchedule) => {
+    const lowerStatus = schedule.status.toLowerCase();
+    if (lowerStatus === "locked") {
+      setLockedSchedule(schedule);
+      setModal("process");
+    } else if (lowerStatus === "booked") {
+      setBookedSchedule(schedule);
+      setModal("booked");
+    } else if (lowerStatus === "in use") {
+      setInUseSchedule(schedule);
+      setModal("inUse");
+    }
+  };
+
   // Hàm tính toán vị trí và chiều rộng của một event block
   const getMarkerStyle = (schedule: IRoomSchedule) => {
     const eventStart = dayjs(schedule.startTime);
@@ -955,10 +973,15 @@ const RoomTimelineTable: React.FC = () => {
   */
 
   return (
-    <div className="container mx-auto p-4 w-full">
+    <div className="!p-4 w-full space-y-6">
+      <PageHeader
+        title="Room Schedules Timeline"
+        description="Xem và quản lý lịch đặt phòng theo timeline"
+        icon={CalendarIcon}
+      />
+
       {/* Header: Chọn ngày */}
-      <div className="flex justify-between items-start mb-6">
-        <h1 className="text-2xl font-bold">Room Schedules Timeline</h1>
+      <div className="flex justify-end items-start">
         <Popover modal={true}>
           <PopoverTrigger asChild>
             <Button
@@ -995,12 +1018,32 @@ const RoomTimelineTable: React.FC = () => {
           Tắt video tất cả phòng
         </Button>
       </div>
-      {/* Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */}
-      <div
-        className="overflow-x-auto"
-        ref={timelineContainerRef}
-        onScroll={handleScroll}
-      >
+      
+      {/* Mobile View */}
+      {isMobile ? (
+        <MobileTimelineView
+          roomsData={roomsData || []}
+          grouped={grouped}
+          date={date}
+          currentTime={currentTime}
+          isToday={isToday}
+          notifications={notifications}
+          blinkingRooms={blinkingRooms}
+          orderNotifications={orderNotifications}
+          orderBlinkingRooms={orderBlinkingRooms}
+          onRoomClick={handleRoomClick}
+          onScheduleClick={handleScheduleClick}
+          onResolveRequest={handleResolveRequest}
+          onOrderClick={handleOrderClick}
+          onEditRoomType={handleEditRoomType}
+        />
+      ) : (
+        /* Desktop View - Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */
+        <div
+          className="overflow-x-auto"
+          ref={timelineContainerRef}
+          onScroll={handleScroll}
+        >
         {/* Timeline container */}
         <div className="relative" style={{ width: `${TIMELINE_WIDTH}px` }}>
           {/* Timeline Header */}
@@ -1249,30 +1292,124 @@ const RoomTimelineTable: React.FC = () => {
                         </Tooltip>
                       );
                     } else if (schedule.status.toLowerCase() === "in use") {
-                      const inUseDuration = dayjs().diff(
-                        dayjs(schedule.startTime),
-                        "minute"
-                      );
+                      const eventStart = dayjs(schedule.startTime);
+                      const inUseDuration = dayjs().diff(eventStart, "minute");
+                      
+                      // Tính thời gian đã sử dụng
                       let durationLabel = "";
                       if (inUseDuration < 60) {
-                        durationLabel = `Đang sử dụng ${inUseDuration} phút`;
+                        durationLabel = `${inUseDuration} phút`;
                       } else {
                         const hours = Math.floor(inUseDuration / 60);
                         const minutes = inUseDuration % 60;
-                        durationLabel = `Đang sử dụng ${hours} giờ${
+                        durationLabel = `${hours} giờ${
                           minutes > 0 ? ` ${minutes} phút` : ""
                         }`;
                       }
+                      
+                      // Tính giờ kết thúc và thời gian còn lại
+                      let endTimeLabel = "";
+                      let remainingTimeLabel = "";
+                      if (schedule.endTime) {
+                        const eventEnd = dayjs(schedule.endTime);
+                        endTimeLabel = eventEnd.format("HH:mm");
+                        const remainingMinutes = eventEnd.diff(dayjs(), "minute");
+                        if (remainingMinutes > 0) {
+                          if (remainingMinutes < 60) {
+                            remainingTimeLabel = `Còn ${remainingMinutes} phút`;
+                          } else {
+                            const hours = Math.floor(remainingMinutes / 60);
+                            const minutes = remainingMinutes % 60;
+                            remainingTimeLabel = `Còn ${hours} giờ${
+                              minutes > 0 ? ` ${minutes} phút` : ""
+                            }`;
+                          }
+                        } else {
+                          remainingTimeLabel = "Đã quá giờ";
+                        }
+                      } else {
+                        // Nếu chưa có endTime, tính đến currentTime hoặc endOfDay
+                        const endOfDay = eventStart.startOf("day").hour(DAY_END_HOUR).minute(0);
+                        const now = dayjs();
+                        const actualEnd = now.isBefore(endOfDay) ? now : endOfDay;
+                        endTimeLabel = actualEnd.format("HH:mm");
+                      }
+                      
+                      // Nguồn đặt
+                      const sourceLabel =
+                        schedule.source === "customer"
+                          ? "Khách đặt online"
+                          : schedule.source === "walk-in"
+                          ? "Khách vãng lai"
+                          : "Admin đặt";
+                      
                       return (
                         <Tooltip key={schedule._id}>
                           <TooltipTrigger asChild>
                             {eventElement}
                           </TooltipTrigger>
-                          <TooltipContent>
-                            <p>{durationLabel}</p>
-                            {/* <p className="text-xs text-gray-500">
-                              Kéo để di chuyển
-                            </p> */}
+                          <TooltipContent className="max-w-xs">
+                            <div className="space-y-1">
+                              <p className="font-semibold">Thông tin sử dụng</p>
+                              <div className="text-sm space-y-0.5">
+                                <p>
+                                  <span className="text-gray-500">Bắt đầu:</span>{" "}
+                                  {eventStart.format("HH:mm")}
+                                </p>
+                                <p>
+                                  <span className="text-gray-500">Kết thúc:</span>{" "}
+                                  {endTimeLabel}
+                                </p>
+                                <p>
+                                  <span className="text-gray-500">Đã sử dụng:</span>{" "}
+                                  {durationLabel}
+                                </p>
+                                {remainingTimeLabel && (
+                                  <p>
+                                    <span className="text-gray-500">Thời gian còn lại:</span>{" "}
+                                    <span
+                                      className={
+                                        remainingTimeLabel === "Đã quá giờ"
+                                          ? "text-red-500 font-medium"
+                                          : ""
+                                      }
+                                    >
+                                      {remainingTimeLabel}
+                                    </span>
+                                  </p>
+                                )}
+                              </div>
+                              {(schedule.customerName ||
+                                schedule.customerPhone ||
+                                schedule.note) && (
+                                <div className="pt-1 border-t text-sm space-y-0.5">
+                                  {schedule.customerName && (
+                                    <p>
+                                      <span className="text-gray-500">Khách hàng:</span>{" "}
+                                      {schedule.customerName}
+                                    </p>
+                                  )}
+                                  {schedule.customerPhone && (
+                                    <p>
+                                      <span className="text-gray-500">SĐT:</span>{" "}
+                                      {schedule.customerPhone}
+                                    </p>
+                                  )}
+                                  {schedule.note && (
+                                    <p>
+                                      <span className="text-gray-500">Ghi chú:</span>{" "}
+                                      <span className="italic">{schedule.note}</span>
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                              <div className="pt-1 border-t text-xs text-gray-500">
+                                <p>{sourceLabel}</p>
+                                {schedule.upgraded && (
+                                  <p className="text-orange-500">Đã nâng cấp phòng</p>
+                                )}
+                              </div>
+                            </div>
                           </TooltipContent>
                         </Tooltip>
                       );
@@ -1285,6 +1422,7 @@ const RoomTimelineTable: React.FC = () => {
           })}
         </div>
       </div>
+      )}
 
       {/* Các modal khác */}
       {modal === "create" && selectedRoom && (

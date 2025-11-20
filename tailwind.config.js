@@ -94,6 +94,5 @@ export default {
       },
     },
   },
-  darkMode: "media",
   plugins: [require("tailwindcss-animate")],
 };

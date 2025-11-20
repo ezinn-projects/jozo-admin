@@ -1,5 +1,6 @@
 import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
 import staffScheduleApis from "@/apis/staffSchedule.apis";
+import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -536,19 +537,12 @@ const MySchedulePage = () => {
   }, [monthSchedules]);
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="md:text-3xl text-xl font-bold flex items-center gap-2">
-            <Briefcase className="h-8 w-8" />
-            My Work Schedule
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            View and manage your work schedule
-          </p>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="My Work Schedule"
+        description="View and manage your work schedule"
+        icon={Briefcase}
+      />
 
       {/* Summary Cards */}
       {summary && (

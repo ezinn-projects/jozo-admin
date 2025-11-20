@@ -1,6 +1,7 @@
 import { Promotion } from "@/apis/promotion.apis";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import UpsertPromotionModal from "@/components/modules/Promotion/UpsertPromotionModal";
+import { Tag } from "lucide-react";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
@@ -108,9 +109,12 @@ function PromotionPage() {
 
   return (
     <div>
-      <Header title="Promotions" subtitle="Manage your promotional campaigns" />
-
-      <UpsertPromotionModal />
+      <PageHeader
+        title="Promotions"
+        description="Quản lý các chương trình khuyến mãi và giảm giá"
+        icon={Tag}
+        actions={<UpsertPromotionModal />}
+      />
 
       <DeleteModal
         title="Delete Promotion"

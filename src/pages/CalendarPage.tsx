@@ -1,9 +1,11 @@
+import { PageHeader } from "@/components/shared";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CustomCalendar } from "@/components/ui/custom-calendar";
 import holidayApis from "@/apis/holiday.apis";
 import { Spin } from "@/components/ui/spin";
+import { Calendar as CalendarIcon } from "lucide-react";
 
 interface Holiday {
   _id?: string;
@@ -73,12 +75,14 @@ function CalendarPage() {
   };
 
   return (
-    <div className="container mx-auto py-6">
+    <div className="!py-6 space-y-6">
+      <PageHeader
+        title="Holiday Calendar"
+        description="Quản lý lịch nghỉ lễ và ngày đặc biệt"
+        icon={CalendarIcon}
+      />
       <Spin spinning={isLoading}>
         <Card>
-          <CardHeader>
-            <h1 className="text-2xl font-bold">Holiday Calendar</h1>
-          </CardHeader>
           <CardContent>
             <CustomCalendar
               events={events}

@@ -19,11 +19,12 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { changePasswordSchema } from "@/lib/schema";
 import { userApis } from "@/apis/user.apis";
 import { useToast } from "@/hooks/use-toast";
-import Header from "@/components/Layout/Header";
+import { Key } from "lucide-react";
 
 type ChangePasswordFormValues = z.infer<typeof changePasswordSchema>;
 
@@ -67,13 +68,14 @@ function ChangePasswordPage() {
   };
 
   return (
-    <div className="p-6">
-      <Header
+    <div className="space-y-6">
+      <PageHeader
         title="Đổi mật khẩu"
-        subtitle="Cập nhật mật khẩu của bạn để bảo mật tài khoản"
+        description="Cập nhật mật khẩu của bạn để bảo mật tài khoản"
+        icon={Key}
       />
 
-      <div className="mt-6 flex justify-center">
+      <div className="flex justify-center">
         <Card className="w-full max-w-md">
           <CardHeader>
             <CardTitle>Đổi mật khẩu</CardTitle>
@@ -169,4 +171,3 @@ function ChangePasswordPage() {
 }
 
 export default ChangePasswordPage;
-

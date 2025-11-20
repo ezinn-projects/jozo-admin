@@ -1,8 +1,10 @@
+import { PageHeader } from "@/components/shared";
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
+import { TrendingUp } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -345,10 +347,12 @@ const RevenueStatisticsPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-4">
-      <Typography variant="h1" className="mb-6">
-        Thống kê doanh thu
-      </Typography>
+    <div className="!p-4 space-y-6">
+      <PageHeader
+        title="Thống kê doanh thu"
+        description="Xem và phân tích doanh thu theo ngày, tuần và tháng"
+        icon={TrendingUp}
+      />
 
       <div className="flex gap-4 mb-6 items-center">
         <Popover>

@@ -1,7 +1,8 @@
 import { IRoomType } from "@/@types/RoomType";
 import roomTypeApis from "@/apis/roomType.apis";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { Building2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import { DeleteModal } from "@/components/shared/DeleteModal";
@@ -160,11 +161,17 @@ function RoomTypesListPage() {
 
   return (
     <div>
-      <Header title="Room Types" subtitle="List of room types" />
-
+      <PageHeader
+        title="Room Types"
+        description="Danh sách các loại phòng"
+        icon={Building2}
+        actions={
       <Link to={PATHS.ROOM_TYPES_NEW}>
-        <Button className="mt-3 mb-4">New room type</Button>
+            <Button>New room type</Button>
       </Link>
+        }
+        className="mb-4"
+      />
 
       <DataTable
         rowKey="_id"

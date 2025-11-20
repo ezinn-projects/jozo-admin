@@ -32,6 +32,12 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
+  // Load dark mode từ localStorage khi component mount
+  useEffect(() => {
+    const darkMode = localStorage.getItem("theme") === "dark";
+    document.documentElement.classList.toggle("dark", darkMode);
+  }, []);
+
   useEffect(() => {
     if (isAuthenticated) {
       navigate(PATHS.HOME, { replace: true });
@@ -81,11 +87,11 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-gray-100">
+    <div className="flex items-center justify-center min-h-screen bg-background">
       <Form {...form}>
         <form
           onSubmit={handleSubmit(onSubmit)}
-          className="bg-white p-6 rounded shadow-md w-full max-w-sm"
+          className="bg-card text-card-foreground p-6 rounded shadow-md w-full max-w-sm border border-border"
         >
           <Typography variant="h2" className="mb-4">
             Login
@@ -119,7 +125,7 @@ export default function LoginPage() {
                     {...field}
                     suffix={
                       <button
-                        className="p-1"
+                        className="p-1 text-foreground"
                         type="button"
                         onClick={togglePassword}
                       >

@@ -1,7 +1,8 @@
 import { IRoom } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { DoorOpen } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -123,7 +124,13 @@ function UpsertRoomPage() {
 
   return (
     <div className="max-w-3xl">
-      <Header title={title} />
+      <PageHeader
+        title={title}
+        description={id ? "Chỉnh sửa thông tin phòng" : "Tạo phòng mới"}
+        icon={DoorOpen}
+        showBackButton
+        backUrl={PATHS.ROOMS}
+      />
 
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-3">

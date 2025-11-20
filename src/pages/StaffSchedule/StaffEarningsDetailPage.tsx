@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -343,7 +344,7 @@ const StaffEarningsDetailPage = () => {
 
   if (!userId) {
     return (
-      <div className="container mx-auto p-6">
+      <div>
         <div className="text-center">
           <p className="text-red-500">Không tìm thấy thông tin nhân viên</p>
           <Button
@@ -359,28 +360,14 @@ const StaffEarningsDetailPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate(PATHS.STAFF_SCHEDULE)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="md:text-3xl text-xl font-bold flex items-center gap-2">
-              <User className="h-8 w-8" />
-              Chi Tiết Thu Nhập - {staffName}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Thống kê chi tiết các ca làm việc và lương thực nhận
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title={`Chi Tiết Thu Nhập - ${staffName}`}
+        description="Thống kê chi tiết các ca làm việc và lương thực nhận"
+        icon={User}
+        showBackButton
+        backUrl={PATHS.STAFF_SCHEDULE}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
