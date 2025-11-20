@@ -168,7 +168,6 @@ const getVerticalMarkerStyle = (
 const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
   roomsData,
   grouped,
-  date,
   currentTime,
   isToday,
   notifications,
@@ -218,7 +217,7 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         }
 
         // Tự động mở card nếu có schedule "in use" hoặc có notification
-        const shouldDefaultOpen = !!inUseSchedule || hasNotification || hasOrderNotification;
+        const shouldDefaultOpen = !!inUseSchedule || !!hasNotification || !!hasOrderNotification;
 
         return (
           <Collapsible key={room._id} defaultOpen={shouldDefaultOpen}>

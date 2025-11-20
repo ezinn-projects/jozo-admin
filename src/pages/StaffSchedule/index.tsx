@@ -26,15 +26,10 @@ import { useSocket } from "@/hooks/useSocket";
 import { cn } from "@/lib/utils";
 import StaffScheduleRegistrationModal from "@/pages/RoomSchedule/components/StaffScheduleRegistrationModal";
 import dayjs, { Dayjs } from "dayjs";
-import {
-  Calendar,
-  CalendarIcon,
-  ChevronLeft,
-  ChevronRight,
-  Search,
-} from "lucide-react";
+import { CalendarIcon, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { Calendar } from "@/components/ui/calendar";
 import StaffScheduleDetailModal from "./components/StaffScheduleDetailModal";
 
 const StaffSchedulePage = () => {
@@ -321,7 +316,7 @@ const StaffSchedulePage = () => {
       <PageHeader
         title="Staff Schedule Management"
         description="Click on staff name to view earnings details, or click on a cell to view/register schedule"
-        icon={Calendar}
+        icon={CalendarIcon}
         className="mb-6"
       />
 
@@ -360,7 +355,9 @@ const StaffSchedulePage = () => {
                 <Calendar
                   mode="single"
                   selected={currentDate.toDate()}
-                  onSelect={(date) => date && setCurrentDate(dayjs(date))}
+                  onSelect={(date: Date | undefined) =>
+                    date && setCurrentDate(dayjs(date))
+                  }
                   initialFocus
                 />
               </PopoverContent>

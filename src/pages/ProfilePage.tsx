@@ -120,10 +120,6 @@ function ProfilePage() {
     }
   };
 
-  const handleAvatarClick = () => {
-    fileInputRef.current?.click();
-  };
-
   const handleZoomClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     setIsZoomDialogOpen(true);

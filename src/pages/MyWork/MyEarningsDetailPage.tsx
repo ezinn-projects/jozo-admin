@@ -28,17 +28,14 @@ import PATHS from "@/constants/paths";
 import { useMySchedules } from "@/hooks/use-my-schedules";
 import dayjs, { Dayjs } from "dayjs";
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Clock,
   DollarSign,
   Download,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 const MyEarningsDetailPage = () => {
-  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
   const hourlyRate = 22000; // 22k VND per hour
 

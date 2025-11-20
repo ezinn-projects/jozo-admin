@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/shared";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CustomCalendar } from "@/components/ui/custom-calendar";
