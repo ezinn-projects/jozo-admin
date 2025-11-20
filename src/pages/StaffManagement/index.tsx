@@ -1,7 +1,8 @@
 import { useState } from "react";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUsers } from "@/hooks/use-users";
 import { User } from "@/@types/user";
@@ -66,14 +67,19 @@ const StaffManagementPage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-3xl font-bold">Quản lý Admin/Staff</h1>
-        <Button onClick={() => navigate(PATHS.STAFF_MANAGEMENT_NEW)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Thêm Admin/Staff
-        </Button>
-      </div>
+    <div>
+      <PageHeader
+        title="Quản lý Admin/Staff"
+        description="Quản lý danh sách quản trị viên và nhân viên"
+        icon={Users}
+        actions={
+          <Button onClick={() => navigate(PATHS.STAFF_MANAGEMENT_NEW)}>
+            <Plus className="mr-2 h-4 w-4" />
+            Thêm Admin/Staff
+          </Button>
+        }
+        className="mb-6"
+      />
 
       {/* Search Bar */}
       <Card className="mb-6">

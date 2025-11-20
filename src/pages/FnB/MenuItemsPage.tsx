@@ -1,7 +1,9 @@
+import { PageHeader } from "@/components/shared";
 import UpsertMenuItemModal from "@/components/modules/FnB/UpsertMenuItemModal";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Utensils } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -119,19 +121,17 @@ const MenuItemsPage = () => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold">Quản lý Menu Items</h1>
-          <p className="text-muted-foreground">
-            Quản lý các món ăn, đồ uống và variants
-          </p>
-        </div>
+      <PageHeader
+        title="Quản lý Menu Items"
+        description="Quản lý các món ăn, đồ uống và variants"
+        icon={Utensils}
+        actions={
         <Button onClick={handleCreate} disabled={isCreating}>
           <Plus className="w-4 h-4 mr-2" />
           Thêm Menu Item
         </Button>
-      </div>
+        }
+      />
 
       {/* Search */}
       <Card>

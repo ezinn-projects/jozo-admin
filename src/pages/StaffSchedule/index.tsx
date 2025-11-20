@@ -1,13 +1,13 @@
-import { useState, useMemo, useEffect } from "react";
-import React from "react";
+import { User } from "@/@types/user";
+import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, ChevronLeft, ChevronRight, CalendarIcon } from "lucide-react";
-import { useUsers } from "@/hooks/use-users";
-import { User } from "@/@types/user";
-import { Role, EmployeeScheduleStatus, ShiftType } from "@/constants/enum";
-import StaffScheduleRegistrationModal from "@/pages/RoomSchedule/components/StaffScheduleRegistrationModal";
-import StaffScheduleDetailModal from "./components/StaffScheduleDetailModal";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Table,
   TableBody,
@@ -17,20 +17,20 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import { Calendar } from "@/components/ui/calendar";
-import dayjs, { Dayjs } from "dayjs";
-import { useStaffSchedules, ViewMode } from "@/hooks/use-staff-schedules";
-import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
-import { cn } from "@/lib/utils";
-import { useSocket } from "@/hooks/useSocket";
-import { useToast } from "@/hooks/use-toast";
-import { useNavigate } from "react-router-dom";
+import { EmployeeScheduleStatus, Role, ShiftType } from "@/constants/enum";
 import PATHS from "@/constants/paths";
+import { useStaffSchedules, ViewMode } from "@/hooks/use-staff-schedules";
+import { useToast } from "@/hooks/use-toast";
+import { useUsers } from "@/hooks/use-users";
+import { useSocket } from "@/hooks/useSocket";
+import { cn } from "@/lib/utils";
+import StaffScheduleRegistrationModal from "@/pages/RoomSchedule/components/StaffScheduleRegistrationModal";
+import dayjs, { Dayjs } from "dayjs";
+import { CalendarIcon, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { Calendar } from "@/components/ui/calendar";
+import StaffScheduleDetailModal from "./components/StaffScheduleDetailModal";
 
 const StaffSchedulePage = () => {
   const navigate = useNavigate();
@@ -49,7 +49,7 @@ const StaffSchedulePage = () => {
   );
 
   const { users, isLoadingUsers } = useUsers();
-  
+
   // Array mapping for day names in Vietnamese
   const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const { toast } = useToast();
@@ -312,14 +312,13 @@ const StaffSchedulePage = () => {
   }
 
   return (
-    <div className="container mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-2">Staff Schedule Management</h1>
-        <p className="text-gray-600">
-          Click on staff name to view earnings details, or click on a cell to
-          view/register schedule
-        </p>
-      </div>
+    <div>
+      <PageHeader
+        title="Staff Schedule Management"
+        description="Click on staff name to view earnings details, or click on a cell to view/register schedule"
+        icon={CalendarIcon}
+        className="mb-6"
+      />
 
       {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
@@ -356,7 +355,9 @@ const StaffSchedulePage = () => {
                 <Calendar
                   mode="single"
                   selected={currentDate.toDate()}
-                  onSelect={(date) => date && setCurrentDate(dayjs(date))}
+                  onSelect={(date: Date | undefined) =>
+                    date && setCurrentDate(dayjs(date))
+                  }
                   initialFocus
                 />
               </PopoverContent>

@@ -1,6 +1,7 @@
 import roomTypeApis from "@/apis/roomType.apis";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
+import { Building2 } from "lucide-react";
 import {
   Form,
   FormControl,
@@ -180,10 +181,17 @@ function UpsertRoomTypePage() {
 
   return (
     <div className="max-w-3xl">
-      <Header title={title} />
+      <PageHeader
+        title={title}
+        description={id ? "Chỉnh sửa thông tin loại phòng" : "Tạo loại phòng mới"}
+        icon={Building2}
+        showBackButton
+        backUrl={PATHS.ROOM_TYPES_LISTS}
+        className="mb-4"
+      />
 
       <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-3">
+        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
           <FormField
             control={form.control}
             name="name"

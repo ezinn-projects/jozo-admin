@@ -1,8 +1,9 @@
 import { IRoom } from "@/@types/Room";
 import roomApis from "@/apis/room.apis";
-import Header from "@/components/Layout/Header";
+import { PageHeader } from "@/components/shared";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
+import { DoorOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
 import PATHS from "@/constants/paths";
@@ -113,13 +114,19 @@ function RoomsListPage() {
 
   return (
     <div>
-      <Header title="Rooms management" subtitle="List of rooms" />
-
-      {isAdmin && (
-        <Link to={PATHS.NEW_ROOM}>
-          <Button className="mt-3 mb-4">New room</Button>
-        </Link>
-      )}
+      <PageHeader
+        title="Rooms Management"
+        description="Quản lý danh sách phòng"
+        icon={DoorOpen}
+        actions={
+          isAdmin ? (
+            <Link to={PATHS.NEW_ROOM}>
+              <Button>New room</Button>
+            </Link>
+          ) : undefined
+        }
+        className="mb-4"
+      />
 
       <DataTable
         rowKey="_id"

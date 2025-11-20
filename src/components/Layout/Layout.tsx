@@ -29,7 +29,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
     <SidebarProvider>
       <AppSidebar />
 
-      <main className="p-3 w-full">
+      <main className="container mx-auto p-3 sm:p-4 md:p-6 w-full">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <SidebarTrigger />

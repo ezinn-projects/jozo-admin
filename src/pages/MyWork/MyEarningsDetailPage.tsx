@@ -1,3 +1,4 @@
+import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -27,22 +28,27 @@ import PATHS from "@/constants/paths";
 import { useMySchedules } from "@/hooks/use-my-schedules";
 import dayjs, { Dayjs } from "dayjs";
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Clock,
   DollarSign,
   Download,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
 
 const MyEarningsDetailPage = () => {
-  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
   const hourlyRate = 22000; // 22k VND per hour
-  
+
   // Array mapping for day names in Vietnamese (0 = Sunday, 1 = Monday, ...)
-  const dayNames = ["Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"];
+  const dayNames = [
+    "Chủ Nhật",
+    "Thứ Hai",
+    "Thứ Ba",
+    "Thứ Tư",
+    "Thứ Năm",
+    "Thứ Sáu",
+    "Thứ Bảy",
+  ];
 
   // Calculate startDate and endDate from selected month
   const startDate = useMemo(
@@ -266,28 +272,14 @@ const MyEarningsDetailPage = () => {
   };
 
   return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => navigate(PATHS.MY_SCHEDULE)}
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="md:text-3xl text-xl font-bold flex items-center gap-2">
-              <DollarSign className="h-8 w-8" />
-              Chi Tiết Lương
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Thống kê chi tiết các ca làm việc và lương thực nhận
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Chi Tiết Lương"
+        description="Thống kê chi tiết các ca làm việc và lương thực nhận"
+        icon={DollarSign}
+        showBackButton
+        backUrl={PATHS.MY_SCHEDULE}
+      />
 
       {/* Summary Cards */}
       <div className="grid gap-4 md:grid-cols-4">
@@ -447,9 +439,7 @@ const MyEarningsDetailPage = () => {
                           {index + 1}
                         </TableCell>
                         <TableCell>{item.date.format("DD/MM/YYYY")}</TableCell>
-                        <TableCell>
-                          {dayNames[item.date.day()]}
-                        </TableCell>
+                        <TableCell>{dayNames[item.date.day()]}</TableCell>
                         <TableCell
                           className={`font-medium ${
                             isNotRegistered ? "text-gray-400" : ""

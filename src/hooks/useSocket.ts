@@ -48,15 +48,21 @@ export const useSocket = () => {
   useEffect(() => {
     if (!user) return;
 
-    const isAdmin = user.role === "admin";
+    const userRole = user.role; // 'admin', 'staff', hoặc 'user'
     const userId = user._id;
 
-    // Initialize socket connection với query params phù hợp
-    const queryParams: { isAdmin?: string; userId?: string } = {};
+    // Chỉ admin và staff mới kết nối đến management room
+    if (userRole !== "admin" && userRole !== "staff") {
+      return;
+    }
 
-    if (isAdmin) {
-      queryParams.isAdmin = "true";
-    } else {
+    // Initialize socket connection với query params mới
+    const queryParams: { role: string; userId?: string } = {
+      role: userRole, // 'admin' hoặc 'staff'
+    };
+
+    // Thêm userId cho staff để nhận notifications riêng
+    if (userRole === "staff") {
       queryParams.userId = userId;
     }
 
@@ -72,21 +78,16 @@ export const useSocket = () => {
 
     // Setup reconnection handling
     socketRef.current.on("connect", () => {
-      console.log("Socket connected");
-
-      // Join room tương ứng với role
-      if (isAdmin) {
-        socketRef.current?.emit("join_room", "admin");
-        console.log("Joined admin room");
-      } else {
-        // Employee join vào room user:userId
+      // Backend sẽ tự động join vào management room cho admin và staff
+      // Staff vẫn cần join vào room user:userId để nhận notifications riêng
+      if (userRole === "staff") {
         socketRef.current?.emit("join_room", `user:${userId}`);
-        console.log(`Joined user room: user:${userId}`);
       }
+      // Admin không cần join room riêng vì đã được join vào management room tự động
     });
 
     socketRef.current.on("disconnect", () => {
-      console.log("Socket disconnected");
+      console.error("Socket disconnected");
     });
 
     socketRef.current.on("connect_error", (error: Error) => {

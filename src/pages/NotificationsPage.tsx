@@ -1,4 +1,5 @@
 import { INotification } from "@/@types/Notification";
+import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,6 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import PATHS from "@/constants/paths";
 import {
@@ -186,19 +186,12 @@ function NotificationsPage() {
 
   return (
     <div className="flex flex-col gap-4 h-full">
-      <Card>
-        <CardContent className="p-6">
-          {/* Header */}
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-semibold">Tất cả thông báo</h2>
-              <p className="text-sm text-muted-foreground">
-                {total} thông báo
-                {unreadCount > 0 && ` • ${unreadCount} chưa đọc`}
-              </p>
-            </div>
-
-            {unreadCount > 0 && (
+      <PageHeader
+        title="Tất cả thông báo"
+        description={`${total} thông báo${unreadCount > 0 ? ` • ${unreadCount} chưa đọc` : ""}`}
+        icon={Bell}
+        actions={
+          unreadCount > 0 ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -208,10 +201,12 @@ function NotificationsPage() {
                 <CheckCheck className="h-4 w-4" />
                 Đánh dấu tất cả đã đọc
               </Button>
-            )}
-          </div>
+          ) : undefined
+        }
+      />
 
-          <Separator className="mb-4" />
+      <Card>
+        <CardContent className="p-6">
 
           {/* Notifications List */}
           {isLoading ? (
