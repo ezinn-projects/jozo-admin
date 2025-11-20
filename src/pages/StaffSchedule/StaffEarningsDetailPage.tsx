@@ -1,3 +1,7 @@
+import staffScheduleApis, {
+  IEmployeeSchedule,
+  IEmployeeSchedulesResponse,
+} from "@/apis/staffSchedule.apis";
 import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,9 +29,9 @@ import {
 } from "@/components/ui/table";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import PATHS from "@/constants/paths";
+import { useQuery } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import {
-  ArrowLeft,
   Calendar as CalendarIcon,
   Clock,
   DollarSign,
@@ -36,11 +40,6 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { useQuery } from "@tanstack/react-query";
-import staffScheduleApis, {
-  IEmployeeSchedule,
-  IEmployeeSchedulesResponse,
-} from "@/apis/staffSchedule.apis";
 
 const StaffEarningsDetailPage = () => {
   const navigate = useNavigate();
