@@ -21,6 +21,7 @@ import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
 import { OrderDetail } from "@/@types/FnbOrder";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import {
   Coffee,
   Utensils,
@@ -81,6 +82,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
   // State cho modal đặt đồ ăn
   const [isMenuModalOpen, setIsMenuModalOpen] = React.useState(false);
+
+  // State cho edit note
+  const [isEditingNote, setIsEditingNote] = React.useState(false);
+  const [noteValue, setNoteValue] = React.useState<string>("");
+
+  // State để lưu schedule hiện tại (để sync với cache)
+  const [currentSchedule, setCurrentSchedule] =
+    React.useState<IRoomSchedule>(schedule);
 
   const queryClient = useQueryClient();
 
@@ -328,50 +337,33 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     }
   };
 
-  // Hàm format note để kết hợp tất cả thông tin
-  const formatNoteWithCustomerInfo = (schedule: IRoomSchedule) => {
-    const parts: string[] = [];
+  // Hàm xử lý edit note
+  const handleEditNote = () => {
+    setIsEditingNote(true);
+  };
 
-    // Thêm note gốc nếu có
-    if (schedule.note) {
-      parts.push(schedule.note);
-    }
+  // Hàm xử lý save note
+  const handleSaveNote = () => {
+    updateNote(noteValue);
+  };
 
-    // Thêm thông tin khách hàng
-    const customerInfo: string[] = [];
-    if (schedule.customerName)
-      customerInfo.push(`KH: ${schedule.customerName}`);
-    if (schedule.customerPhone)
-      customerInfo.push(`SĐT: ${schedule.customerPhone}`);
-    if (schedule.customerEmail)
-      customerInfo.push(`Email: ${schedule.customerEmail}`);
-
-    if (customerInfo.length > 0) {
-      parts.push(`[${customerInfo.join(" | ")}]`);
-    }
-
-    // Thêm thông tin room upgrade
-    if (schedule.upgraded && schedule.originalRoomType) {
-      parts.push(`[UPGRADE: ${schedule.originalRoomType} → Phòng hiện tại]`);
-    }
-
-    // Thêm thông tin source
-    if (schedule.source) {
-      const sourceInfo = getSourceInfo(schedule.source);
-      parts.push(`[${sourceInfo.label}]`);
-    }
-
-    return parts.join(" ");
+  // Hàm xử lý cancel edit note
+  const handleCancelEditNote = () => {
+    setNoteValue(currentSchedule.note || "");
+    setIsEditingNote(false);
   };
 
   // Khởi tạo state khi schedule thay đổi
   React.useEffect(() => {
     if (schedule) {
+      setCurrentSchedule(schedule);
       setAdjustedStartTime(dayjs(schedule.startTime).format("HH:mm"));
       const defaultEnd = schedule.endTime
         ? dayjs(schedule.endTime)
         : dayjs(schedule.startTime).add(120, "minute");
       setAdjustedEndTime(defaultEnd.format("HH:mm"));
+      setNoteValue(schedule.note || "");
+      setIsEditingNote(false);
     }
   }, [schedule]);
 
@@ -401,6 +393,70 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         description: `Schedule updated${
           variables.status ? " to " + variables.status : ""
         }`,
+      });
+    },
+  });
+
+  // Mutation riêng để cập nhật note
+  const { mutate: updateNote, isPending: isUpdatingNote } = useMutation({
+    mutationFn: (note: string) =>
+      roomsScheduleApis.updateSchedule(schedule._id, { note }),
+    onMutate: async (newNote) => {
+      // Cancel any outgoing refetches để tránh overwrite optimistic update
+      const queryKey = [
+        "roomSchedules",
+        dayjs(schedule.startTime).toISOString(),
+      ];
+
+      await queryClient.cancelQueries({ queryKey });
+
+      // Snapshot giá trị cũ
+      const previousSchedules =
+        queryClient.getQueryData<IRoomSchedule[]>(queryKey);
+
+      // Optimistically update cache
+      queryClient.setQueryData<IRoomSchedule[]>(queryKey, (old) => {
+        if (!old) return old;
+        return old.map((s) =>
+          s._id === schedule._id ? { ...s, note: newNote } : s
+        );
+      });
+
+      // Cập nhật noteValue và currentSchedule để UI hiển thị ngay
+      setNoteValue(newNote);
+      setCurrentSchedule((prev) => ({ ...prev, note: newNote }));
+
+      return { previousSchedules, queryKey };
+    },
+    onSuccess: () => {
+      toast({
+        title: "Success",
+        description: "Ghi chú đã được cập nhật",
+      });
+      setIsEditingNote(false);
+      // Invalidate để sync với server (nhưng không refetch ngay)
+      const queryKey = [
+        "roomSchedules",
+        dayjs(schedule.startTime).toISOString(),
+      ];
+      queryClient.invalidateQueries({ queryKey });
+    },
+    onError: (error, _newNote, context) => {
+      console.error("Error updating note:", error);
+
+      // Rollback về giá trị cũ nếu có lỗi
+      if (context?.previousSchedules && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousSchedules);
+        // Rollback noteValue và currentSchedule
+        const originalNote = schedule.note || "";
+        setNoteValue(originalNote);
+        setCurrentSchedule((prev) => ({ ...prev, note: originalNote }));
+      }
+
+      toast({
+        title: "Error",
+        description: "Không thể cập nhật ghi chú",
+        variant: "destructive",
       });
     },
   });
@@ -501,12 +557,51 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           <p>
             <span className="font-medium">End:</span> {eventEnd.format("HH:mm")}
           </p>
-          {formatNoteWithCustomerInfo(schedule) && (
-            <p>
-              <span className="font-medium">Note:</span>{" "}
-              {formatNoteWithCustomerInfo(schedule)}
-            </p>
-          )}
+          <div>
+            <span className="font-medium">Note:</span>
+            {isEditingNote ? (
+              <div className="mt-2 space-y-2">
+                <Input
+                  value={noteValue}
+                  onChange={(e) => setNoteValue(e.target.value)}
+                  placeholder="Nhập ghi chú..."
+                  className="w-full"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveNote}
+                    disabled={isUpdatingNote}
+                    className="bg-green-600 hover:bg-green-700"
+                  >
+                    {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={handleCancelEditNote}
+                    disabled={isUpdatingNote}
+                  >
+                    Hủy
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="mt-1 flex items-start gap-2">
+                <p className="flex-1 break-words">
+                  {currentSchedule.note || "Chưa có ghi chú"}
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleEditNote}
+                  disabled={isUpdatingNote}
+                >
+                  Chỉnh sửa
+                </Button>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Thông tin nguồn booking */}
