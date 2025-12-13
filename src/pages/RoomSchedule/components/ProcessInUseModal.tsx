@@ -821,6 +821,41 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogDescription>
             </DialogHeader>
 
+            {/* Thông tin quà tặng */}
+            {schedule.giftEnabled !== undefined && (
+              <div className="mb-4">
+                <div
+                  className={`${
+                    schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
+                  } p-3 rounded-lg border ${
+                    schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
+                  }`}
+                >
+                  <div className="flex items-center gap-2">
+                    <Gift
+                      className={`w-4 h-4 ${
+                        schedule.giftEnabled ? "text-pink-500" : "text-gray-500"
+                      }`}
+                    />
+                    <span className="text-sm font-medium">
+                      Trạng thái quà tặng:
+                    </span>
+                    <span
+                      className={`text-sm ${
+                        schedule.giftEnabled
+                          ? "text-pink-600 font-semibold"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {schedule.giftEnabled
+                        ? "Được nhận quà"
+                        : "Không được nhận quà"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Bill Preview Section */}
             <div className="mt-4 p-3 sm:p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-xs sm:text-sm">
               <h4 className="text-center text-lg text-purple-700 font-bold mb-2">

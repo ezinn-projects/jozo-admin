@@ -34,6 +34,7 @@ import {
   Globe,
   UserCheck,
   Building,
+  Gift,
 } from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
@@ -693,6 +694,35 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                   {schedule.originalRoomType}
                 </span>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Thông tin quà tặng */}
+        {schedule.giftEnabled !== undefined && (
+          <div className="mt-4">
+            <h3 className="font-semibold mb-2 flex items-center gap-2">
+              <Gift className="w-4 h-4 text-pink-500" />
+              Trạng thái quà tặng
+            </h3>
+
+            <div
+              className={`flex items-center gap-2 ${
+                schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
+              } p-3 rounded-lg border ${
+                schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
+              }`}
+            >
+              <Badge
+                variant="outline"
+                className={`${
+                  schedule.giftEnabled
+                    ? "text-pink-600 border-pink-200"
+                    : "text-gray-600 border-gray-200"
+                }`}
+              >
+                {schedule.giftEnabled ? "Được nhận quà" : "Không được nhận quà"}
+              </Badge>
             </div>
           </div>
         )}

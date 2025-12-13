@@ -34,6 +34,7 @@ const UpsertRoomTypePage = lazy(
 );
 // const FnBPage = lazy(() => import("@/pages/FnB"));
 const MenuItemsPage = lazy(() => import("@/pages/FnB/MenuItemsPage"));
+const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const StaffManagementPage = lazy(() => import("@/pages/StaffManagement"));
 const CreateStaffPage = lazy(
   () => import("@/pages/StaffManagement/pages/CreateUserPage")
@@ -127,6 +128,7 @@ function useRoute() {
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
+                <Route path={PATHS.GIFTS} element={<GiftsPage />} />
                 <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
                 <Route
                   path={PATHS.STAFF_EARNINGS_DETAIL}
