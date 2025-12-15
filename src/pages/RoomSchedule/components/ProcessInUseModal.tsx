@@ -41,6 +41,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
@@ -70,6 +71,10 @@ interface BillData {
   note?: string;
   endTime?: string | Date;
   startTime?: string | Date;
+  freeHourPromotion?: {
+    freeMinutesApplied: number;
+    freeAmount: number;
+  };
 }
 
 // Interface cho bill response từ API
@@ -83,6 +88,10 @@ interface BillResponse {
   note?: string;
   endTime?: string | Date;
   startTime?: string | Date;
+  freeHourPromotion?: {
+    freeMinutesApplied: number;
+    freeAmount: number;
+  };
 }
 
 interface BillResultWithNote extends BillResponse {
@@ -111,6 +120,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [customStartTime, setCustomStartTime] = useState<string>("");
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
+  const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -125,8 +135,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
+      setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
     }
-  }, [isOpen, schedule.startTime]);
+  }, [isOpen, schedule.startTime, schedule.applyFreeHourPromo]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -172,6 +183,44 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       });
     },
   });
+
+  // Mutation để cập nhật applyFreeHourPromo
+  const { mutate: updateFreeHourPromo, isPending: isUpdatingFreeHourPromo } =
+    useMutation({
+      mutationFn: (applyFreeHourPromo: boolean) =>
+        roomsScheduleApis.updateSchedule(schedule._id, {
+          applyFreeHourPromo,
+        }),
+      onSuccess: (_, applyFreeHourPromo) => {
+        refetchSchedules?.();
+        // Refetch bill để cập nhật dữ liệu khuyến mãi giờ miễn phí
+        queryClient.invalidateQueries({
+          queryKey: [
+            "bill",
+            schedule._id,
+            selectedPromotion,
+            customEndTime,
+            customStartTime,
+          ],
+        });
+        toast({
+          title: "Success",
+          description: applyFreeHourPromo
+            ? "Đã áp dụng khuyến mãi giờ miễn phí"
+            : "Đã tắt khuyến mãi giờ miễn phí",
+        });
+      },
+      onError: (error) => {
+        console.error("Error updating free hour promo:", error);
+        toast({
+          title: "Error",
+          description: "Không thể cập nhật khuyến mãi giờ miễn phí",
+          variant: "destructive",
+        });
+        // Rollback checkbox state on error
+        setApplyFreeHourPromo(!applyFreeHourPromo);
+      },
+    });
 
   // Mutation để cập nhật số lượng item (dùng add/remove)
   const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
@@ -574,6 +623,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     note,
     endTime,
     startTime,
+    freeHourPromotion,
   } = billResult;
 
   // Debug: Log items khi thay đổi
@@ -1153,6 +1203,27 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
                 <div className="border-t-2 border-dashed border-purple-400" />
 
+                {/* Free Hour Promotion Checkbox */}
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id="free-hour-promo"
+                    checked={applyFreeHourPromo}
+                    onCheckedChange={(checked) => {
+                      const newValue = checked === true;
+                      setApplyFreeHourPromo(newValue);
+                      updateFreeHourPromo(newValue);
+                    }}
+                    disabled={isUpdatingFreeHourPromo}
+                  />
+                  <Label
+                    htmlFor="free-hour-promo"
+                    className="text-xs sm:text-sm cursor-pointer"
+                  >
+                    Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
+                    có giá trị trên 30k)
+                  </Label>
+                </div>
+
                 {/* Lucky Draw Promotion Section */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
                   <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -1206,16 +1277,82 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </div>
                   )}
 
+                  {/* Free Hour Promotion */}
+                  {freeHourPromotion && freeHourPromotion.freeAmount > 0 && (
+                    <div className="flex justify-between text-xs sm:text-sm">
+                      <span className="text-blue-600 break-words">
+                        {(() => {
+                          // Tính khung giờ đầu tiên từ giờ bắt đầu + 60 phút
+                          const startTime = customStartTime
+                            ? dayjs(schedule.startTime)
+                                .set(
+                                  "hour",
+                                  parseInt(customStartTime.split(":")[0])
+                                )
+                                .set(
+                                  "minute",
+                                  parseInt(customStartTime.split(":")[1])
+                                )
+                                .set("second", 0)
+                            : dayjs(schedule.startTime);
+                          const endTime = startTime.add(60, "minute");
+                          const timeRange = `${startTime.format(
+                            "HH:mm"
+                          )} - ${endTime.format("HH:mm")}`;
+                          return `Chương trình KM (${timeRange}):`;
+                        })()}
+                      </span>
+                      <span className="text-blue-600 font-medium break-words ml-2 text-right">
+                        -
+                        {freeHourPromotion.freeAmount.toLocaleString("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        })}
+                      </span>
+                    </div>
+                  )}
+
                   {/* Tính toán giá gốc */}
                   {(() => {
-                    const originalTotal = (roomTotal || 0) + (fnbTotal || 0);
+                    // totalAmount từ API đã là tổng sau khi trừ free hour và promotion
+                    const freeHourDiscount = freeHourPromotion?.freeAmount || 0;
+
+                    // Tính tổng gốc từ items hoặc từ roomTotal + fnbTotal
+                    let originalTotal = (roomTotal || 0) + (fnbTotal || 0);
+
+                    // Nếu không có roomTotal/fnbTotal, tính từ items
+                    if (originalTotal === 0 && items && items.length > 0) {
+                      originalTotal = items.reduce(
+                        (sum, item) => sum + item.price * item.quantity,
+                        0
+                      );
+                    }
+
+                    // Nếu vẫn không có, tính từ totalAmount + freeAmount (vì totalAmount đã trừ freeAmount)
+                    if (originalTotal === 0 && totalAmount) {
+                      originalTotal = totalAmount + freeHourDiscount;
+                    }
+
+                    // Tổng sau khi trừ free hour
+                    const afterFreeHourTotal = Math.max(
+                      0,
+                      originalTotal - freeHourDiscount
+                    );
+
+                    // Tính promotion discount (nếu có) dựa trên tổng sau khi trừ free hour
+                    const promotionDiscountAmount = appliedPromotion
+                      ? (afterFreeHourTotal *
+                          (appliedPromotion.discountPercentage || 0)) /
+                        100
+                      : 0;
+
+                    // Tổng cuối cùng: sử dụng totalAmount từ API (đã được tính sẵn)
                     const finalTotal = totalAmount || 0;
-                    const discountAmount = originalTotal - finalTotal;
 
                     return (
                       <>
-                        {/* Giảm giá (nếu có) */}
-                        {appliedPromotion && discountAmount > 0 && (
+                        {/* Giảm giá promotion (nếu có) */}
+                        {appliedPromotion && promotionDiscountAmount > 0 && (
                           <div className="flex justify-between text-xs sm:text-sm">
                             <span className="text-green-600 break-words">
                               Giảm {appliedPromotion.name} (
@@ -1223,7 +1360,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                             </span>
                             <span className="text-green-600 font-medium break-words ml-2 text-right">
                               -
-                              {discountAmount.toLocaleString("vi-VN", {
+                              {promotionDiscountAmount.toLocaleString("vi-VN", {
                                 style: "currency",
                                 currency: "VND",
                               })}

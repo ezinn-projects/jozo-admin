@@ -9,6 +9,7 @@ interface ICreateRoomScheduleRequest {
   endTime: string | null;
   status: RoomStatus;
   note?: string;
+  applyFreeHourPromo?: boolean;
 }
 
 const roomsScheduleApis = {
