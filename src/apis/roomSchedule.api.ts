@@ -10,6 +10,7 @@ interface ICreateRoomScheduleRequest {
   status: RoomStatus;
   note?: string;
   giftEnabled?: boolean;
+  applyFreeHourPromo?: boolean;
 }
 
 const roomsScheduleApis = {

@@ -46,6 +46,8 @@ interface IRoomSchedule {
   source?: "customer" | "admin" | "walk-in";
   // Gift enabled
   giftEnabled?: boolean;
+  // Free hour promotion
+  applyFreeHourPromo?: boolean;
 }
 
 export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };
