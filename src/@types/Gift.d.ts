@@ -50,3 +50,12 @@ export interface ScheduleGift {
   items?: GiftBundleItem[];
 }
 
+// Interface cho gift trong bill response
+export interface BillGift {
+  giftId: string; // ObjectId từ backend được serialize thành string
+  name: string;
+  type: GiftType;
+  discountPercentage?: number;
+  items?: GiftBundleItem[];
+}
+

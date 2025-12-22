@@ -1,4 +1,5 @@
 import { OrderDetail } from "@/@types/FnbOrder";
+import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
@@ -70,6 +71,7 @@ interface BillData {
   note?: string;
   endTime?: string | Date;
   startTime?: string | Date;
+  gift?: BillGift;
 }
 
 // Interface cho bill response từ API
@@ -83,6 +85,7 @@ interface BillResponse {
   note?: string;
   endTime?: string | Date;
   startTime?: string | Date;
+  gift?: BillGift;
 }
 
 interface BillResultWithNote extends BillResponse {
@@ -574,6 +577,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     note,
     endTime,
     startTime,
+    gift,
   } = billResult;
 
   // Debug: Log items khi thay đổi
@@ -822,19 +826,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             </DialogHeader>
 
             {/* Thông tin quà tặng */}
-            {schedule.giftEnabled !== undefined && (
-              <div className="mb-4">
-                <div
-                  className={`${
-                    schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
-                  } p-3 rounded-lg border ${
-                    schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
-                  }`}
-                >
+            <div className="mb-4">
+              <div
+                className={`${
+                  gift ? "bg-pink-50" : "bg-gray-50"
+                } p-3 rounded-lg border ${
+                  gift ? "border-pink-200" : "border-gray-200"
+                }`}
+              >
+                <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Gift
                       className={`w-4 h-4 ${
-                        schedule.giftEnabled ? "text-pink-500" : "text-gray-500"
+                        gift ? "text-pink-500" : "text-gray-500"
                       }`}
                     />
                     <span className="text-sm font-medium">
@@ -842,19 +846,47 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </span>
                     <span
                       className={`text-sm ${
-                        schedule.giftEnabled
-                          ? "text-pink-600 font-semibold"
-                          : "text-gray-600"
+                        gift ? "text-pink-600 font-semibold" : "text-gray-600"
                       }`}
                     >
-                      {schedule.giftEnabled
-                        ? "Được nhận quà"
-                        : "Không được nhận quà"}
+                      {gift ? "Đã nhận quà" : "Không được nhận quà"}
                     </span>
                   </div>
+                  {gift && (
+                    <div className="pl-6 space-y-1">
+                      <div className="text-sm">
+                        <span className="font-medium">Tên quà:</span>{" "}
+                        <span className="text-pink-700">{gift.name}</span>
+                      </div>
+                      {gift.type === "discount" && gift.discountPercentage && (
+                        <div className="text-sm">
+                          <span className="font-medium">Giảm giá:</span>{" "}
+                          <span className="text-green-600 font-semibold">
+                            {gift.discountPercentage}%
+                          </span>
+                        </div>
+                      )}
+                      {gift.type === "snacks_drinks" &&
+                        gift.items &&
+                        gift.items.length > 0 && (
+                          <div className="text-sm space-y-1">
+                            <span className="font-medium">
+                              Items trong quà:
+                            </span>
+                            <ul className="list-disc list-inside ml-2 space-y-0.5">
+                              {gift.items.map((item, index) => (
+                                <li key={index} className="text-purple-600">
+                                  {item.name} x{item.quantity}
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        )}
+                    </div>
+                  )}
                 </div>
               </div>
-            )}
+            </div>
 
             {/* Bill Preview Section */}
             <div className="mt-4 p-3 sm:p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-xs sm:text-sm">

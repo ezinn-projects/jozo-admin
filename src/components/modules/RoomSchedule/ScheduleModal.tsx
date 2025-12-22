@@ -340,9 +340,9 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 control={control}
                 name="giftEnabled"
                 render={({ field }) => (
-                  <FormItem>
+                  <FormItem className="">
                     <FormLabel>Allow Gift</FormLabel>
-                    <FormControl>
+                    <FormControl className="ml-2">
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
