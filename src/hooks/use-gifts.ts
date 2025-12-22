@@ -1,4 +1,3 @@
-import { Gift } from "@/@types/Gift";
 import giftApis from "@/apis/gift.apis";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -93,4 +92,3 @@ export const useDeleteGift = () => {
     },
   });
 };
-

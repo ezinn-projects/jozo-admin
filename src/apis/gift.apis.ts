@@ -1,4 +1,4 @@
-import { Gift, GiftCreateRequest } from "@/@types/Gift";
+import { Gift } from "@/@types/Gift";
 import http from "@/utils/http";
 
 const giftApis = {
@@ -20,9 +20,7 @@ const giftApis = {
 
   deleteGift: (id: string) => http.delete<HTTPResponse<Gift>>(`/gifts/${id}`),
 
-  getGiftById: (id: string) =>
-    http.get<HTTPResponse<Gift>>(`/gifts/${id}`),
+  getGiftById: (id: string) => http.get<HTTPResponse<Gift>>(`/gifts/${id}`),
 };
 
 export default giftApis;
-
