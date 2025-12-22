@@ -9,6 +9,7 @@ interface ICreateRoomScheduleRequest {
   endTime: string | null;
   status: RoomStatus;
   note?: string;
+  giftEnabled?: boolean;
   applyFreeHourPromo?: boolean;
 }
 

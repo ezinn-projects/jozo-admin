@@ -44,6 +44,8 @@ interface IRoomSchedule {
   upgraded?: boolean;
   // Booking source
   source?: "customer" | "admin" | "walk-in";
+  // Gift enabled
+  giftEnabled?: boolean;
   // Free hour promotion
   applyFreeHourPromo?: boolean;
 }

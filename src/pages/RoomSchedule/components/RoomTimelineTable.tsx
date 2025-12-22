@@ -1,4 +1,5 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
+import { Gift as GiftType } from "@/@types/Gift";
 import roomApis from "@/apis/room.apis";
 import {
   useQuery /* , useMutation */,
@@ -10,6 +11,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { PageHeader } from "@/components/shared";
 import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
+import GiftDetailsModal from "@/components/modules/RoomSchedule/GiftDetailsModal";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -36,6 +38,7 @@ import {
   CalendarIcon,
   CircleXIcon,
   EditIcon,
+  Gift,
   UtensilsCrossed,
 } from "lucide-react";
 import EditRoomTypeModal from "./EditRoomTypeModal";
@@ -77,6 +80,7 @@ type Modal =
   | "bill"
   | "editRoomType"
   | "orderDetails"
+  | "giftDetails"
   | null;
 
 // interface DragState {
@@ -121,6 +125,8 @@ const RoomTimelineTable: React.FC = () => {
     offNewOrderNotification,
     onNewBooking,
     offNewBooking,
+    onGiftClaimed,
+    offGiftClaimed,
   } = useSocket();
   const [date, setDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } = useRoomSchedules(date);
@@ -148,6 +154,11 @@ const RoomTimelineTable: React.FC = () => {
   const [roomForEdit, setRoomForEdit] = useState<IRoom | null>(null);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [orderRoomId, setOrderRoomId] = useState<string>("");
+  const [giftData, setGiftData] = useState<{
+    gift: GiftType;
+    roomId: string;
+    scheduleId: string;
+  } | null>(null);
 
   // Drag and drop state - TẠM THỜI DISABLED
   /*
@@ -274,6 +285,18 @@ const RoomTimelineTable: React.FC = () => {
   }>({});
 
   const [orderBlinkingRooms, setOrderBlinkingRooms] = useState<{
+    [key: string]: boolean;
+  }>({});
+
+  const [giftNotifications, setGiftNotifications] = useState<{
+    [roomId: string]: {
+      gift: GiftType;
+      scheduleId: string;
+      timestamp: number;
+    };
+  }>({});
+
+  const [giftBlinkingRooms, setGiftBlinkingRooms] = useState<{
     [key: string]: boolean;
   }>({});
 
@@ -407,6 +430,63 @@ const RoomTimelineTable: React.FC = () => {
       }
     };
 
+    // Handle gift claimed notifications
+    const handleGiftClaimed = (data: {
+      roomId: string;
+      scheduleId: string;
+      gift: GiftType;
+    }) => {
+      console.log("gift claimed notification data", data);
+      // Convert numeric roomId to actual room ID if needed
+      // Backend có thể gửi roomId dạng số hoặc string ID
+      let actualRoomId = data.roomId;
+
+      // Nếu roomId là số, convert sang actual room ID
+      if (!isNaN(Number(data.roomId))) {
+        actualRoomId =
+          roomsData?.[parseInt(data.roomId) - 1]?._id || data.roomId;
+      }
+
+      if (actualRoomId && roomsData?.find((r) => r._id === actualRoomId)) {
+        setGiftNotifications((prev) => ({
+          ...prev,
+          [actualRoomId]: {
+            gift: data.gift,
+            scheduleId: data.scheduleId,
+            timestamp: Date.now(),
+          },
+        }));
+
+        // Start blinking for the room
+        setGiftBlinkingRooms((prev) => ({
+          ...prev,
+          [actualRoomId]: true,
+        }));
+
+        // Stop blinking after 30 seconds
+        setTimeout(() => {
+          setGiftBlinkingRooms((prev) => ({
+            ...prev,
+            [actualRoomId]: false,
+          }));
+        }, 30000);
+
+        const roomName = roomsData?.find(
+          (r) => r._id === actualRoomId
+        )?.roomName;
+
+        // Speak the notification
+        speak(`Quà tặng đã được nhận từ ${roomName}`);
+
+        // Show toast notification
+        toast({
+          title: "Quà tặng đã được nhận",
+          description: `${roomName}: ${data.gift.name}`,
+          variant: "default",
+        });
+      }
+    };
+
     // Handle new booking notifications
     const handleNewBooking = (data: {
       roomId: string;
@@ -523,6 +603,7 @@ const RoomTimelineTable: React.FC = () => {
     onNotification(handleNotification);
     onNewOrderNotification(handleNewOrderNotification);
     onNewBooking(bookingHandler);
+    onGiftClaimed(handleGiftClaimed);
 
     // Join admin room để nhận tất cả booking notifications
     joinRoom("admin");
@@ -537,6 +618,7 @@ const RoomTimelineTable: React.FC = () => {
       offNotification(handleNotification);
       offNewOrderNotification(handleNewOrderNotification);
       offNewBooking(bookingHandler);
+      offGiftClaimed(handleGiftClaimed);
       leaveRoom("admin");
       roomsData?.forEach((_, index) => {
         leaveRoom((index + 1).toString());
@@ -555,6 +637,8 @@ const RoomTimelineTable: React.FC = () => {
     offNewOrderNotification,
     onNewBooking,
     offNewBooking,
+    onGiftClaimed,
+    offGiftClaimed,
     queryClient,
     date,
   ]);
@@ -584,6 +668,22 @@ const RoomTimelineTable: React.FC = () => {
           (acc, [roomId, notification]) => {
             if (now - notification.timestamp < 10 * 60 * 1000) {
               // Keep order notifications less than 10 minutes old
+              acc[roomId] = notification;
+            }
+            return acc;
+          },
+          {} as typeof prev
+        );
+        return filtered;
+      });
+
+      // Clear old gift notifications (older than 10 minutes)
+      setGiftNotifications((prev) => {
+        const now = Date.now();
+        const filtered = Object.entries(prev).reduce(
+          (acc, [roomId, notification]) => {
+            if (now - notification.timestamp < 10 * 60 * 1000) {
+              // Keep gift notifications less than 10 minutes old
               acc[roomId] = notification;
             }
             return acc;
@@ -625,6 +725,7 @@ const RoomTimelineTable: React.FC = () => {
     setRoomForEdit(null);
     setOrderData(null);
     setOrderRoomId("");
+    setGiftData(null);
   };
 
   const handleOrderClick = (roomId: string) => {
@@ -648,6 +749,23 @@ const RoomTimelineTable: React.FC = () => {
       delete newNotifications[roomId];
       return newNotifications;
     });
+  };
+
+  const handleGiftClick = (roomId: string) => {
+    const giftNotification = giftNotifications[roomId];
+    if (giftNotification) {
+      setGiftData({
+        gift: giftNotification.gift,
+        roomId: roomId,
+        scheduleId: giftNotification.scheduleId,
+      });
+      setModal("giftDetails");
+      // Stop blinking when clicked
+      setGiftBlinkingRooms((prev) => ({
+        ...prev,
+        [roomId]: false,
+      }));
+    }
   };
 
   const handleScheduleClick = (schedule: IRoomSchedule) => {
@@ -1018,7 +1136,7 @@ const RoomTimelineTable: React.FC = () => {
           Tắt video tất cả phòng
         </Button>
       </div>
-      
+
       {/* Mobile View */}
       {isMobile ? (
         <MobileTimelineView
@@ -1031,10 +1149,13 @@ const RoomTimelineTable: React.FC = () => {
           blinkingRooms={blinkingRooms}
           orderNotifications={orderNotifications}
           orderBlinkingRooms={orderBlinkingRooms}
+          giftNotifications={giftNotifications}
+          giftBlinkingRooms={giftBlinkingRooms}
           onRoomClick={handleRoomClick}
           onScheduleClick={handleScheduleClick}
           onResolveRequest={handleResolveRequest}
           onOrderClick={handleOrderClick}
+          onGiftClick={handleGiftClick}
           onEditRoomType={handleEditRoomType}
         />
       ) : (
@@ -1044,384 +1165,434 @@ const RoomTimelineTable: React.FC = () => {
           ref={timelineContainerRef}
           onScroll={handleScroll}
         >
-        {/* Timeline container */}
-        <div className="relative" style={{ width: `${TIMELINE_WIDTH}px` }}>
-          {/* Timeline Header */}
-          <div
-            className="flex border-b bg-gray-200 w-full"
-            style={{ position: "sticky", top: 0, zIndex: 20 }}
-          >
-            <div className="w-[240px] p-2 border-r flex items-center justify-center font-medium bg-gray-200">
-              Phòng
-            </div>
-            <div className="flex-1 relative h-10">
-              {Array.from({
-                length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
-              }).map((_, index) => {
-                const left = index * (HOUR_MARKER_SPACING / 4);
-                return (
-                  <div
-                    key={`grid-${index}`}
-                    className={`absolute h-full w-px ${
-                      index % 4 === 0 ? "bg-gray-300" : "bg-gray-200"
-                    }`}
-                    style={{ left }}
-                  />
-                );
-              })}
-              {Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }).map(
-                (_, index) => {
-                  const hour = DAY_START_HOUR + index;
-                  const left = index * HOUR_MARKER_SPACING;
+          {/* Timeline container */}
+          <div className="relative" style={{ width: `${TIMELINE_WIDTH}px` }}>
+            {/* Timeline Header */}
+            <div
+              className="flex border-b bg-gray-200 w-full"
+              style={{ position: "sticky", top: 0, zIndex: 20 }}
+            >
+              <div className="w-[240px] p-2 border-r flex items-center justify-center font-medium bg-gray-200">
+                Phòng
+              </div>
+              <div className="flex-1 relative h-10">
+                {Array.from({
+                  length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
+                }).map((_, index) => {
+                  const left = index * (HOUR_MARKER_SPACING / 4);
                   return (
                     <div
-                      key={`header-marker-${hour}`}
-                      className="absolute top-1/2 -translate-y-1/2 text-xs text-gray-600 text-center font-medium"
-                      style={{ left, width: 20 }}
-                    >
-                      {hour}:00
-                    </div>
-                  );
-                }
-              )}
-            </div>
-          </div>
-
-          {/* Now Marker (line đỏ) */}
-          {isToday && markerLeft >= 0 && markerLeft <= TIMELINE_WIDTH && (
-            <>
-              <div
-                className="absolute z-20"
-                style={{
-                  left: markerLeft - 18,
-                  top: "50%",
-                  transform: "translateY(-50%)",
-                }}
-              >
-                <div className="text-xs text-red-500 bg-white px-1 rounded">
-                  {currentTime.format("HH:mm")}
-                </div>
-              </div>
-              <div
-                className="absolute bg-red-500 w-px"
-                style={{ left: markerLeft, top: 0, bottom: 0, zIndex: 10 }}
-              />
-            </>
-          )}
-
-          {/* Danh sách phòng */}
-          {roomsData?.map((room) => {
-            const roomSchedules = grouped[room._id] || [];
-            const hasNotification = notifications[room._id];
-            const isBlinking = blinkingRooms[room._id];
-            const hasOrderNotification = orderNotifications[room._id];
-            const isOrderBlinking = orderBlinkingRooms[room._id];
-
-            return (
-              <div
-                key={room._id}
-                className="flex border-b hover:bg-gray-50 w-full transition-colors duration-200"
-                // onDragOver={handleDragOver}
-                // onDragLeave={handleDragLeave}
-                // onDrop={(e) => handleDrop(e, room._id)}
-              >
-                <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={() => handleRoomClick(room._id)}
-                      className={`text-blue-600 hover:underline ${
-                        isBlinking
-                          ? "animate-[blink_1s_ease-in-out_infinite]"
-                          : ""
+                      key={`grid-${index}`}
+                      className={`absolute h-full w-px ${
+                        index % 4 === 0 ? "bg-gray-300" : "bg-gray-200"
                       }`}
-                    >
-                      {room.roomName}
-                    </button>
-                    <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
-                      {getRoomTypeLabel(room.roomType)}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditRoomType(room);
-                      }}
-                      className="text-gray-400 hover:text-blue-600 transition-colors"
-                    >
-                      <EditIcon className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    {hasNotification && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => handleResolveRequest(room._id)}
-                          >
-                            <BellIcon className="h-5 w-5 text-red-500 animate-bounce" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{hasNotification.message}</p>
-                          <p className="text-xs text-gray-500 mt-1">
-                            {dayjs(hasNotification.timestamp).format("HH:mm")}
-                          </p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {hasOrderNotification && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={() => handleOrderClick(room._id)}
-                            className={`${
-                              isOrderBlinking ? "animate-pulse" : ""
-                            }`}
-                          >
-                            <UtensilsCrossed className="h-5 w-5 text-orange-500" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{hasOrderNotification.message}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </div>
-                </div>
-                <div className="flex-1 h-12 relative">
-                  {isToday && (
-                    <>
-                      {/* Overlay cho vùng đã qua (màu đậm hơn) */}
-                      <div
-                        style={{
-                          position: "absolute",
-                          top: 0,
-                          left: 0,
-                          width: markerLeft,
-                          height: "100%",
-                          pointerEvents: "none",
-                          zIndex: 0,
-                        }}
-                      ></div>
-                    </>
-                  )}
-                  {Array.from({
-                    length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
-                  }).map((_, index) => {
-                    const left = index * (HOUR_MARKER_SPACING / 4);
+                      style={{ left }}
+                    />
+                  );
+                })}
+                {Array.from({ length: DAY_END_HOUR - DAY_START_HOUR + 1 }).map(
+                  (_, index) => {
+                    const hour = DAY_START_HOUR + index;
+                    const left = index * HOUR_MARKER_SPACING;
                     return (
                       <div
-                        key={`room-grid-${index}`}
-                        className={`absolute h-full w-px ${
-                          index % 4 === 0 ? "bg-gray-200" : "bg-gray-100"
-                        }`}
-                        style={{ left }}
-                      />
-                    );
-                  })}
-                  {roomSchedules?.map((schedule) => {
-                    const { left, width, bgColor } = getMarkerStyle(schedule);
-                    // const isDragging =
-                    //   dragState.isDragging &&
-                    //   dragState.scheduleId === schedule._id;
-                    const eventElement = (
-                      <div
-                        key={schedule._id}
-                        className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md`}
-                        style={{ left, width }}
-                        title={`${schedule.status} - ${dayjs(
-                          schedule.startTime
-                        ).format("HH:mm")}`}
-                        // draggable
-                        // onDragStart={(e) => handleDragStart(e, schedule)}
-                        // onDragEnd={handleDragEnd}
-                        onClick={() => {
-                          const lowerStatus = schedule.status.toLowerCase();
-                          if (lowerStatus === "locked") {
-                            setLockedSchedule(schedule);
-                            setModal("process");
-                          } else if (lowerStatus === "booked") {
-                            setBookedSchedule(schedule);
-                            setModal("booked");
-                          } else if (lowerStatus === "in use") {
-                            setInUseSchedule(schedule);
-                            setModal("inUse");
-                          }
-                        }}
+                        key={`header-marker-${hour}`}
+                        className="absolute top-1/2 -translate-y-1/2 text-xs text-gray-600 text-center font-medium"
+                        style={{ left, width: 20 }}
                       >
-                        {/* Hiển thị thời gian trong schedule block */}
-                        <div className="text-xs text-white font-medium px-1 py-0.5 truncate">
-                          {dayjs(schedule.startTime).format("HH:mm")}
-                        </div>
+                        {hour}:00
                       </div>
                     );
-                    if (schedule.status.toLowerCase() === "booked") {
-                      const eventStart = dayjs(schedule.startTime);
-                      const eventEnd = schedule.endTime
-                        ? dayjs(schedule.endTime)
-                        : eventStart.add(120, "minute");
-                      return (
-                        <Tooltip key={schedule._id}>
+                  }
+                )}
+              </div>
+            </div>
+
+            {/* Now Marker (line đỏ) */}
+            {isToday && markerLeft >= 0 && markerLeft <= TIMELINE_WIDTH && (
+              <>
+                <div
+                  className="absolute z-20"
+                  style={{
+                    left: markerLeft - 18,
+                    top: "50%",
+                    transform: "translateY(-50%)",
+                  }}
+                >
+                  <div className="text-xs text-red-500 bg-white px-1 rounded">
+                    {currentTime.format("HH:mm")}
+                  </div>
+                </div>
+                <div
+                  className="absolute bg-red-500 w-px"
+                  style={{ left: markerLeft, top: 0, bottom: 0, zIndex: 10 }}
+                />
+              </>
+            )}
+
+            {/* Danh sách phòng */}
+            {roomsData?.map((room) => {
+              const roomSchedules = grouped[room._id] || [];
+              const hasNotification = notifications[room._id];
+              const isBlinking = blinkingRooms[room._id];
+              const hasOrderNotification = orderNotifications[room._id];
+              const isOrderBlinking = orderBlinkingRooms[room._id];
+              const hasGiftNotification = giftNotifications[room._id];
+              const isGiftBlinking = giftBlinkingRooms[room._id];
+
+              return (
+                <div
+                  key={room._id}
+                  className="flex border-b hover:bg-gray-50 w-full transition-colors duration-200"
+                  // onDragOver={handleDragOver}
+                  // onDragLeave={handleDragLeave}
+                  // onDrop={(e) => handleDrop(e, room._id)}
+                >
+                  <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleRoomClick(room._id)}
+                        className={`text-blue-600 hover:underline ${
+                          isBlinking
+                            ? "animate-[blink_1s_ease-in-out_infinite]"
+                            : ""
+                        }`}
+                      >
+                        {room.roomName}
+                      </button>
+                      <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
+                        {getRoomTypeLabel(room.roomType)}
+                      </span>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleEditRoomType(room);
+                        }}
+                        className="text-gray-400 hover:text-blue-600 transition-colors"
+                      >
+                        <EditIcon className="h-3 w-3" />
+                      </button>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {hasNotification && (
+                        <Tooltip>
                           <TooltipTrigger asChild>
-                            {eventElement}
+                            <button
+                              onClick={() => handleResolveRequest(room._id)}
+                            >
+                              <BellIcon className="h-5 w-5 text-red-500 animate-bounce" />
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
-                            <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
-                            {/* <p className="text-xs text-gray-500">
-                              Kéo để di chuyển
-                            </p> */}
+                            <p>{hasNotification.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              {dayjs(hasNotification.timestamp).format("HH:mm")}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
-                      );
-                    } else if (schedule.status.toLowerCase() === "locked") {
-                      const lockedDuration = dayjs().diff(
-                        dayjs(schedule.startTime),
-                        "minute"
-                      );
-                      return (
-                        <Tooltip key={schedule._id}>
+                      )}
+                      {hasOrderNotification && (
+                        <Tooltip>
                           <TooltipTrigger asChild>
-                            {eventElement}
+                            <button
+                              onClick={() => handleOrderClick(room._id)}
+                              className={`${
+                                isOrderBlinking ? "animate-pulse" : ""
+                              }`}
+                            >
+                              <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+                            </button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Đã khóa {lockedDuration} phút</p>
-                            {/* <p className="text-xs text-gray-500">
-                              Kéo để di chuyển
-                            </p> */}
+                            <p>{hasOrderNotification.message}</p>
                           </TooltipContent>
                         </Tooltip>
+                      )}
+                      {hasGiftNotification && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={() => handleGiftClick(room._id)}
+                              className={`${
+                                isGiftBlinking ? "animate-pulse" : ""
+                              }`}
+                            >
+                              <Gift className="h-5 w-5 text-purple-500" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Quà tặng: {hasGiftNotification.gift.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex-1 h-12 relative">
+                    {isToday && (
+                      <>
+                        {/* Overlay cho vùng đã qua (màu đậm hơn) */}
+                        <div
+                          style={{
+                            position: "absolute",
+                            top: 0,
+                            left: 0,
+                            width: markerLeft,
+                            height: "100%",
+                            pointerEvents: "none",
+                            zIndex: 0,
+                          }}
+                        ></div>
+                      </>
+                    )}
+                    {Array.from({
+                      length: (DAY_END_HOUR - DAY_START_HOUR) * 4 + 1,
+                    }).map((_, index) => {
+                      const left = index * (HOUR_MARKER_SPACING / 4);
+                      return (
+                        <div
+                          key={`room-grid-${index}`}
+                          className={`absolute h-full w-px ${
+                            index % 4 === 0 ? "bg-gray-200" : "bg-gray-100"
+                          }`}
+                          style={{ left }}
+                        />
                       );
-                    } else if (schedule.status.toLowerCase() === "in use") {
-                      const eventStart = dayjs(schedule.startTime);
-                      const inUseDuration = dayjs().diff(eventStart, "minute");
-                      
-                      // Tính thời gian đã sử dụng
-                      let durationLabel = "";
-                      if (inUseDuration < 60) {
-                        durationLabel = `${inUseDuration} phút`;
-                      } else {
-                        const hours = Math.floor(inUseDuration / 60);
-                        const minutes = inUseDuration % 60;
-                        durationLabel = `${hours} giờ${
-                          minutes > 0 ? ` ${minutes} phút` : ""
-                        }`;
-                      }
-                      
-                      // Tính giờ kết thúc và thời gian còn lại
-                      let endTimeLabel = "";
-                      let remainingTimeLabel = "";
-                      if (schedule.endTime) {
-                        const eventEnd = dayjs(schedule.endTime);
-                        endTimeLabel = eventEnd.format("HH:mm");
-                        const remainingMinutes = eventEnd.diff(dayjs(), "minute");
-                        if (remainingMinutes > 0) {
-                          if (remainingMinutes < 60) {
-                            remainingTimeLabel = `Còn ${remainingMinutes} phút`;
+                    })}
+                    {roomSchedules?.map((schedule) => {
+                      const { left, width, bgColor } = getMarkerStyle(schedule);
+                      // const isDragging =
+                      //   dragState.isDragging &&
+                      //   dragState.scheduleId === schedule._id;
+                      const eventElement = (
+                        <div
+                          key={schedule._id}
+                          className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md`}
+                          style={{ left, width }}
+                          title={`${schedule.status} - ${dayjs(
+                            schedule.startTime
+                          ).format("HH:mm")}`}
+                          // draggable
+                          // onDragStart={(e) => handleDragStart(e, schedule)}
+                          // onDragEnd={handleDragEnd}
+                          onClick={() => {
+                            const lowerStatus = schedule.status.toLowerCase();
+                            if (lowerStatus === "locked") {
+                              setLockedSchedule(schedule);
+                              setModal("process");
+                            } else if (lowerStatus === "booked") {
+                              setBookedSchedule(schedule);
+                              setModal("booked");
+                            } else if (lowerStatus === "in use") {
+                              setInUseSchedule(schedule);
+                              setModal("inUse");
+                            }
+                          }}
+                        >
+                          {/* Hiển thị thời gian trong schedule block */}
+                          <div className="text-xs text-white font-medium px-1 py-0.5 truncate">
+                            {dayjs(schedule.startTime).format("HH:mm")}
+                          </div>
+                        </div>
+                      );
+                      if (schedule.status.toLowerCase() === "booked") {
+                        const eventStart = dayjs(schedule.startTime);
+                        const eventEnd = schedule.endTime
+                          ? dayjs(schedule.endTime)
+                          : eventStart.add(120, "minute");
+                        return (
+                          <Tooltip key={schedule._id}>
+                            <TooltipTrigger asChild>
+                              {eventElement}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
+                              <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
+                              {/* <p className="text-xs text-gray-500">
+                              Kéo để di chuyển
+                            </p> */}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      } else if (schedule.status.toLowerCase() === "locked") {
+                        const lockedDuration = dayjs().diff(
+                          dayjs(schedule.startTime),
+                          "minute"
+                        );
+                        return (
+                          <Tooltip key={schedule._id}>
+                            <TooltipTrigger asChild>
+                              {eventElement}
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Đã khóa {lockedDuration} phút</p>
+                              {/* <p className="text-xs text-gray-500">
+                              Kéo để di chuyển
+                            </p> */}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      } else if (schedule.status.toLowerCase() === "in use") {
+                        const eventStart = dayjs(schedule.startTime);
+                        const inUseDuration = dayjs().diff(
+                          eventStart,
+                          "minute"
+                        );
+
+                        // Tính thời gian đã sử dụng
+                        let durationLabel = "";
+                        if (inUseDuration < 60) {
+                          durationLabel = `${inUseDuration} phút`;
+                        } else {
+                          const hours = Math.floor(inUseDuration / 60);
+                          const minutes = inUseDuration % 60;
+                          durationLabel = `${hours} giờ${
+                            minutes > 0 ? ` ${minutes} phút` : ""
+                          }`;
+                        }
+
+                        // Tính giờ kết thúc và thời gian còn lại
+                        let endTimeLabel = "";
+                        let remainingTimeLabel = "";
+                        if (schedule.endTime) {
+                          const eventEnd = dayjs(schedule.endTime);
+                          endTimeLabel = eventEnd.format("HH:mm");
+                          const remainingMinutes = eventEnd.diff(
+                            dayjs(),
+                            "minute"
+                          );
+                          if (remainingMinutes > 0) {
+                            if (remainingMinutes < 60) {
+                              remainingTimeLabel = `Còn ${remainingMinutes} phút`;
+                            } else {
+                              const hours = Math.floor(remainingMinutes / 60);
+                              const minutes = remainingMinutes % 60;
+                              remainingTimeLabel = `Còn ${hours} giờ${
+                                minutes > 0 ? ` ${minutes} phút` : ""
+                              }`;
+                            }
                           } else {
-                            const hours = Math.floor(remainingMinutes / 60);
-                            const minutes = remainingMinutes % 60;
-                            remainingTimeLabel = `Còn ${hours} giờ${
-                              minutes > 0 ? ` ${minutes} phút` : ""
-                            }`;
+                            remainingTimeLabel = "Đã quá giờ";
                           }
                         } else {
-                          remainingTimeLabel = "Đã quá giờ";
+                          // Nếu chưa có endTime, tính đến currentTime hoặc endOfDay
+                          const endOfDay = eventStart
+                            .startOf("day")
+                            .hour(DAY_END_HOUR)
+                            .minute(0);
+                          const now = dayjs();
+                          const actualEnd = now.isBefore(endOfDay)
+                            ? now
+                            : endOfDay;
+                          endTimeLabel = actualEnd.format("HH:mm");
                         }
-                      } else {
-                        // Nếu chưa có endTime, tính đến currentTime hoặc endOfDay
-                        const endOfDay = eventStart.startOf("day").hour(DAY_END_HOUR).minute(0);
-                        const now = dayjs();
-                        const actualEnd = now.isBefore(endOfDay) ? now : endOfDay;
-                        endTimeLabel = actualEnd.format("HH:mm");
-                      }
-                      
-                      // Nguồn đặt
-                      const sourceLabel =
-                        schedule.source === "customer"
-                          ? "Khách đặt online"
-                          : schedule.source === "walk-in"
-                          ? "Khách vãng lai"
-                          : "Admin đặt";
-                      
-                      return (
-                        <Tooltip key={schedule._id}>
-                          <TooltipTrigger asChild>
-                            {eventElement}
-                          </TooltipTrigger>
-                          <TooltipContent className="max-w-xs">
-                            <div className="space-y-1">
-                              <p className="font-semibold">Thông tin sử dụng</p>
-                              <div className="text-sm space-y-0.5">
-                                <p>
-                                  <span className="text-gray-500">Bắt đầu:</span>{" "}
-                                  {eventStart.format("HH:mm")}
+
+                        // Nguồn đặt
+                        const sourceLabel =
+                          schedule.source === "customer"
+                            ? "Khách đặt online"
+                            : schedule.source === "walk-in"
+                            ? "Khách vãng lai"
+                            : "Admin đặt";
+
+                        return (
+                          <Tooltip key={schedule._id}>
+                            <TooltipTrigger asChild>
+                              {eventElement}
+                            </TooltipTrigger>
+                            <TooltipContent className="max-w-xs">
+                              <div className="space-y-1">
+                                <p className="font-semibold">
+                                  Thông tin sử dụng
                                 </p>
-                                <p>
-                                  <span className="text-gray-500">Kết thúc:</span>{" "}
-                                  {endTimeLabel}
-                                </p>
-                                <p>
-                                  <span className="text-gray-500">Đã sử dụng:</span>{" "}
-                                  {durationLabel}
-                                </p>
-                                {remainingTimeLabel && (
+                                <div className="text-sm space-y-0.5">
                                   <p>
-                                    <span className="text-gray-500">Thời gian còn lại:</span>{" "}
-                                    <span
-                                      className={
-                                        remainingTimeLabel === "Đã quá giờ"
-                                          ? "text-red-500 font-medium"
-                                          : ""
-                                      }
-                                    >
-                                      {remainingTimeLabel}
-                                    </span>
+                                    <span className="text-gray-500">
+                                      Bắt đầu:
+                                    </span>{" "}
+                                    {eventStart.format("HH:mm")}
                                   </p>
-                                )}
-                              </div>
-                              {(schedule.customerName ||
-                                schedule.customerPhone ||
-                                schedule.note) && (
-                                <div className="pt-1 border-t text-sm space-y-0.5">
-                                  {schedule.customerName && (
+                                  <p>
+                                    <span className="text-gray-500">
+                                      Kết thúc:
+                                    </span>{" "}
+                                    {endTimeLabel}
+                                  </p>
+                                  <p>
+                                    <span className="text-gray-500">
+                                      Đã sử dụng:
+                                    </span>{" "}
+                                    {durationLabel}
+                                  </p>
+                                  {remainingTimeLabel && (
                                     <p>
-                                      <span className="text-gray-500">Khách hàng:</span>{" "}
-                                      {schedule.customerName}
-                                    </p>
-                                  )}
-                                  {schedule.customerPhone && (
-                                    <p>
-                                      <span className="text-gray-500">SĐT:</span>{" "}
-                                      {schedule.customerPhone}
-                                    </p>
-                                  )}
-                                  {schedule.note && (
-                                    <p>
-                                      <span className="text-gray-500">Ghi chú:</span>{" "}
-                                      <span className="italic">{schedule.note}</span>
+                                      <span className="text-gray-500">
+                                        Thời gian còn lại:
+                                      </span>{" "}
+                                      <span
+                                        className={
+                                          remainingTimeLabel === "Đã quá giờ"
+                                            ? "text-red-500 font-medium"
+                                            : ""
+                                        }
+                                      >
+                                        {remainingTimeLabel}
+                                      </span>
                                     </p>
                                   )}
                                 </div>
-                              )}
-                              <div className="pt-1 border-t text-xs text-gray-500">
-                                <p>{sourceLabel}</p>
-                                {schedule.upgraded && (
-                                  <p className="text-orange-500">Đã nâng cấp phòng</p>
+                                {(schedule.customerName ||
+                                  schedule.customerPhone ||
+                                  schedule.note) && (
+                                  <div className="pt-1 border-t text-sm space-y-0.5">
+                                    {schedule.customerName && (
+                                      <p>
+                                        <span className="text-gray-500">
+                                          Khách hàng:
+                                        </span>{" "}
+                                        {schedule.customerName}
+                                      </p>
+                                    )}
+                                    {schedule.customerPhone && (
+                                      <p>
+                                        <span className="text-gray-500">
+                                          SĐT:
+                                        </span>{" "}
+                                        {schedule.customerPhone}
+                                      </p>
+                                    )}
+                                    {schedule.note && (
+                                      <p>
+                                        <span className="text-gray-500">
+                                          Ghi chú:
+                                        </span>{" "}
+                                        <span className="italic">
+                                          {schedule.note}
+                                        </span>
+                                      </p>
+                                    )}
+                                  </div>
                                 )}
+                                <div className="pt-1 border-t text-xs text-gray-500">
+                                  <p>{sourceLabel}</p>
+                                  {schedule.upgraded && (
+                                    <p className="text-orange-500">
+                                      Đã nâng cấp phòng
+                                    </p>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </TooltipContent>
-                        </Tooltip>
-                      );
-                    }
-                    return eventElement;
-                  })}
+                            </TooltipContent>
+                          </Tooltip>
+                        );
+                      }
+                      return eventElement;
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
+          </div>
         </div>
-      </div>
       )}
 
       {/* Các modal khác */}
@@ -1481,6 +1652,16 @@ const RoomTimelineTable: React.FC = () => {
           orderData={orderData}
           roomId={orderRoomId}
           onOrderServed={() => handleOrderServed(orderRoomId)}
+        />
+      )}
+      {modal === "giftDetails" && giftData && (
+        <GiftDetailsModal
+          isOpen={true}
+          onClose={closeModal}
+          gift={giftData.gift}
+          roomId={giftData.roomId}
+          scheduleId={giftData.scheduleId}
+          roomName={roomsData?.find((r) => r._id === giftData.roomId)?.roomName}
         />
       )}
     </div>

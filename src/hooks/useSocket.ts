@@ -3,6 +3,7 @@ import io, { Socket } from "socket.io-client";
 import { useToast } from "./use-toast";
 import useAuth from "./useAuth";
 import { INotification } from "@/@types/Notification";
+import { Gift } from "@/@types/Gift";
 
 interface BookingData {
   roomId: string;
@@ -296,6 +297,19 @@ export const useSocket = () => {
     socketRef.current?.off("new_notification", callback);
   };
 
+  // Gift claimed event listener
+  const onGiftClaimed = (
+    callback: (data: { roomId: string; scheduleId: string; gift: Gift }) => void
+  ) => {
+    socketRef.current?.on("gift_claimed", callback);
+  };
+
+  const offGiftClaimed = (
+    callback: (data: { roomId: string; scheduleId: string; gift: Gift }) => void
+  ) => {
+    socketRef.current?.off("gift_claimed", callback);
+  };
+
   return {
     socket: socketRef.current,
     joinRoom,
@@ -314,5 +328,7 @@ export const useSocket = () => {
     offScheduleAssigned,
     onNewNotification,
     offNewNotification,
+    onGiftClaimed,
+    offGiftClaimed,
   };
 };

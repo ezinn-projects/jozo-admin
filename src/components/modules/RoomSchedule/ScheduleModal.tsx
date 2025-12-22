@@ -35,6 +35,7 @@ import { format } from "date-fns";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
+import { Switch } from "@/components/ui/switch";
 
 // Define schema using zod
 const scheduleSchema = z.object({
@@ -42,6 +43,7 @@ const scheduleSchema = z.object({
   endTime: z.string().nonempty("End time is required"),
   status: z.nativeEnum(RoomStatus),
   note: z.string().max(200).optional(),
+  giftEnabled: z.boolean().optional(),
 });
 
 type FormValues = z.infer<typeof scheduleSchema>;
@@ -76,6 +78,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       endTime: "",
       status: RoomStatus.Booked,
       note: "",
+      giftEnabled: false,
     },
   });
 
@@ -209,6 +212,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
             endTime: endTimeISO,
             status: values.status,
             note: values.note,
+            giftEnabled: values.giftEnabled,
           },
         });
       } else {
@@ -222,6 +226,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
           endTime: endTimeISO,
           status: values.status,
           note: values.note,
+          giftEnabled: values.giftEnabled,
         };
         createSchedule(scheduleData);
       }
@@ -331,7 +336,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </FormItem>
                 )}
               />
-
+              <FormField
+                control={control}
+                name="giftEnabled"
+                render={({ field }) => (
+                  <FormItem className="">
+                    <FormLabel>Allow Gift</FormLabel>
+                    <FormControl className="ml-2">
+                      <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <DialogFooter>
                 <Button type="submit" loading={isCreating || isUpdating}>
                   {scheduleId ? "Update" : "Create"}

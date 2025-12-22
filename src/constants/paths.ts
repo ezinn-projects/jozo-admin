@@ -51,6 +51,9 @@ const PATHS = {
   // recruitment management
   RECRUITMENT: "/recruitment",
 
+  // gifts management
+  GIFTS: "/gifts",
+
   // staff schedule management
   STAFF_SCHEDULE: "/staff-schedule",
   STAFF_EARNINGS_DETAIL: "/staff-schedule/:userId/earnings",

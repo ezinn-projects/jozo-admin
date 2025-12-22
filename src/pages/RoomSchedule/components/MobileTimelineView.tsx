@@ -1,11 +1,7 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import dayjs, { Dayjs } from "dayjs";
 import React, { useEffect, useState } from "react";
-import {
-  BellIcon,
-  EditIcon,
-  UtensilsCrossed,
-} from "lucide-react";
+import { BellIcon, EditIcon, Gift, UtensilsCrossed } from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -46,10 +42,19 @@ interface MobileTimelineViewProps {
     };
   };
   orderBlinkingRooms: { [key: string]: boolean };
+  giftNotifications?: {
+    [roomId: string]: {
+      gift: any;
+      scheduleId: string;
+      timestamp: number;
+    };
+  };
+  giftBlinkingRooms?: { [key: string]: boolean };
   onRoomClick: (roomId: string) => void;
   onScheduleClick: (schedule: IRoomSchedule) => void;
   onResolveRequest: (roomId: string) => void;
   onOrderClick: (roomId: string) => void;
+  onGiftClick?: (roomId: string) => void;
   onEditRoomType: (room: IRoom) => void;
 }
 
@@ -142,7 +147,7 @@ const getVerticalMarkerStyle = (
       (DAY_END_HOUR - DAY_START_HOUR) * 60
     );
     const markerTop = clampedMinutes * MOBILE_SCALE;
-    
+
     if (markerTop >= top + height) {
       if (status === "booked") {
         if (schedule.source === "customer") {
@@ -174,10 +179,13 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
   blinkingRooms,
   orderNotifications,
   orderBlinkingRooms,
+  giftNotifications = {},
+  giftBlinkingRooms = {},
   onRoomClick,
   onScheduleClick,
   onResolveRequest,
   onOrderClick,
+  onGiftClick,
   onEditRoomType,
 }) => {
   // State để cập nhật thời gian real-time
@@ -199,6 +207,8 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         const isBlinking = blinkingRooms[room._id];
         const hasOrderNotification = orderNotifications[room._id];
         const isOrderBlinking = orderBlinkingRooms[room._id];
+        const hasGiftNotification = giftNotifications[room._id];
+        const isGiftBlinking = giftBlinkingRooms[room._id];
 
         // Tìm schedule "in use" để hiển thị thông tin
         const inUseSchedule = roomSchedules.find(
@@ -206,7 +216,10 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         );
         let inUseDuration = null;
         if (inUseSchedule) {
-          const duration = currentTimeState.diff(dayjs(inUseSchedule.startTime), "minute");
+          const duration = currentTimeState.diff(
+            dayjs(inUseSchedule.startTime),
+            "minute"
+          );
           if (duration < 60) {
             inUseDuration = `${duration} phút`;
           } else {
@@ -217,7 +230,11 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         }
 
         // Tự động mở card nếu có schedule "in use" hoặc có notification
-        const shouldDefaultOpen = !!inUseSchedule || !!hasNotification || !!hasOrderNotification;
+        const shouldDefaultOpen =
+          !!inUseSchedule ||
+          !!hasNotification ||
+          !!hasOrderNotification ||
+          !!hasGiftNotification;
 
         return (
           <Collapsible key={room._id} defaultOpen={shouldDefaultOpen}>
@@ -293,6 +310,26 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         </TooltipContent>
                       </Tooltip>
                     )}
+                    {hasGiftNotification && onGiftClick && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onGiftClick(room._id);
+                            }}
+                            className={`flex-shrink-0 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center active:opacity-70 ${
+                              isGiftBlinking ? "animate-pulse" : ""
+                            }`}
+                          >
+                            <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Quà tặng: {hasGiftNotification.gift.name}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                     {inUseSchedule && inUseDuration && (
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded text-xs sm:text-sm font-medium whitespace-nowrap">
                         <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
@@ -308,151 +345,166 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
               <CollapsibleContent>
                 <div className="px-3 sm:px-4 pb-4 overflow-x-hidden">
                   {/* Timeline dọc */}
-                  <div className="relative overflow-y-auto max-h-[600px] sm:max-h-[800px] border border-gray-200 rounded-md" style={{ minHeight: `${Math.min(MOBILE_TIMELINE_HEIGHT, 600)}px` }}>
-                    <div className="relative" style={{ height: `${MOBILE_TIMELINE_HEIGHT}px` }}>
-                    {/* Hour markers */}
-                    {Array.from({
-                      length: DAY_END_HOUR - DAY_START_HOUR + 1,
-                    }).map((_, index) => {
-                      const hour = DAY_START_HOUR + index;
-                      const top = index * MOBILE_HOUR_HEIGHT;
-                      return (
-                        <div
-                          key={`hour-marker-${hour}`}
-                          className="absolute left-0 right-0 border-t border-gray-200"
-                          style={{ top: `${top}px` }}
-                        >
-                          <div className="absolute left-0 top-0 -translate-y-1/2 bg-white px-2 text-xs sm:text-sm text-gray-600 font-medium">
-                            {hour.toString().padStart(2, "0")}:00
-                          </div>
-                        </div>
-                      );
-                    })}
-
-                    {/* 15-minute markers */}
-                    {Array.from({
-                      length: (DAY_END_HOUR - DAY_START_HOUR) * 4,
-                    }).map((_, index) => {
-                      const top = (index + 1) * (MOBILE_HOUR_HEIGHT / 4);
-                      return (
-                        <div
-                          key={`quarter-${index}`}
-                          className="absolute left-8 right-0 border-t border-gray-100"
-                          style={{ top: `${top}px` }}
-                        />
-                      );
-                    })}
-
-                    {/* Now marker (nếu là hôm nay) */}
-                    {isToday && (() => {
-                      const totalMinutes =
-                        (currentTime.hour() - DAY_START_HOUR) * 60 + currentTime.minute();
-                      const clampedMinutes = Math.min(
-                        Math.max(totalMinutes, 0),
-                        (DAY_END_HOUR - DAY_START_HOUR) * 60
-                      );
-                      const markerTop = clampedMinutes * MOBILE_SCALE;
-                      return (
-                        <>
-                          <div
-                            className="absolute left-0 right-0 bg-red-500 w-full"
-                            style={{
-                              top: `${markerTop}px`,
-                              height: "2px",
-                              zIndex: 10,
-                            }}
-                          />
-                          <div
-                            className="absolute bg-white px-2 py-1 rounded shadow text-xs sm:text-sm text-red-500 font-medium"
-                            style={{
-                              top: `${markerTop - 12}px`,
-                              left: "8px",
-                              zIndex: 11,
-                            }}
-                          >
-                            {currentTime.format("HH:mm")}
-                          </div>
-                        </>
-                      );
-                    })()}
-
-                    {/* Schedule blocks */}
-                    {roomSchedules.map((schedule) => {
-                      const { top, height, bgColor } = getVerticalMarkerStyle(
-                        schedule,
-                        currentTime,
-                        isToday
-                      );
-                      const eventStart = dayjs(schedule.startTime);
-                      const eventEnd = schedule.endTime
-                        ? dayjs(schedule.endTime)
-                        : eventStart.add(120, "minute");
-                      const status = schedule.status.toLowerCase();
-
-                      let tooltipContent = "";
-                      if (status === "booked") {
-                        tooltipContent = `Bắt đầu: ${eventStart.format("HH:mm")}\nKết thúc: ${eventEnd.format("HH:mm")}`;
-                      } else if (status === "locked") {
-                        const lockedDuration = dayjs().diff(
-                          dayjs(schedule.startTime),
-                          "minute"
-                        );
-                        tooltipContent = `Đã khóa ${lockedDuration} phút`;
-                      } else if (status === "in use") {
-                        const inUseDuration = dayjs().diff(
-                          dayjs(schedule.startTime),
-                          "minute"
-                        );
-                        if (inUseDuration < 60) {
-                          tooltipContent = `Đang sử dụng ${inUseDuration} phút`;
-                        } else {
-                          const hours = Math.floor(inUseDuration / 60);
-                          const minutes = inUseDuration % 60;
-                          tooltipContent = `Đang sử dụng ${hours} giờ${
-                            minutes > 0 ? ` ${minutes} phút` : ""
-                          }`;
-                        }
-                      }
-
-                      const eventElement = (
-                        <div
-                          key={schedule._id}
-                          className={`absolute left-12 sm:left-14 right-2 sm:right-4 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 active:opacity-90 transition-all duration-200 hover:shadow-md cursor-pointer touch-manipulation min-h-[32px]`}
-                          style={{
-                            top: `${top}px`,
-                            height: `${Math.max(height, 32)}px`,
-                          }}
-                          onClick={() => onScheduleClick(schedule)}
-                        >
-                          <div className="p-2 sm:p-1.5 h-full flex flex-col justify-center">
-                            <div className="text-xs sm:text-sm text-white font-medium truncate leading-tight">
-                              {eventStart.format("HH:mm")}
-                              {schedule.endTime && ` - ${eventEnd.format("HH:mm")}`}
-                            </div>
-                            {height >= 40 && (
-                              <div className="text-xs text-white/90 truncate mt-1 leading-tight">
-                                {schedule.customerName || schedule.status}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      );
-
-                      if (tooltipContent) {
+                  <div
+                    className="relative overflow-y-auto max-h-[600px] sm:max-h-[800px] border border-gray-200 rounded-md"
+                    style={{
+                      minHeight: `${Math.min(MOBILE_TIMELINE_HEIGHT, 600)}px`,
+                    }}
+                  >
+                    <div
+                      className="relative"
+                      style={{ height: `${MOBILE_TIMELINE_HEIGHT}px` }}
+                    >
+                      {/* Hour markers */}
+                      {Array.from({
+                        length: DAY_END_HOUR - DAY_START_HOUR + 1,
+                      }).map((_, index) => {
+                        const hour = DAY_START_HOUR + index;
+                        const top = index * MOBILE_HOUR_HEIGHT;
                         return (
-                          <Tooltip key={schedule._id}>
-                            <TooltipTrigger asChild>
-                              {eventElement}
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="whitespace-pre-line">{tooltipContent}</p>
-                            </TooltipContent>
-                          </Tooltip>
+                          <div
+                            key={`hour-marker-${hour}`}
+                            className="absolute left-0 right-0 border-t border-gray-200"
+                            style={{ top: `${top}px` }}
+                          >
+                            <div className="absolute left-0 top-0 -translate-y-1/2 bg-white px-2 text-xs sm:text-sm text-gray-600 font-medium">
+                              {hour.toString().padStart(2, "0")}:00
+                            </div>
+                          </div>
                         );
-                      }
+                      })}
 
-                      return eventElement;
-                    })}
+                      {/* 15-minute markers */}
+                      {Array.from({
+                        length: (DAY_END_HOUR - DAY_START_HOUR) * 4,
+                      }).map((_, index) => {
+                        const top = (index + 1) * (MOBILE_HOUR_HEIGHT / 4);
+                        return (
+                          <div
+                            key={`quarter-${index}`}
+                            className="absolute left-8 right-0 border-t border-gray-100"
+                            style={{ top: `${top}px` }}
+                          />
+                        );
+                      })}
+
+                      {/* Now marker (nếu là hôm nay) */}
+                      {isToday &&
+                        (() => {
+                          const totalMinutes =
+                            (currentTime.hour() - DAY_START_HOUR) * 60 +
+                            currentTime.minute();
+                          const clampedMinutes = Math.min(
+                            Math.max(totalMinutes, 0),
+                            (DAY_END_HOUR - DAY_START_HOUR) * 60
+                          );
+                          const markerTop = clampedMinutes * MOBILE_SCALE;
+                          return (
+                            <>
+                              <div
+                                className="absolute left-0 right-0 bg-red-500 w-full"
+                                style={{
+                                  top: `${markerTop}px`,
+                                  height: "2px",
+                                  zIndex: 10,
+                                }}
+                              />
+                              <div
+                                className="absolute bg-white px-2 py-1 rounded shadow text-xs sm:text-sm text-red-500 font-medium"
+                                style={{
+                                  top: `${markerTop - 12}px`,
+                                  left: "8px",
+                                  zIndex: 11,
+                                }}
+                              >
+                                {currentTime.format("HH:mm")}
+                              </div>
+                            </>
+                          );
+                        })()}
+
+                      {/* Schedule blocks */}
+                      {roomSchedules.map((schedule) => {
+                        const { top, height, bgColor } = getVerticalMarkerStyle(
+                          schedule,
+                          currentTime,
+                          isToday
+                        );
+                        const eventStart = dayjs(schedule.startTime);
+                        const eventEnd = schedule.endTime
+                          ? dayjs(schedule.endTime)
+                          : eventStart.add(120, "minute");
+                        const status = schedule.status.toLowerCase();
+
+                        let tooltipContent = "";
+                        if (status === "booked") {
+                          tooltipContent = `Bắt đầu: ${eventStart.format(
+                            "HH:mm"
+                          )}\nKết thúc: ${eventEnd.format("HH:mm")}`;
+                        } else if (status === "locked") {
+                          const lockedDuration = dayjs().diff(
+                            dayjs(schedule.startTime),
+                            "minute"
+                          );
+                          tooltipContent = `Đã khóa ${lockedDuration} phút`;
+                        } else if (status === "in use") {
+                          const inUseDuration = dayjs().diff(
+                            dayjs(schedule.startTime),
+                            "minute"
+                          );
+                          if (inUseDuration < 60) {
+                            tooltipContent = `Đang sử dụng ${inUseDuration} phút`;
+                          } else {
+                            const hours = Math.floor(inUseDuration / 60);
+                            const minutes = inUseDuration % 60;
+                            tooltipContent = `Đang sử dụng ${hours} giờ${
+                              minutes > 0 ? ` ${minutes} phút` : ""
+                            }`;
+                          }
+                        }
+
+                        const eventElement = (
+                          <div
+                            key={schedule._id}
+                            className={`absolute left-12 sm:left-14 right-2 sm:right-4 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 active:opacity-90 transition-all duration-200 hover:shadow-md cursor-pointer touch-manipulation min-h-[32px]`}
+                            style={{
+                              top: `${top}px`,
+                              height: `${Math.max(height, 32)}px`,
+                            }}
+                            onClick={() => onScheduleClick(schedule)}
+                          >
+                            <div className="p-2 sm:p-1.5 h-full flex flex-col justify-center">
+                              <div className="text-xs sm:text-sm text-white font-medium truncate leading-tight">
+                                {eventStart.format("HH:mm")}
+                                {schedule.endTime &&
+                                  ` - ${eventEnd.format("HH:mm")}`}
+                              </div>
+                              {height >= 40 && (
+                                <div className="text-xs text-white/90 truncate mt-1 leading-tight">
+                                  {schedule.customerName || schedule.status}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        );
+
+                        if (tooltipContent) {
+                          return (
+                            <Tooltip key={schedule._id}>
+                              <TooltipTrigger asChild>
+                                {eventElement}
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="whitespace-pre-line">
+                                  {tooltipContent}
+                                </p>
+                              </TooltipContent>
+                            </Tooltip>
+                          );
+                        }
+
+                        return eventElement;
+                      })}
                     </div>
                   </div>
                 </div>
@@ -466,4 +518,3 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
 };
 
 export default MobileTimelineView;
-
