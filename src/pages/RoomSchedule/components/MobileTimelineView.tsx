@@ -210,6 +210,21 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         const hasGiftNotification = giftNotifications[room._id];
         const isGiftBlinking = giftBlinkingRooms[room._id];
 
+        // Tìm schedule có gift nhưng chưa finished
+        const scheduleWithGift = roomSchedules.find((schedule) => {
+          const scheduleGift = (schedule as unknown as { gift?: any })?.gift;
+          const status = schedule.status?.toLowerCase();
+          return (
+            scheduleGift &&
+            status !== "finished" &&
+            status !== "cancelled" &&
+            status !== "completed"
+          );
+        });
+        const scheduleGiftInfo = scheduleWithGift
+          ? (scheduleWithGift as unknown as { gift?: any })?.gift
+          : null;
+
         // Tìm schedule "in use" để hiển thị thông tin
         const inUseSchedule = roomSchedules.find(
           (s) => s.status.toLowerCase() === "in use"
@@ -307,6 +322,16 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>{hasOrderNotification.message}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {scheduleGiftInfo && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Gift className="h-5 w-5 sm:h-6 sm:w-6 text-purple-500 flex-shrink-0" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Quà tặng: {scheduleGiftInfo.name}</p>
                         </TooltipContent>
                       </Tooltip>
                     )}

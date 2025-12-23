@@ -1237,8 +1237,34 @@ const RoomTimelineTable: React.FC = () => {
               const isBlinking = blinkingRooms[room._id];
               const hasOrderNotification = orderNotifications[room._id];
               const isOrderBlinking = orderBlinkingRooms[room._id];
-              const hasGiftNotification = giftNotifications[room._id];
-              const isGiftBlinking = giftBlinkingRooms[room._id];
+              const giftNotification = giftNotifications[room._id];
+              const giftSchedule = giftNotification
+                ? roomSchedules.find((s) => s._id === giftNotification.scheduleId)
+                : undefined;
+              const giftStatus = giftSchedule?.status?.toLowerCase();
+              const showGiftNotification =
+                !!giftNotification &&
+                !["cancelled", "finished", "completed"].includes(
+                  giftStatus || ""
+                );
+              const isGiftBlinking =
+                showGiftNotification && giftBlinkingRooms[room._id];
+
+              // Tìm schedule có gift nhưng chưa finished
+              const scheduleWithGift = roomSchedules.find((schedule) => {
+                const scheduleGift = (schedule as unknown as { gift?: any })
+                  ?.gift;
+                const status = schedule.status?.toLowerCase();
+                return (
+                  scheduleGift &&
+                  status !== "finished" &&
+                  status !== "cancelled" &&
+                  status !== "completed"
+                );
+              });
+              const scheduleGiftInfo = scheduleWithGift
+                ? (scheduleWithGift as unknown as { gift?: any })?.gift
+                : null;
 
               return (
                 <div
@@ -1308,7 +1334,17 @@ const RoomTimelineTable: React.FC = () => {
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      {hasGiftNotification && (
+                      {scheduleGiftInfo && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Gift className="h-5 w-5 text-purple-500" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Quà tặng: {scheduleGiftInfo.name}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      {showGiftNotification && (
                         <Tooltip>
                           <TooltipTrigger asChild>
                             <button
@@ -1321,7 +1357,7 @@ const RoomTimelineTable: React.FC = () => {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent>
-                            <p>Quà tặng: {hasGiftNotification.gift.name}</p>
+                            <p>Quà tặng: {giftNotification?.gift.name}</p>
                           </TooltipContent>
                         </Tooltip>
                       )}

@@ -77,6 +77,16 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     ? dayjs(schedule.endTime)
     : eventStart.add(120, "minute");
 
+  // Gift info (API trả về gift object, khác với giftEnabled)
+  const giftInfo = (schedule as unknown as { gift?: any }).gift;
+  const hasGift = !!giftInfo;
+  const giftStatus = giftInfo?.status;
+  const isGiftClaimed = giftStatus === "claimed";
+  const giftItems =
+    giftInfo?.type === "snacks_drinks" && Array.isArray(giftInfo?.items)
+      ? giftInfo.items
+      : [];
+
   // State cho thời gian điều chỉnh
   const [adjustedStartTime, setAdjustedStartTime] = React.useState<string>("");
   const [adjustedEndTime, setAdjustedEndTime] = React.useState<string>("");
@@ -542,7 +552,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[725px]">
+      <DialogContent className="sm:max-w-[725px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Process Booked Event</DialogTitle>
           <DialogDescription>
@@ -699,7 +709,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         )}
 
         {/* Thông tin quà tặng */}
-        {schedule.giftEnabled !== undefined && (
+        {(hasGift || schedule.giftEnabled !== undefined) && (
           <div className="mt-4">
             <h3 className="font-semibold mb-2 flex items-center gap-2">
               <Gift className="w-4 h-4 text-pink-500" />
@@ -708,21 +718,64 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
             <div
               className={`flex items-center gap-2 ${
-                schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
+                hasGift || schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
               } p-3 rounded-lg border ${
-                schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
+                hasGift || schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
               }`}
             >
               <Badge
                 variant="outline"
                 className={`${
-                  schedule.giftEnabled
+                  hasGift || schedule.giftEnabled
                     ? "text-pink-600 border-pink-200"
                     : "text-gray-600 border-gray-200"
                 }`}
               >
-                {schedule.giftEnabled ? "Được nhận quà" : "Không được nhận quà"}
+                {hasGift
+                  ? isGiftClaimed
+                    ? "Đã nhận quà"
+                    : "Đã được gán quà"
+                  : schedule.giftEnabled
+                  ? "Được nhận quà"
+                  : "Không được nhận quà"}
               </Badge>
+              {hasGift && (
+                <div className="text-sm space-y-1">
+                  <p className="font-medium">{giftInfo?.name || "Quà tặng"}</p>
+                  <p className="text-xs text-gray-600">
+                    Trạng thái: {giftStatus || "N/A"}
+                  </p>
+                  {giftInfo?.type === "snacks_drinks" && giftItems.length > 0 && (
+                    <div className="mt-2 space-y-1">
+                      <p className="font-semibold text-gray-700">
+                        Bao gồm:
+                      </p>
+                      <ul className="list-disc pl-5 space-y-0.5">
+                        {giftItems.map(
+                          (item: {
+                            itemId: string;
+                            name?: string;
+                            quantity?: number;
+                            category?: string;
+                          }) => (
+                            <li key={item.itemId} className="text-xs text-gray-700">
+                              <span className="font-medium">{item.name || "Món"}</span>
+                              {item.quantity !== undefined && (
+                                <span className="ml-1">x{item.quantity}</span>
+                              )}
+                              {item.category && (
+                                <span className="ml-2 text-gray-500">
+                                  ({item.category})
+                                </span>
+                              )}
+                            </li>
+                          )
+                        )}
+                      </ul>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         )}

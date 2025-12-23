@@ -859,7 +859,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl w-[95vw] max-h-[95vh] sm:max-h-[90vh] p-0 flex flex-col overflow-hidden">
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[100vh] sm:max-h-[94vh] p-0 flex flex-col overflow-y-auto">
           <div
             className="overflow-y-auto flex-1 px-4 sm:px-6 pt-4 sm:pt-6"
             style={{ WebkitOverflowScrolling: "touch" }}
