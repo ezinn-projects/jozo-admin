@@ -20,6 +20,10 @@ export interface IBill {
   fnbTotal: number;
   roomTotal: number;
   totalAmount: number;
+  freeHourPromotion?: {
+    freeMinutesApplied?: number;
+    freeAmount?: number;
+  };
   startTime: Date;
   endTime: Date;
   actualEndTime: Date;

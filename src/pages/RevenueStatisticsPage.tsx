@@ -943,6 +943,34 @@ const RevenueStatisticsPage = () => {
 
                 <div className="border-t-2 border-dashed border-purple-400 my-2" />
 
+                {billDetail.data.result.freeHourPromotion ? (
+                  <div className="border border-purple-200 rounded-lg bg-white/70 p-3 space-y-1">
+                    <p className="font-bold text-purple-700">
+                      Ưu đãi giờ miễn phí
+                    </p>
+                    <div className="flex justify-between text-sm">
+                      <span>Phút miễn phí áp dụng</span>
+                      <span className="font-semibold text-green-700">
+                        {billDetail.data.result.freeHourPromotion
+                          .freeMinutesApplied || 0}{" "}
+                        phút
+                      </span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span>Giá trị miễn phí</span>
+                      <span className="font-semibold text-green-700">
+                        {formatCurrency(
+                          billDetail.data.result.freeHourPromotion.freeAmount ||
+                            0
+                        )}{" "}
+                        VNĐ
+                      </span>
+                    </div>
+                  </div>
+                ) : null}
+
+                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+
                 <div>
                   <p>
                     <span className="font-bold">Phương thức thanh toán:</span>{" "}

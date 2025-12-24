@@ -49,6 +49,10 @@ const billAPis = {
             discountPercentage?: number;
             promotionId?: string;
           }[];
+          freeHourPromotion?: {
+            freeMinutesApplied?: number;
+            freeAmount?: number;
+          };
         }
       >
     >(`/bill/details/${billId}`);
