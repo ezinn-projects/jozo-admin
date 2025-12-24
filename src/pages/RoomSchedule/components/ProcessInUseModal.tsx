@@ -47,6 +47,7 @@ import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
 
 // Define bill interfaces
 interface BillItem {
@@ -124,6 +125,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
+  const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
+    schedule.giftEnabled || false
+  );
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -139,8 +143,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
+      setIsGiftEnabled(schedule.giftEnabled || false);
     }
-  }, [isOpen, schedule.startTime, schedule.applyFreeHourPromo]);
+  }, [
+    isOpen,
+    schedule.startTime,
+    schedule.applyFreeHourPromo,
+    schedule.giftEnabled,
+  ]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -222,6 +232,37 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
         // Rollback checkbox state on error
         setApplyFreeHourPromo(!applyFreeHourPromo);
+      },
+    });
+
+  // Mutation để bật/tắt quyền nhận quà
+  const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
+    useMutation({
+      mutationFn: (giftEnabled: boolean) =>
+        roomsScheduleApis.updateSchedule(schedule._id, { giftEnabled }),
+      onMutate: async (giftEnabled) => {
+        const previous = isGiftEnabled;
+        setIsGiftEnabled(giftEnabled);
+        return { previous };
+      },
+      onSuccess: (_, giftEnabled) => {
+        refetchSchedules?.();
+        toast({
+          title: "Success",
+          description: giftEnabled
+            ? "Đã cho phép nhận quà"
+            : "Đã tắt quyền nhận quà",
+        });
+      },
+      onError: (_error, _giftEnabled, context) => {
+        if (context?.previous !== undefined) {
+          setIsGiftEnabled(context.previous);
+        }
+        toast({
+          title: "Error",
+          description: "Không thể cập nhật quyền nhận quà",
+          variant: "destructive",
+        });
       },
     });
 
@@ -879,16 +920,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             <div className="mb-4">
               <div
                 className={`${
-                  gift ? "bg-pink-50" : "bg-gray-50"
+                  gift || isGiftEnabled ? "bg-pink-50" : "bg-gray-50"
                 } p-3 rounded-lg border ${
-                  gift ? "border-pink-200" : "border-gray-200"
+                  gift || isGiftEnabled ? "border-pink-200" : "border-gray-200"
                 }`}
               >
                 <div className="flex flex-col gap-2">
                   <div className="flex items-center gap-2">
                     <Gift
                       className={`w-4 h-4 ${
-                        gift ? "text-pink-500" : "text-gray-500"
+                        gift || isGiftEnabled
+                          ? "text-pink-500"
+                          : "text-gray-500"
                       }`}
                     />
                     <span className="text-sm font-medium">
@@ -896,11 +939,27 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </span>
                     <span
                       className={`text-sm ${
-                        gift ? "text-pink-600 font-semibold" : "text-gray-600"
+                        gift || isGiftEnabled
+                          ? "text-pink-600 font-semibold"
+                          : "text-gray-600"
                       }`}
                     >
-                      {gift ? "Đã nhận quà" : "Không được nhận quà"}
+                      {gift
+                        ? "Đã nhận quà"
+                        : isGiftEnabled
+                        ? "Được phép nhận quà"
+                        : "Không được nhận quà"}
                     </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs sm:text-sm">Allow Gift</span>
+                    <Switch
+                      checked={isGiftEnabled}
+                      onCheckedChange={(checked) =>
+                        updateGiftEnabled(checked === true)
+                      }
+                      disabled={isUpdatingGiftEnabled}
+                    />
                   </div>
                   {gift && (
                     <div className="pl-6 space-y-1">

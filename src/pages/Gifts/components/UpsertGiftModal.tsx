@@ -86,6 +86,12 @@ const formSchema = z
       (val) => (val === null || val === undefined || val === "" ? 1 : val),
       z.number().min(1, "Tổng số lượng phải lớn hơn 0")
     ),
+    remainingQuantity: z.preprocess(
+      (val) => (val === null || val === undefined || val === "" ? 0 : val),
+      z
+        .number()
+        .min(0, "Số lượng còn lại phải lớn hơn hoặc bằng 0")
+    ),
     isActive: z.boolean(),
   })
   .superRefine((data, ctx) => {
@@ -103,6 +109,15 @@ const formSchema = z
       });
     }
     // Nếu type là "discount", không cần validate items
+
+    // remainingQuantity không được lớn hơn totalQuantity
+    if (data.remainingQuantity > data.totalQuantity) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Số lượng còn lại không được vượt quá tổng số lượng",
+        path: ["remainingQuantity"],
+      });
+    }
   });
 
 type FormData = z.infer<typeof formSchema>;
@@ -178,6 +193,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
       discountPercentage: undefined,
       items: [],
       totalQuantity: 1,
+      remainingQuantity: 1,
       isActive: true,
     },
   });
@@ -188,6 +204,15 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
   });
 
   const giftType = form.watch("type");
+  const totalQuantityValue = form.watch("totalQuantity");
+
+  // Đảm bảo remainingQuantity không vượt quá totalQuantity khi người dùng chỉnh
+  useEffect(() => {
+    const remaining = form.getValues("remainingQuantity");
+    if (remaining > totalQuantityValue) {
+      form.setValue("remainingQuantity", totalQuantityValue);
+    }
+  }, [totalQuantityValue, form]);
 
   // Cập nhật form khi có dữ liệu chi tiết
   useEffect(() => {
@@ -217,6 +242,8 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
         discountPercentage: detail.discountPercentage,
         items: processedItems,
         totalQuantity: detail.totalQuantity || 1,
+        remainingQuantity:
+          detail.remainingQuantity ?? detail.totalQuantity ?? 0,
         isActive: detail.isActive ?? true,
       });
     } else if (!gift) {
@@ -229,6 +256,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
         discountPercentage: undefined,
         items: [],
         totalQuantity: 1,
+        remainingQuantity: 1,
         isActive: true,
       });
     }
@@ -359,6 +387,10 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
       submitFormData.append("name", data.name);
       submitFormData.append("type", data.type);
       submitFormData.append("totalQuantity", data.totalQuantity.toString());
+      submitFormData.append(
+        "remainingQuantity",
+        data.remainingQuantity.toString()
+      );
       submitFormData.append("isActive", data.isActive.toString());
 
       // Các trường optional
@@ -437,6 +469,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
       discountPercentage: undefined,
       items: [],
       totalQuantity: 1,
+      remainingQuantity: 1,
       isActive: true,
     });
     onClose();
@@ -540,6 +573,26 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                   {form.formState.errors.totalQuantity && (
                     <p className="text-sm text-red-500">
                       {form.formState.errors.totalQuantity.message}
+                    </p>
+                  )}
+                </div>
+
+                {/* Số lượng còn lại */}
+                <div className="space-y-2">
+                  <Label htmlFor="remainingQuantity">Số lượng còn lại *</Label>
+                  <Input
+                    id="remainingQuantity"
+                    type="number"
+                    min={0}
+                    max={form.watch("totalQuantity")}
+                    {...form.register("remainingQuantity", {
+                      valueAsNumber: true,
+                    })}
+                    placeholder="0"
+                  />
+                  {form.formState.errors.remainingQuantity && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.remainingQuantity.message}
                     </p>
                   )}
                 </div>
