@@ -74,6 +74,7 @@ interface BillData {
   endTime?: string | Date;
   startTime?: string | Date;
   gift?: BillGift;
+  giftDiscountAmount?: number;
   freeHourPromotion?: {
     freeMinutesApplied: number;
     freeAmount: number;
@@ -92,6 +93,7 @@ interface BillResponse {
   endTime?: string | Date;
   startTime?: string | Date;
   gift?: BillGift;
+  giftDiscountAmount?: number;
   freeHourPromotion?: {
     freeMinutesApplied: number;
     freeAmount: number;
@@ -669,6 +671,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     startTime,
     gift,
     freeHourPromotion,
+    giftDiscountAmount = 0,
   } = billResult;
 
   // Debug: Log items khi thay đổi
@@ -1376,6 +1379,42 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   </Select>
                 </div>
 
+                {/* Gift hiển thị trong bill */}
+                {gift && (
+                  <div className="p-2 mb-2 bg-pink-50 border border-pink-200 rounded-md text-pink-700 text-xs sm:text-sm space-y-1">
+                    <div className="font-bold flex items-center gap-2">
+                      <Gift className="w-4 h-4" />
+                      <span>Quà tặng: {gift.name}</span>
+                    </div>
+                    {gift.type === "discount" && gift.discountPercentage ? (
+                      <p>Giảm {gift.discountPercentage}%</p>
+                    ) : null}
+                    {giftDiscountAmount > 0 && (
+                      <p className="text-pink-700">
+                        Trị giá giảm:{" "}
+                        {giftDiscountAmount.toLocaleString("vi-VN", {
+                          style: "currency",
+                          currency: "VND",
+                        })}
+                      </p>
+                    )}
+                    {gift.type === "snacks_drinks" &&
+                    gift.items &&
+                    gift.items.length > 0 ? (
+                      <div className="space-y-0.5">
+                        <p className="font-medium">Items tặng:</p>
+                        <ul className="list-disc list-inside pl-3 space-y-0.5">
+                          {gift.items.map((item, idx) => (
+                            <li key={idx}>
+                              {item.name} x{item.quantity}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    ) : null}
+                  </div>
+                )}
+
                 {appliedPromotion && (
                   <div className="p-2 bg-green-100 rounded-md text-green-700 text-xs sm:text-sm">
                     <p className="font-bold">{appliedPromotion.name}</p>
@@ -1477,6 +1516,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
                     return (
                       <>
+                        {/* Giảm giá từ quà tặng */}
+                        {giftDiscountAmount > 0 && (
+                          <div className="flex justify-between text-xs sm:text-sm">
+                            <span className="text-pink-600 break-words">
+                              Giảm quà tặng{gift?.name ? ` (${gift.name})` : ""}
+                              :
+                            </span>
+                            <span className="text-pink-600 font-medium break-words ml-2 text-right">
+                              -
+                              {giftDiscountAmount.toLocaleString("vi-VN", {
+                                style: "currency",
+                                currency: "VND",
+                              })}
+                            </span>
+                          </div>
+                        )}
                         {/* Giảm giá promotion (nếu có) */}
                         {appliedPromotion && promotionDiscountAmount > 0 && (
                           <div className="flex justify-between text-xs sm:text-sm">
