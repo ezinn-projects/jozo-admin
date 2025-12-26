@@ -346,7 +346,6 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       <Switch
                         checked={field.value}
                         onCheckedChange={field.onChange}
-                        disabled
                       />
                     </FormControl>
                     <FormMessage />
