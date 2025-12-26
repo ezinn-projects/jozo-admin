@@ -238,35 +238,34 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     });
 
   // Mutation để bật/tắt quyền nhận quà
-  const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
-    useMutation({
-      mutationFn: (giftEnabled: boolean) =>
-        roomsScheduleApis.updateSchedule(schedule._id, { giftEnabled }),
-      onMutate: async (giftEnabled) => {
-        const previous = isGiftEnabled;
-        setIsGiftEnabled(giftEnabled);
-        return { previous };
-      },
-      onSuccess: (_, giftEnabled) => {
-        refetchSchedules?.();
-        toast({
-          title: "Success",
-          description: giftEnabled
-            ? "Đã cho phép nhận quà"
-            : "Đã tắt quyền nhận quà",
-        });
-      },
-      onError: (_error, _giftEnabled, context) => {
-        if (context?.previous !== undefined) {
-          setIsGiftEnabled(context.previous);
-        }
-        toast({
-          title: "Error",
-          description: "Không thể cập nhật quyền nhận quà",
-          variant: "destructive",
-        });
-      },
-    });
+  const { mutate: updateGiftEnabled } = useMutation({
+    mutationFn: (giftEnabled: boolean) =>
+      roomsScheduleApis.updateSchedule(schedule._id, { giftEnabled }),
+    onMutate: async (giftEnabled) => {
+      const previous = isGiftEnabled;
+      setIsGiftEnabled(giftEnabled);
+      return { previous };
+    },
+    onSuccess: (_, giftEnabled) => {
+      refetchSchedules?.();
+      toast({
+        title: "Success",
+        description: giftEnabled
+          ? "Đã cho phép nhận quà"
+          : "Đã tắt quyền nhận quà",
+      });
+    },
+    onError: (_error, _giftEnabled, context) => {
+      if (context?.previous !== undefined) {
+        setIsGiftEnabled(context.previous);
+      }
+      toast({
+        title: "Error",
+        description: "Không thể cập nhật quyền nhận quà",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Mutation để cập nhật số lượng item (dùng add/remove)
   const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
@@ -961,7 +960,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       onCheckedChange={(checked) =>
                         updateGiftEnabled(checked === true)
                       }
-                      disabled={isUpdatingGiftEnabled}
+                      disabled={true}
                     />
                   </div>
                   {gift && (
@@ -1349,8 +1348,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     className="text-xs sm:text-sm cursor-pointer"
                   >
                     Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
-                    có giá trị trên 30k)
+                    có giá trị trên 35k)
                   </Label>
+                  <p className="text-[10px] sm:text-xs text-muted-foreground">
+                    Chỉ áp dụng từ 10h đến 19h
+                  </p>
                 </div>
 
                 {/* Lucky Draw Promotion Section */}
