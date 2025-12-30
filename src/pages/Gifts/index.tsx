@@ -17,7 +17,7 @@ import { useGetAllGifts, useDeleteGift } from "@/hooks/use-gifts";
 import { Gift as GiftType } from "@/@types/Gift";
 import { GIFT_TYPE_LABELS } from "./constants";
 import { Edit, Plus, Search, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useMemo, useState } from "react";
 import UpsertGiftModal from "./components/UpsertGiftModal";
 import { formatCurrency } from "@/utils/formatters";
 
@@ -26,19 +26,19 @@ const GiftsPage = () => {
   const { mutate: deleteGift, isPending: isDeleting } = useDeleteGift();
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredItems, setFilteredItems] = useState<GiftType[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<GiftType | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<GiftType | null>(null);
 
-  // Filter items based on search term
-  useEffect(() => {
-    const filtered = gifts.filter((item) =>
-      item.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredItems(filtered);
-  }, [gifts, searchTerm]);
+  // Derive filtered items from gifts and search term to avoid extra renders
+  const filteredItems = useMemo(
+    () =>
+      gifts.filter((item) =>
+        item.name.toLowerCase().includes(searchTerm.toLowerCase())
+      ),
+    [gifts, searchTerm]
+  );
 
   const handleEdit = (item: GiftType) => {
     setSelectedItem(item);
@@ -168,9 +168,7 @@ const GiftsPage = () => {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <Badge
-                      variant={item.isActive ? "default" : "secondary"}
-                    >
+                    <Badge variant={item.isActive ? "default" : "secondary"}>
                       {item.isActive ? "Kích hoạt" : "Tắt"}
                     </Badge>
                   </TableCell>
@@ -229,4 +227,3 @@ const GiftsPage = () => {
 };
 
 export default GiftsPage;
-

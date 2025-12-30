@@ -1,6 +1,11 @@
 import { FnBCategory } from "@/constants/enum";
 
-export type GiftType = "snacks_drinks" | "discount";
+// Giữ "discount" làm alias cho kiểu phần trăm để backward compatibility
+export type GiftType =
+  | "snacks_drinks"
+  | "discount_percentage"
+  | "discount_amount"
+  | "discount";
 
 export interface GiftBundleItem {
   itemId: string; // ObjectId từ backend được serialize thành string
@@ -18,6 +23,7 @@ export interface Gift {
   image?: string;
   price?: number;
   discountPercentage?: number;
+  discountAmount?: number;
   items?: GiftBundleItem[];
   totalQuantity: number; // tổng số suất quà (bundle) tạo ra
   remainingQuantity: number; // số suất còn lại để random
@@ -32,6 +38,7 @@ export interface GiftCreateRequest {
   image?: string;
   price?: number;
   discountPercentage?: number;
+  discountAmount?: number;
   items?: GiftBundleItem[];
   totalQuantity: number;
   isActive?: boolean;
@@ -47,6 +54,7 @@ export interface ScheduleGift {
   assignedAt: Date;
   claimedAt?: Date;
   discountPercentage?: number;
+  discountAmount?: number;
   items?: GiftBundleItem[];
 }
 
@@ -56,6 +64,7 @@ export interface BillGift {
   name: string;
   type: GiftType;
   discountPercentage?: number;
+  discountAmount?: number;
   items?: GiftBundleItem[];
 }
 

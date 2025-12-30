@@ -38,6 +38,10 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({
 
   if (!gift) return null;
 
+  const isDiscountPercentage =
+    gift.type === "discount_percentage" || gift.type === "discount";
+  const isDiscountAmount = gift.type === "discount_amount";
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
@@ -95,9 +99,14 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({
                     Giá trị: {formatCurrency(gift.price)}
                   </div>
                 )}
-                {gift.type === "discount" && gift.discountPercentage && (
+                {isDiscountPercentage && gift.discountPercentage && (
                   <div className="text-lg font-semibold text-green-600">
                     Giảm giá: {gift.discountPercentage}%
+                  </div>
+                )}
+                {isDiscountAmount && gift.discountAmount && (
+                  <div className="text-lg font-semibold text-green-600">
+                    Giảm giá: {formatCurrency(gift.discountAmount)}
                   </div>
                 )}
               </div>

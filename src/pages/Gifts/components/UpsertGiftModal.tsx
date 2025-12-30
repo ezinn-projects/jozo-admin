@@ -19,13 +19,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
-import { Gift, GiftBundleItem } from "@/@types/Gift";
+import { Gift, GiftBundleItem, GiftType } from "@/@types/Gift";
 import { GIFT_TYPES, GIFT_TYPE_LABELS } from "../constants";
 import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { PlusCircle, Trash2, ChevronDown, ChevronRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
@@ -65,21 +65,26 @@ const giftBundleItemSchema = z
 const formSchema = z
   .object({
     name: z.string().min(1, "Tên quà tặng là bắt buộc"),
-    type: z.enum(["snacks_drinks", "discount"], {
-      required_error: "Loại quà tặng là bắt buộc",
-    }),
+    type: z.enum(
+      ["snacks_drinks", "discount_percentage", "discount_amount", "discount"],
+      {
+        required_error: "Loại quà tặng là bắt buộc",
+      }
+    ),
     image: z.string().optional().nullable(),
     price: z.preprocess(
       (val) => (val === null || val === undefined || val === "" ? 0 : val),
       z.number().min(0, "Giá phải lớn hơn hoặc bằng 0").optional()
     ),
     discountPercentage: z.preprocess(
-      (val) => (val === null || val === undefined || val === "" ? 0 : val),
-      z
-        .number()
-        .min(0, "Phần trăm giảm giá phải lớn hơn hoặc bằng 0")
-        .max(100, "Phần trăm giảm giá không được vượt quá 100")
-        .optional()
+      (val) =>
+        val === null || val === undefined || val === "" ? undefined : val,
+      z.number().gt(0, "Phần trăm giảm giá phải lớn hơn 0").optional()
+    ),
+    discountAmount: z.preprocess(
+      (val) =>
+        val === null || val === undefined || val === "" ? undefined : val,
+      z.number().gt(0, "Số tiền giảm giá phải lớn hơn 0").optional()
     ),
     items: z.array(giftBundleItemSchema).optional(),
     totalQuantity: z.preprocess(
@@ -88,9 +93,7 @@ const formSchema = z
     ),
     remainingQuantity: z.preprocess(
       (val) => (val === null || val === undefined || val === "" ? 0 : val),
-      z
-        .number()
-        .min(0, "Số lượng còn lại phải lớn hơn hoặc bằng 0")
+      z.number().min(0, "Số lượng còn lại phải lớn hơn hoặc bằng 0")
     ),
     isActive: z.boolean(),
   })
@@ -108,7 +111,30 @@ const formSchema = z
         }
       });
     }
-    // Nếu type là "discount", không cần validate items
+
+    // Nếu type là discount_percentage/alias discount, yêu cầu discountPercentage > 0
+    if (
+      (data.type === "discount_percentage" || data.type === "discount") &&
+      (!data.discountPercentage || data.discountPercentage <= 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Phần trăm giảm giá phải lớn hơn 0",
+        path: ["discountPercentage"],
+      });
+    }
+
+    // Nếu type là discount_amount, yêu cầu discountAmount > 0
+    if (
+      data.type === "discount_amount" &&
+      (!data.discountAmount || data.discountAmount <= 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Số tiền giảm giá phải lớn hơn 0",
+        path: ["discountAmount"],
+      });
+    }
 
     // remainingQuantity không được lớn hơn totalQuantity
     if (data.remainingQuantity > data.totalQuantity) {
@@ -121,6 +147,23 @@ const formSchema = z
   });
 
 type FormData = z.infer<typeof formSchema>;
+
+// Chuẩn hóa type: alias "discount" map về "discount_percentage"
+const normalizeGiftType = (type: GiftType): GiftType =>
+  type === GIFT_TYPES.DISCOUNT ? GIFT_TYPES.DISCOUNT_PERCENTAGE : type;
+
+const DEFAULT_GIFT_VALUES: FormData = {
+  name: "",
+  type: GIFT_TYPES.SNACKS_DRINKS,
+  image: "",
+  price: undefined,
+  discountPercentage: undefined,
+  discountAmount: undefined,
+  items: [],
+  totalQuantity: 1,
+  remainingQuantity: 1,
+  isActive: true,
+};
 
 const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
   isOpen,
@@ -185,17 +228,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    defaultValues: {
-      name: "",
-      type: GIFT_TYPES.SNACKS_DRINKS,
-      image: "",
-      price: undefined,
-      discountPercentage: undefined,
-      items: [],
-      totalQuantity: 1,
-      remainingQuantity: 1,
-      isActive: true,
-    },
+    defaultValues: DEFAULT_GIFT_VALUES,
   });
 
   const { fields, append, remove } = useFieldArray({
@@ -205,6 +238,10 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
 
   const giftType = form.watch("type");
   const totalQuantityValue = form.watch("totalQuantity");
+  const isDiscountPercentage =
+    giftType === GIFT_TYPES.DISCOUNT_PERCENTAGE ||
+    giftType === GIFT_TYPES.DISCOUNT;
+  const isDiscountAmount = giftType === GIFT_TYPES.DISCOUNT_AMOUNT;
 
   // Đảm bảo remainingQuantity không vượt quá totalQuantity khi người dùng chỉnh
   useEffect(() => {
@@ -214,15 +251,29 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
     }
   }, [totalQuantityValue, form]);
 
-  // Cập nhật form khi có dữ liệu chi tiết
+  // Cập nhật form khi có dữ liệu chi tiết hoặc mở modal tạo mới (tránh reset lặp)
+  const initializedKeyRef = useRef<string | null>(null);
+  const menuItemsLength = menuItems.length;
+
   useEffect(() => {
-    if (giftDetail?.data?.result && isEdit) {
+    if (!isOpen) {
+      initializedKeyRef.current = null;
+    }
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    // Khi edit
+    if (isEdit && giftDetail?.data?.result) {
       const detail = giftDetail.data.result;
+      const normalizedType = normalizeGiftType(detail.type as GiftType);
+      const key = `edit-${gift?._id || ""}-${menuItemsLength}`;
+      if (initializedKeyRef.current === key) return;
 
       // Xử lý items để set parentItemId nếu là variant
       const processedItems = (detail.items || []).map(
         (item: GiftBundleItem) => {
-          // Tìm xem item này có phải là variant không
           const menuItem = menuItems.find((mi) => mi._id === item.itemId);
           if (menuItem && menuItem.parentId) {
             return {
@@ -234,35 +285,41 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
         }
       );
 
+      initializedKeyRef.current = key;
       form.reset({
         name: detail.name || "",
-        type: detail.type || GIFT_TYPES.SNACKS_DRINKS,
+        type: normalizedType || GIFT_TYPES.SNACKS_DRINKS,
         image: detail.image || "",
         price: detail.price,
         discountPercentage: detail.discountPercentage,
+        discountAmount: detail.discountAmount,
         items: processedItems,
         totalQuantity: detail.totalQuantity || 1,
         remainingQuantity:
           detail.remainingQuantity ?? detail.totalQuantity ?? 0,
         isActive: detail.isActive ?? true,
       });
-    } else if (!gift) {
-      // Reset form khi tạo mới
-      form.reset({
-        name: "",
-        type: GIFT_TYPES.SNACKS_DRINKS,
-        image: "",
-        price: undefined,
-        discountPercentage: undefined,
-        items: [],
-        totalQuantity: 1,
-        remainingQuantity: 1,
-        isActive: true,
-      });
+      setMainImageFile(null);
+      return;
     }
-    // Reset files
-    setMainImageFile(null);
-  }, [giftDetail, gift, isEdit, form, menuItems]);
+
+    // Khi tạo mới
+    if (!isEdit) {
+      const key = `create-${menuItemsLength}`;
+      if (initializedKeyRef.current === key) return;
+      initializedKeyRef.current = key;
+      form.reset(DEFAULT_GIFT_VALUES);
+      setMainImageFile(null);
+    }
+  }, [
+    isOpen,
+    isEdit,
+    gift?._id,
+    giftDetail?.data?.result,
+    menuItemsLength,
+    form,
+    menuItems,
+  ]);
 
   // Hiển thị lỗi nếu có
   useEffect(() => {
@@ -385,7 +442,8 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
 
       // Các trường text bắt buộc
       submitFormData.append("name", data.name);
-      submitFormData.append("type", data.type);
+      const normalizedType = normalizeGiftType(data.type as GiftType);
+      submitFormData.append("type", normalizedType);
       submitFormData.append("totalQuantity", data.totalQuantity.toString());
       submitFormData.append(
         "remainingQuantity",
@@ -398,11 +456,21 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
         submitFormData.append("price", data.price.toString());
       }
 
-      if (data.type === "discount" && data.discountPercentage !== undefined) {
+      if (
+        (data.type === "discount_percentage" || data.type === "discount") &&
+        data.discountPercentage !== undefined
+      ) {
         submitFormData.append(
           "discountPercentage",
           data.discountPercentage.toString()
         );
+      }
+
+      if (
+        data.type === "discount_amount" &&
+        data.discountAmount !== undefined
+      ) {
+        submitFormData.append("discountAmount", data.discountAmount.toString());
       }
 
       // File ảnh chính (optional)
@@ -461,17 +529,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
   };
 
   const handleClose = () => {
-    form.reset({
-      name: "",
-      type: GIFT_TYPES.SNACKS_DRINKS,
-      image: "",
-      price: undefined,
-      discountPercentage: undefined,
-      items: [],
-      totalQuantity: 1,
-      remainingQuantity: 1,
-      isActive: true,
-    });
+    form.reset(DEFAULT_GIFT_VALUES);
     onClose();
   };
 
@@ -529,11 +587,25 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                   <Select
                     value={form.watch("type")}
                     onValueChange={(value) => {
-                      const newType = value as "snacks_drinks" | "discount";
+                      const newType = value as GiftType;
                       form.setValue("type", newType);
-                      // Clear items khi chuyển sang discount
-                      if (newType === "discount") {
+                      // Clear items và giá không dùng cho discount
+                      if (
+                        newType === GIFT_TYPES.DISCOUNT_PERCENTAGE ||
+                        newType === GIFT_TYPES.DISCOUNT ||
+                        newType === GIFT_TYPES.DISCOUNT_AMOUNT
+                      ) {
                         form.setValue("items", []);
+                        form.setValue("price", undefined);
+                      }
+                      if (
+                        newType === GIFT_TYPES.DISCOUNT_PERCENTAGE ||
+                        newType === GIFT_TYPES.DISCOUNT
+                      ) {
+                        form.setValue("discountAmount", undefined);
+                      }
+                      if (newType === GIFT_TYPES.DISCOUNT_AMOUNT) {
+                        form.setValue("discountPercentage", undefined);
                       }
                     }}
                   >
@@ -544,8 +616,11 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                       <SelectItem value={GIFT_TYPES.SNACKS_DRINKS}>
                         {GIFT_TYPE_LABELS[GIFT_TYPES.SNACKS_DRINKS]}
                       </SelectItem>
-                      <SelectItem value={GIFT_TYPES.DISCOUNT}>
-                        {GIFT_TYPE_LABELS[GIFT_TYPES.DISCOUNT]}
+                      <SelectItem value={GIFT_TYPES.DISCOUNT_PERCENTAGE}>
+                        {GIFT_TYPE_LABELS[GIFT_TYPES.DISCOUNT_PERCENTAGE]}
+                      </SelectItem>
+                      <SelectItem value={GIFT_TYPES.DISCOUNT_AMOUNT}>
+                        {GIFT_TYPE_LABELS[GIFT_TYPES.DISCOUNT_AMOUNT]}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -598,7 +673,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                 </div>
 
                 {/* Giá - chỉ hiển thị khi type = snacks_drinks */}
-                {giftType === "snacks_drinks" && (
+                {giftType === GIFT_TYPES.SNACKS_DRINKS && (
                   <div className="space-y-2">
                     <Label htmlFor="price">Giá (VND)</Label>
                     <Input
@@ -624,7 +699,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                 )}
 
                 {/* Phần trăm giảm giá - chỉ hiển thị khi type = discount */}
-                {giftType === "discount" && (
+                {isDiscountPercentage && (
                   <div className="space-y-2">
                     <Label htmlFor="discountPercentage">
                       Phần trăm giảm giá (%)
@@ -632,7 +707,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                     <Input
                       id="discountPercentage"
                       type="number"
-                      min={0}
+                      min={0.01}
                       max={100}
                       {...form.register("discountPercentage", {
                         valueAsNumber: true,
@@ -642,6 +717,34 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                     {form.formState.errors.discountPercentage && (
                       <p className="text-sm text-red-500">
                         {form.formState.errors.discountPercentage.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Số tiền giảm giá - chỉ hiển thị khi type = discount_amount */}
+                {isDiscountAmount && (
+                  <div className="space-y-2">
+                    <Label htmlFor="discountAmount">
+                      Số tiền giảm giá (VND)
+                    </Label>
+                    <Input
+                      id="discountAmount"
+                      value={
+                        form.watch("discountAmount")
+                          ? formatCurrency(form.watch("discountAmount") || 0)
+                          : ""
+                      }
+                      onChange={(e) => {
+                        const rawValue = e.target.value.replace(/\./g, "");
+                        const numericValue = Number(rawValue) || 0;
+                        form.setValue("discountAmount", numericValue);
+                      }}
+                      placeholder="0"
+                    />
+                    {form.formState.errors.discountAmount && (
+                      <p className="text-sm text-red-500">
+                        {form.formState.errors.discountAmount.message}
                       </p>
                     )}
                   </div>
@@ -675,7 +778,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
             </div>
 
             {/* Phần Items - chỉ hiển thị khi type = snacks_drinks */}
-            {giftType === "snacks_drinks" && (
+            {giftType === GIFT_TYPES.SNACKS_DRINKS && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium">Items</h3>
