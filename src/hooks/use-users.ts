@@ -1,10 +1,20 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { userApis } from "@/apis/user.apis";
-import { UpdateUserRequest } from "@/@types/user";
+import { UpdateUserRequest, UsersQueryParams } from "@/@types/user";
 import { toast } from "@/hooks/use-toast";
+import type { AxiosError } from "axios";
 
-export const useUsers = () => {
+export const useUsers = (params: UsersQueryParams = {}) => {
   const queryClient = useQueryClient();
+  const { page = 1, limit = 1000, search, role } = params;
+
+  const extractErrorMessage = (error: unknown) => {
+    const axiosError = error as AxiosError<{ message?: string }>;
+    return (
+      axiosError?.response?.data?.message ||
+      (error instanceof Error ? error.message : "Có lỗi xảy ra")
+    );
+  };
 
   // Query để lấy danh sách tất cả users
   const {
@@ -12,19 +22,36 @@ export const useUsers = () => {
     isLoading: isLoadingUsers,
     error: usersError,
     refetch: refetchUsers,
+    isFetching: isFetchingUsers,
   } = useQuery({
-    queryKey: ["users"],
-    queryFn: userApis.getAllUsers,
+    queryKey: ["users", page, limit, search, role],
+    queryFn: () =>
+      userApis.getAllUsers({
+        page,
+        limit,
+        ...(search ? { search } : {}),
+        ...(role ? { role } : {}),
+      }),
   });
 
   // Lấy users từ response
-  const users = usersResponse?.data?.result?.users || [];
+  const users = usersResponse?.data?.result?.items || [];
+  const pagination = usersResponse?.data?.result?.pagination;
 
   // Hook để lấy thông tin user theo ID
   const useUserById = (id: string) => {
     return useQuery({
       queryKey: ["user", id],
       queryFn: () => userApis.getUserById(id),
+      enabled: !!id,
+    });
+  };
+
+  // Hook để lấy membership detail của user
+  const useUserMembership = (id: string) => {
+    return useQuery({
+      queryKey: ["user-membership", id],
+      queryFn: () => userApis.getUserMembership(id),
       enabled: !!id,
     });
   };
@@ -41,7 +68,7 @@ export const useUsers = () => {
     },
     onError: (error: unknown) => {
       const errorMessage =
-        error instanceof Error ? error.message : "Có lỗi xảy ra khi tạo user";
+        extractErrorMessage(error) || "Có lỗi xảy ra khi tạo user";
       toast({
         title: "Lỗi",
         description: errorMessage,
@@ -63,9 +90,7 @@ export const useUsers = () => {
     },
     onError: (error: unknown) => {
       const errorMessage =
-        error instanceof Error
-          ? error.message
-          : "Có lỗi xảy ra khi cập nhật user";
+        extractErrorMessage(error) || "Có lỗi xảy ra khi cập nhật user";
       toast({
         title: "Lỗi",
         description: errorMessage,
@@ -98,9 +123,12 @@ export const useUsers = () => {
   return {
     users,
     isLoadingUsers,
+    isFetchingUsers,
     usersError,
     refetchUsers,
+    pagination,
     useUserById,
+    useUserMembership,
     createUser: createUserMutation.mutate,
     updateUser: updateUserMutation.mutate,
     deleteUser: deleteUserMutation.mutate,

@@ -6,12 +6,26 @@ import {
   UserResponse,
   ChangePasswordRequestBody,
   ChangePasswordResponse,
+  UsersQueryParams,
 } from "@/@types/user";
+import {
+  GrantUserPointsPayload,
+  UserMembershipDetailResponse,
+} from "@/@types/Membership";
 
 export const userApis = {
   // Lấy danh sách tất cả users
-  getAllUsers: () => {
-    return http.get<UsersResponse>("/users");
+  getAllUsers: (params?: UsersQueryParams) => {
+    const { page = 1, limit = 1000, search, role } = params || {};
+
+    return http.get<UsersResponse>("/membership/members", {
+      params: {
+        page,
+        limit,
+        ...(search ? { search } : {}),
+        ...(role ? { role } : {}),
+      },
+    });
   },
 
   // Lấy thông tin user theo ID
@@ -44,4 +58,12 @@ export const userApis = {
     // Không cần set Content-Type, axios sẽ tự động set với boundary khi data là FormData
     return http.put<UserResponse>(`/users/${id}`, data);
   },
+
+  // Lấy thông tin membership của user (điểm, streak, tier)
+  getUserMembership: (id: string) =>
+    http.get<UserMembershipDetailResponse>(`/users/${id}/membership`),
+
+  // Cộng điểm cho user (admin)
+  grantUserPoints: (id: string, payload: GrantUserPointsPayload) =>
+    http.post(`/users/${id}/points`, payload),
 };

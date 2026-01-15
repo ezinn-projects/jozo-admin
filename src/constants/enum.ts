@@ -8,6 +8,7 @@
 export enum Role {
   Admin = "admin",
   Staff = "staff",
+  Member = "client",
   User = "user",
 }
 

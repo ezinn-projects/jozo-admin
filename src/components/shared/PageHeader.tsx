@@ -10,37 +10,37 @@ export interface PageHeaderProps {
    * Tiêu đề chính của trang
    */
   title: string;
-  
+
   /**
    * Mô tả ngắn gọn về trang (subtitle)
    */
   description?: string;
-  
+
   /**
    * Icon hiển thị bên cạnh title (tùy chọn)
    */
   icon?: LucideIcon;
-  
+
   /**
    * Các action buttons hiển thị bên phải header
    */
   actions?: ReactNode;
-  
+
   /**
    * Hiển thị nút back (quay lại trang trước)
    */
   showBackButton?: boolean;
-  
+
   /**
    * URL để back về (nếu không có sẽ dùng navigate(-1))
    */
   backUrl?: string;
-  
+
   /**
    * Custom className cho container
    */
   className?: string;
-  
+
   /**
    * Hiển thị separator line dưới header
    */
@@ -49,7 +49,7 @@ export interface PageHeaderProps {
 
 /**
  * PageHeader Component
- * 
+ *
  * Component header thống nhất cho tất cả các trang trong hệ thống.
  * Thiết kế theo chuẩn big tech (Salesforce, HubSpot, Microsoft Dynamics) với:
  * - Typography nhất quán và rõ ràng
@@ -79,7 +79,7 @@ export function PageHeader({
   };
 
   return (
-    <div className={cn("w-full", className)}>
+    <div className={cn("w-full mt-6", className)}>
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
         {/* Left side: Back button + Title section */}
         <div className="flex-1 min-w-0">
@@ -132,10 +132,7 @@ export function PageHeader({
       </div>
 
       {/* Separator */}
-      {showSeparator && (
-        <div className="w-full h-px bg-border mt-6" />
-      )}
+      {showSeparator && <div className="w-full h-px bg-border mt-6" />}
     </div>
   );
 }
-

@@ -151,8 +151,14 @@ const GiftsPage = () => {
                   <TableCell>
                     {item.type === "snacks_drinks" && item.price
                       ? `${formatCurrency(item.price)} VND`
-                      : item.type === "discount" && item.discountPercentage
+                      : (item.type === "discount_percentage" ||
+                          item.type === "discount") &&
+                        item.discountPercentage
                       ? `${item.discountPercentage}%`
+                      : (item.type === "discount_amount" ||
+                          item.type === "fnb_discount_amount") &&
+                        item.discountAmount
+                      ? `${formatCurrency(item.discountAmount)} VND`
                       : "-"}
                   </TableCell>
                   <TableCell>{item.totalQuantity}</TableCell>

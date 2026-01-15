@@ -1,11 +1,11 @@
 import { PageHeader } from "@/components/shared";
 import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { UserPlus } from "lucide-react";
+import { CalendarIcon, UserPlus } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
@@ -14,6 +14,14 @@ import { CreateUserRequest } from "@/@types/user";
 import { useUsers } from "@/hooks/use-users";
 import { useNavigate } from "react-router-dom";
 import PATHS from "@/constants/paths";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { cn } from "@/utils";
+import { format } from "date-fns";
 
 // Schema cho form tạo user mới
 const createUserSchema = z
@@ -23,9 +31,14 @@ const createUserSchema = z
     email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
     password: z.string().min(6, "Mật khẩu phải có ít nhất 6 ký tự"),
     confirm_password: z.string().min(1, "Xác nhận mật khẩu là bắt buộc"),
-    date_of_birth: z.string().min(1, "Ngày sinh là bắt buộc"),
+    date_of_birth: z.coerce.date({
+      required_error: "Ngày sinh là bắt buộc",
+      invalid_type_error: "Ngày sinh không hợp lệ",
+    }),
     role: z.nativeEnum(Role, { required_error: "Vai trò là bắt buộc" }),
-    phone_number: z.string().min(10, "Số điện thoại phải có ít nhất 10 số"),
+    phone_number: z
+      .string()
+      .regex(/^\d{10,11}$/, "Số điện thoại phải gồm 10-11 chữ số"),
   })
   .refine((data) => data.password === data.confirm_password, {
     message: "Mật khẩu không khớp",
@@ -52,11 +65,14 @@ const CreateUserForm = () => {
       email: "",
       password: "",
       confirm_password: "",
-      date_of_birth: "",
-      role: Role.Staff, // Mặc định là Staff (sẽ được map thành "user" ở backend)
+      date_of_birth: undefined,
+      role: Role.Member, // Mặc định member
       phone_number: "",
     },
   });
+
+  const normalizePhone = (value: string) =>
+    value.replace(/\D/g, "").slice(0, 11);
 
   const onSubmit = (data: CreateUserFormData) => {
     const createData: CreateUserRequest = {
@@ -65,8 +81,8 @@ const CreateUserForm = () => {
       email: data.email || undefined,
       password: data.password,
       confirm_password: data.confirm_password,
-      date_of_birth: new Date(data.date_of_birth),
-      role: Role.Staff, // Luôn tạo user với role Staff (sẽ được map thành "user" ở backend)
+      date_of_birth: data.date_of_birth,
+      role: Role.Member, // Luôn tạo user với role member
       phone_number: data.phone_number,
     };
 
@@ -190,6 +206,16 @@ const CreateUserForm = () => {
               <Input
                 id="phone_number"
                 {...form.register("phone_number")}
+                inputMode="numeric"
+                pattern="[0-9]*"
+                maxLength={11}
+                onChange={(e) => {
+                  const normalized = normalizePhone(e.target.value);
+                  form.setValue("phone_number", normalized, {
+                    shouldValidate: true,
+                    shouldDirty: true,
+                  });
+                }}
                 placeholder="Nhập số điện thoại"
               />
               {form.formState.errors.phone_number && (
@@ -200,19 +226,49 @@ const CreateUserForm = () => {
             </div>
 
             {/* Ngày sinh */}
-            <div className="space-y-2">
-              <Label htmlFor="date_of_birth">Ngày sinh *</Label>
-              <Input
-                id="date_of_birth"
-                type="date"
-                {...form.register("date_of_birth")}
-              />
-              {form.formState.errors.date_of_birth && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.date_of_birth.message}
-                </p>
+            <Controller
+              control={form.control}
+              name="date_of_birth"
+              render={({ field }) => (
+                <div className="space-y-2">
+                  <Label>Ngày sinh *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !field.value && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {field.value
+                          ? format(field.value, "dd/MM/yyyy")
+                          : "Chọn ngày"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={field.value}
+                        onSelect={(date) => date && field.onChange(date)}
+                        captionLayout="dropdown-buttons"
+                        fromYear={1950}
+                        toYear={new Date().getFullYear()}
+                        disabled={{ after: new Date() }}
+                        initialFocus
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {form.formState.errors.date_of_birth && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.date_of_birth.message}
+                    </p>
+                  )}
+                </div>
               )}
-            </div>
+            />
 
             {/* Buttons */}
             <div className="flex gap-4 pt-4">
