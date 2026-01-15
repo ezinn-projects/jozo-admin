@@ -3,7 +3,7 @@ import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
-import roomsScheduleApis from "@/apis/roomSchedule.api";
+import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +48,8 @@ import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import roomApis from "@/apis/room.apis";
+import { Textarea } from "@/components/ui/textarea";
 
 // Define bill interfaces
 interface BillItem {
@@ -130,6 +132,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
     schedule.giftEnabled || false
   );
+  const [targetRoomId, setTargetRoomId] = useState<string>("");
+  const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -146,6 +150,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setIsGiftEnabled(schedule.giftEnabled || false);
+      setTargetRoomId("");
+      setRoomChangeNote("");
     }
   }, [
     isOpen,
@@ -165,9 +171,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     AxiosResponse<HTTPResponse<IRoom[]>>
   >(["rooms"]);
 
+  // Fetch rooms để luôn có danh sách mới nhất cho dropdown đổi phòng
+  const { data: fetchedRooms, isLoading: isLoadingRooms } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: () => roomApis.getRooms(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const room = roomsData?.data.result?.find(
     (room) => room._id === schedule.roomId
   );
+  const rooms = fetchedRooms?.data?.result || roomsData?.data.result || [];
+  const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
@@ -267,6 +282,59 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
       },
     });
+
+  // Mutation đổi phòng
+  const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
+    mutationFn: (payload: IChangeRoomRequest) =>
+      roomsScheduleApis.changeRoom(schedule._id, payload),
+    onSuccess: () => {
+      refetchSchedules?.();
+      toast({
+        title: "Success",
+        description: "Đã đổi phòng thành công",
+      });
+      onClose();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Không thể đổi phòng, vui lòng thử lại",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleChangeRoom = () => {
+    if (!targetRoomId) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn phòng mới để chuyển.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (targetRoomId === schedule.roomId) {
+      toast({
+        title: "Phòng mới phải khác phòng hiện tại",
+        description: "Chọn phòng khác để tiếp tục.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: IChangeRoomRequest = {
+      roomId: schedule.roomId,
+      newRoomId: targetRoomId,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      status: schedule.status,
+      roomChangeNote: roomChangeNote || undefined,
+      updatedBy: user?._id,
+    };
+
+    changeRoom(payload);
+  };
 
   // Mutation để cập nhật số lượng item (dùng add/remove)
   const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
@@ -998,6 +1066,54 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Đổi phòng */}
+            <div className="mb-4 space-y-2">
+              <h4 className="text-base font-semibold">Đổi phòng</h4>
+              <div className="grid gap-2 md:grid-cols-2">
+                <Select
+                  value={targetRoomId}
+                  onValueChange={setTargetRoomId}
+                  disabled={isLoadingRooms || availableRooms.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        availableRooms.length === 0
+                          ? "Không còn phòng khác để đổi"
+                          : "Chọn phòng mới"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((room) => (
+                      <SelectItem key={String(room._id)} value={String(room._id)}>
+                        {room.roomName} - {room.roomType}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs sm:text-sm">Lý do đổi (tuỳ chọn)</Label>
+                  <Textarea
+                    value={roomChangeNote}
+                    onChange={(e) => setRoomChangeNote(e.target.value)}
+                    placeholder="Ví dụ: Khách yêu cầu đổi phòng"
+                    className="min-h-[60px]"
+                  />
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleChangeRoom}
+                loading={isChangingRoom}
+                disabled={availableRooms.length === 0}
+                className="w-full md:w-auto"
+              >
+                Chuyển sang phòng mới
+              </Button>
             </div>
 
             {/* Bill Preview Section */}
