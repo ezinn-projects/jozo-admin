@@ -42,7 +42,7 @@ export type UpdateUserRequest = {
 export type UsersResponse = {
   message: string;
   result: {
-    users: User[];
+    items: User[];
     pagination: {
       page: number;
       limit: number;
