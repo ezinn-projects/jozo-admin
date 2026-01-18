@@ -300,36 +300,28 @@ const RoomTimelineTable: React.FC = () => {
     [key: string]: boolean;
   }>({});
 
-  // Text-to-speech function
-  const speak = async (text: string) => {
-    const response = await fetch(
-      `https://texttospeech.googleapis.com/v1/text:synthesize?key=${
-        import.meta.env.VITE_GOOGLE_API_KEY
-      }`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          input: { text },
-          voice: {
-            languageCode: "vi-VN",
-            name: "vi-VN-Wavenet-A", // giọng nam. Có thể dùng Wavenet-B, Standard-A,...
-            ssmlGender: "MALE",
-          },
-          audioConfig: {
-            audioEncoding: "MP3",
-            speakingRate: 1.0,
-            pitch: 0,
-          },
-        }),
-      }
-    );
+  // Text-to-speech using Web Speech API (vi-VN)
+  const speak = (text: string) => {
+    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
+      console.warn("Web Speech API not supported");
+      return;
+    }
 
-    const data = await response.json();
-    const audio = new Audio("data:audio/mp3;base64," + data.audioContent);
-    audio.play();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "vi-VN";
+    utterance.rate = 1;
+    utterance.pitch = 1;
+
+    const voices = window.speechSynthesis.getVoices();
+    const vietnameseVoice = voices.find(
+      (voice) => voice.lang?.toLowerCase().startsWith("vi")
+    );
+    if (vietnameseVoice) {
+      utterance.voice = vietnameseVoice;
+    }
+
+    window.speechSynthesis.cancel(); // stop any ongoing speech before speaking new text
+    window.speechSynthesis.speak(utterance);
   };
 
   // Socket connection and notification handling
