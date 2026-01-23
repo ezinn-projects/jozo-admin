@@ -4,6 +4,7 @@ import {
   Clock,
   DoorOpenIcon,
   Home,
+  Music,
   PercentIcon,
   Settings2,
   UtensilsCrossed,
@@ -97,6 +98,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Promotion",
         url: PATHS.PROMOTION,
         icon: PercentIcon,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Songs Collection",
+        url: PATHS.SONGS_COLLECTION,
+        icon: Music,
         roles: [Role.Admin],
       },
       {

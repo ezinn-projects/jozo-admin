@@ -67,6 +67,9 @@ const PATHS = {
 
   // total revenue
   TOTAL_REVENUE: "/total-revenue",
+
+  // room music
+  SONGS_COLLECTION: "/songs-collection",
 } as const;
 
 export default PATHS;
