@@ -974,6 +974,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               .toISOString()
           : dayjs(startTime || schedule.startTime).toISOString(),
         promotionId: selectedPromotion || undefined,
+        applyFreeHourPromotion: applyFreeHourPromo,
       }),
     onSuccess: () => {
       toast({

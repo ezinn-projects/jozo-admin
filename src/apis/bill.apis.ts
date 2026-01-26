@@ -70,6 +70,7 @@ const billAPis = {
       actualEndTime: string;
       promotionId?: string;
       actualStartTime?: string;
+      applyFreeHourPromotion?: boolean;
     }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
 
