@@ -1,7 +1,6 @@
 import roomsMusicApis from "@/apis/roomMusic.apis";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Song } from "@/@types/RoomMusic";
 
 export const useSongsCollection = (params?: {
   page?: number;
@@ -9,7 +8,12 @@ export const useSongsCollection = (params?: {
   keyword?: string;
 }) =>
   useQuery({
-    queryKey: ["songs-collection", params?.page, params?.limit, params?.keyword],
+    queryKey: [
+      "songs-collection",
+      params?.page,
+      params?.limit,
+      params?.keyword,
+    ],
     queryFn: async () => {
       const response = await roomsMusicApis.getSongsCollection(params);
       return response.data;
