@@ -148,6 +148,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
+      // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setIsGiftEnabled(schedule.giftEnabled || false);
       setTargetRoomId("");
@@ -724,6 +725,35 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       return mappedItem;
     });
   }, [billData?.data.result, orderDetailData, menuItems]);
+
+  // Tính tổng tiền snack + nước để kiểm tra điều kiện khuyến mãi
+  const totalSnackDrinkAmount = React.useMemo(() => {
+    if (!itemsWithDetails || itemsWithDetails.length === 0) return 0;
+
+    return itemsWithDetails.reduce((total, item) => {
+      const category = item.category?.toLowerCase() || "";
+      // Kiểm tra nếu là snack hoặc drink (hỗ trợ cả số ít và số nhiều)
+      const isSnackOrDrink =
+        category === "snack" ||
+        category === "snacks" ||
+        category === "drink" ||
+        category === "drinks";
+
+      if (isSnackOrDrink) {
+        return total + item.price * item.quantity;
+      }
+      return total;
+    }, 0);
+  }, [itemsWithDetails]);
+
+  // Kiểm tra xem có phải cuối tuần không (thứ 7 = 6, chủ nhật = 0)
+  const isWeekend = React.useMemo(() => {
+    const dayOfWeek = dayjs().day(); // 0 = chủ nhật, 6 = thứ 7
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  }, []);
+
+  // Kiểm tra xem có đủ điều kiện để áp dụng khuyến mãi không (>= 35k và không phải cuối tuần)
+  const canApplyFreeHourPromo = totalSnackDrinkAmount >= 35000 && !isWeekend;
 
   // Sử dụng trực tiếp dữ liệu từ API vì backend đã tính toán promotion
   const billResult = (billData?.data.result || {}) as BillData;
@@ -1449,26 +1479,46 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 <div className="border-t-2 border-dashed border-purple-400" />
 
                 {/* Free Hour Promotion Checkbox */}
-                <div className="flex items-center gap-2 mb-2">
-                  <Checkbox
-                    id="free-hour-promo"
-                    checked={applyFreeHourPromo}
-                    onCheckedChange={(checked) => {
-                      const newValue = checked === true;
-                      setApplyFreeHourPromo(newValue);
-                      updateFreeHourPromo(newValue);
-                    }}
-                    disabled={isUpdatingFreeHourPromo}
-                  />
-                  <Label
-                    htmlFor="free-hour-promo"
-                    className="text-xs sm:text-sm cursor-pointer"
-                  >
-                    Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
-                    có giá trị trên 35k)
-                  </Label>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    Chỉ áp dụng từ 10h đến 19h
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="free-hour-promo"
+                      checked={applyFreeHourPromo}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        setApplyFreeHourPromo(newValue);
+                        updateFreeHourPromo(newValue);
+                      }}
+                      disabled={isUpdatingFreeHourPromo}
+                    />
+                    <Label
+                      htmlFor="free-hour-promo"
+                      className="text-xs sm:text-sm cursor-pointer"
+                    >
+                      Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
+                      có giá trị trên 35k)
+                    </Label>
+                  </div>
+                  {!canApplyFreeHourPromo && (
+                    <p className="text-[10px] sm:text-xs text-red-500 ml-6">
+                      {isWeekend ? (
+                        <>
+                          Không thể áp dụng khuyến mãi vào cuối tuần (thứ 7 và chủ nhật).
+                        </>
+                      ) : (
+                        <>
+                          Tổng snack + nước hiện tại:{" "}
+                          {totalSnackDrinkAmount.toLocaleString("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          })}
+                          . Cần đạt tối thiểu 35.000đ để áp dụng khuyến mãi.
+                        </>
+                      )}
+                    </p>
+                  )}
+                  <p className="text-[10px] sm:text-xs text-muted-foreground ml-6">
+                    Chỉ áp dụng từ 10h đến 19h, không áp dụng cuối tuần
                   </p>
                 </div>
 

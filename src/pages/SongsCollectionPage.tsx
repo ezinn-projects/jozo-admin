@@ -1,4 +1,5 @@
 import { PageHeader } from "@/components/shared";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -9,33 +10,73 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useSongsCollection } from "@/hooks/use-room-music";
+import { useDeleteSong, useNormalizeSongs, useSongsCollection } from "@/hooks/use-room-music";
 import { formatDate } from "@/utils/formatters";
-import { Music, RefreshCcw, Search } from "lucide-react";
-import { useMemo, useState } from "react";
+import { Loader2, Music, RefreshCcw, Search, Trash2, Wand2 } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import PaginationContainer from "@/pages/RecruitmentPage/components/PaginationContainer";
 
 const SongsCollectionPage = () => {
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(50);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const shouldKeepFocusRef = useRef(false);
+
+  // Debounce search term
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        shouldKeepFocusRef.current = true;
+      }
+      setDebouncedSearchTerm(searchTerm);
+      setCurrentPage(1); // Reset về trang đầu tiên khi search
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
   const {
-    data: songs = [],
+    data: responseData,
     isLoading,
     isFetching,
     refetch,
     error,
-  } = useSongsCollection();
-  const [searchTerm, setSearchTerm] = useState("");
+  } = useSongsCollection({
+    page: currentPage,
+    limit: pageSize,
+    keyword: debouncedSearchTerm || undefined,
+  });
 
-  const filteredSongs = useMemo(
-    () =>
-      songs.filter((song) => {
-        const term = searchTerm.toLowerCase();
-        return (
-          song.title.toLowerCase().includes(term) ||
-          song.author.toLowerCase().includes(term) ||
-          song.video_id.toLowerCase().includes(term)
-        );
-      }),
-    [songs, searchTerm]
-  );
+  // Keep focus on input after search completes
+  useEffect(() => {
+    if (shouldKeepFocusRef.current && !isFetching && searchInputRef.current) {
+      // Use setTimeout to ensure focus happens after render
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+        shouldKeepFocusRef.current = false;
+      }, 0);
+    }
+  }, [isFetching]);
+
+  const {
+    mutate: normalizeSongs,
+    isPending: isNormalizing,
+  } = useNormalizeSongs();
+
+  const {
+    mutate: deleteSong,
+    isPending: isDeleting,
+  } = useDeleteSong();
+
+  // Extract songs and pagination from response
+  const songs = responseData?.result?.songs || [];
+  const pagination = responseData?.result?.pagination;
+  
+  // Use pagination info from API
+  const total = pagination?.total || 0;
+  const totalPages = pagination?.totalPages || 0;
 
   const formatDuration = (seconds?: number) => {
     if (seconds === undefined || Number.isNaN(seconds)) return "-";
@@ -44,6 +85,24 @@ const SongsCollectionPage = () => {
       .toString()
       .padStart(2, "0");
     return `${minutes}:${remainingSeconds}`;
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1); // Reset về trang đầu tiên khi thay đổi page size
+  };
+
+  const handleDeleteSong = (videoId: string, title: string) => {
+    const confirmed = window.confirm(
+      `Bạn có chắc chắn muốn xóa bài hát "${title}" khỏi collection?`
+    );
+    if (confirmed) {
+      deleteSong(videoId);
+    }
   };
 
   if (isLoading) {
@@ -78,14 +137,35 @@ const SongsCollectionPage = () => {
         description="Xem danh sách các bài hát đã được lưu vào collection"
         icon={Music}
         actions={
-          <button
-            onClick={() => refetch()}
-            className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium border rounded-md hover:bg-gray-50"
-            disabled={isFetching}
-          >
-            <RefreshCcw className={`w-4 h-4 ${isFetching ? "animate-spin" : ""}`} />
-            Làm mới
-          </button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => {
+                const ok = window.confirm(
+                  "Chuẩn hóa sẽ cập nhật title_normalized/author_normalized cho dữ liệu cũ. Tiếp tục?"
+                );
+                if (ok) normalizeSongs();
+              }}
+              disabled={isNormalizing}
+            >
+              {isNormalizing ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Wand2 className="w-4 h-4 mr-2" />
+              )}
+              Chuẩn hóa dữ liệu
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => refetch()}
+              disabled={isFetching}
+            >
+              <RefreshCcw
+                className={`w-4 h-4 mr-2 ${isFetching ? "animate-spin" : ""}`}
+              />
+              Làm mới
+            </Button>
+          </div>
         }
       />
 
@@ -94,6 +174,7 @@ const SongsCollectionPage = () => {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
             <Input
+              ref={searchInputRef}
               placeholder="Tìm kiếm theo tên bài hát, tác giả hoặc video ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -118,10 +199,11 @@ const SongsCollectionPage = () => {
                 <TableHead>Thời lượng</TableHead>
                 <TableHead>Ngày thêm</TableHead>
                 <TableHead>Cập nhật</TableHead>
+                <TableHead className="w-[100px]">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSongs.map((song) => (
+              {songs.map((song) => (
                 <TableRow key={song._id || song.video_id}>
                   <TableCell>
                     {song.thumbnail ? (
@@ -164,17 +246,39 @@ const SongsCollectionPage = () => {
                       ? formatDate(String(song.updated_at))
                       : "-"}
                   </TableCell>
+                  <TableCell>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDeleteSong(song.video_id, song.title)}
+                      disabled={isDeleting}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
           </Table>
 
-          {filteredSongs.length === 0 && (
+          {songs.length === 0 && (
             <div className="text-center py-8 text-gray-500">
-              {searchTerm
+              {debouncedSearchTerm
                 ? "Không tìm thấy bài hát phù hợp"
                 : "Chưa có bài hát nào trong collection"}
             </div>
+          )}
+
+          {songs.length > 0 && (
+            <PaginationContainer
+              currentPage={currentPage}
+              totalPages={totalPages}
+              pageSize={pageSize}
+              total={total}
+              onPageChange={handlePageChange}
+              onPageSizeChange={handlePageSizeChange}
+            />
           )}
         </CardContent>
       </Card>
