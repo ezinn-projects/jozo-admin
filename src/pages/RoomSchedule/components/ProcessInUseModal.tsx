@@ -232,6 +232,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
         toast({
@@ -390,6 +391,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
 
@@ -405,6 +407,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           selectedPromotion,
           customEndTime,
           customStartTime,
+          applyFreeHourPromo,
         ]);
 
         const previousOrderData = queryClient.getQueryData([
@@ -430,6 +433,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
           (
             old:
@@ -543,6 +547,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               selectedPromotion,
               customEndTime,
               customStartTime,
+              applyFreeHourPromo,
             ],
             context.previousBillData
           );
@@ -603,6 +608,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
         queryClient.invalidateQueries({
@@ -621,6 +627,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       selectedPromotion,
       customEndTime,
       customStartTime,
+      applyFreeHourPromo,
     ],
     queryFn: () => {
       // Convert custom times to ISO strings
@@ -644,7 +651,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         schedule._id,
         selectedPromotion || undefined,
         actualEndTime,
-        actualStartTime
+        actualStartTime,
+        applyFreeHourPromo
       );
     },
     enabled: isOpen && !!customEndTime && !!customStartTime,
@@ -828,7 +836,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handlePaymentMethodChange = (value: string) => {
     queryClient.setQueryData(
-      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
+      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime, applyFreeHourPromo],
       (oldData: unknown) => {
         console.log("oldData", oldData);
         if (!oldData) return oldData;
@@ -884,6 +892,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
           (oldData: AxiosResponse<HTTPResponse<BillResponse>>) => {
             console.log("oldData", oldData.data.result);
