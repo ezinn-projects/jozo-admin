@@ -81,3 +81,87 @@ export type GrantUserPointsPayload = {
   points: number;
   reason?: string;
 };
+
+export type UpdateStreakPayload = {
+  count?: number;
+  reset?: boolean;
+};
+
+// Pending gift từ reward history
+export interface IPendingGift {
+  rewardHistoryId: string;
+  giftId: string;
+  giftName: string;
+  giftType: string;
+  giftImage?: string;
+  streakCount: number;
+  assignedAt: string;
+}
+
+// Eligible gift chưa được assign
+export interface IEligibleGift {
+  streakCount: number;
+  giftId: string;
+  giftName: string;
+  giftType: string;
+  giftImage?: string;
+  bonusPoints?: number;
+}
+
+// User info trong response
+export interface IPendingGiftsUser {
+  userId: string;
+  name: string;
+  phone_number: string;
+  tier: string;
+  availablePoint: number;
+  streakCount: number;
+}
+
+// Response từ GET /pending-gifts
+export interface IPendingGiftsResponse {
+  user: IPendingGiftsUser;
+  pending: IPendingGift[];
+  eligible: IEligibleGift[];
+}
+
+// Payload cho POST /claim-gift
+export interface IClaimGiftPayload {
+  phone: string;
+  streakCount: number;
+  scheduleId: string;
+}
+
+// Streak Info Response - GET /membership/members/:userId/streak
+export interface IUserStreak {
+  _id: string;
+  userId: string;
+  count: number;
+  lastVisitAt: string;
+  expiredAt: string;
+  windowDays: number;
+  createdAt: string;
+  updatedAt: string;
+  isExpired: boolean;
+  isActive: boolean;
+}
+
+export interface IClaimedRewardGift {
+  giftId: string;
+  giftName: string;
+  giftType: string;
+}
+
+export interface IClaimedReward {
+  streakCount: number;
+  points?: number;
+  gift?: IClaimedRewardGift;
+  claimedAt: string;
+}
+
+export interface IUserStreakInfo {
+  streak: IUserStreak;
+  claimedRewards: IClaimedReward[];
+}
+
+export type UserStreakInfoResponse = HTTPResponse<IUserStreakInfo>;

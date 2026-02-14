@@ -93,6 +93,7 @@ const billAPis = {
       promotionId?: string;
     }>;
     totalAmount: number;
+    customerPhone?: string;
     paymentMethod: string;
     startTime: string;
     endTime: string;

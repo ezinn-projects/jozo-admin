@@ -2,7 +2,10 @@ import membershipApis from "@/apis/membership.apis";
 import {
   GrantUserPointsPayload,
   IMembershipConfig,
+  IPendingGiftsResponse,
+  IUserStreakInfo,
   MembershipConfigPayload,
+  UpdateStreakPayload,
 } from "@/@types/Membership";
 import { useToast } from "./use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -72,5 +75,68 @@ export const useUpdateMemberPoints = (userId?: string) => {
         variant: "destructive",
       });
     },
+  });
+};
+
+export const useUpdateMemberStreak = (userId?: string) => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: UpdateStreakPayload) => {
+      if (!userId) {
+        return Promise.reject(new Error("Thiếu userId để cập nhật streak"));
+      }
+      return membershipApis.updateMemberStreak(userId, payload);
+    },
+    onSuccess: (response) => {
+      toast({
+        title: "Thành công",
+        description:
+          response.data.message || "Đã cập nhật streak thành công",
+      });
+      queryClient.invalidateQueries({ queryKey: ["user-membership", userId] });
+    },
+    onError: (error) => {
+      const errorMessage =
+        error instanceof Error ? error.message : "Không thể cập nhật streak";
+      toast({
+        title: "Lỗi",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    },
+  });
+};
+
+export const usePendingGifts = (phone?: string) => {
+  return useQuery({
+    queryKey: ["pending-gifts", phone],
+    queryFn: async () => {
+      if (!phone) {
+        throw new Error("Thiếu số điện thoại");
+      }
+      const response = await membershipApis.getPendingGifts(phone);
+      return response.data.result as IPendingGiftsResponse | undefined;
+    },
+    enabled: !!phone,
+    staleTime: 30 * 1000, // 30 giây
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useMemberStreakInfo = (userId?: string) => {
+  return useQuery({
+    queryKey: ["member-streak-info", userId],
+    queryFn: async () => {
+      if (!userId) {
+        throw new Error("Thiếu userId");
+      }
+      const response = await membershipApis.getMemberStreakInfo(userId);
+      return response.data.result as IUserStreakInfo | undefined;
+    },
+    enabled: !!userId,
+    staleTime: 30 * 1000, // 30 giây
+    refetchOnWindowFocus: true,
   });
 };
