@@ -126,24 +126,18 @@ const FnbStatsPage = () => {
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <label className="text-sm font-medium">
-              {period === "day"
-                ? "Date"
-                : period === "week"
-                  ? "Date in week"
-                  : "Date in month"}
-            </label>
+          <div className="flex w-[180px] flex-col gap-2">
+            <label className="text-sm font-medium">Date</label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-[240px] justify-start text-left font-normal",
+                    "h-9 w-full justify-start text-left font-normal",
                     !date && "text-muted-foreground"
                   )}
                 >
-                  <Calendar className="mr-2 h-4 w-4" />
+                  <Calendar className="mr-2 h-4 w-4 shrink-0" />
                   {date ? (
                     format(date, "MMM d, yyyy", { locale: enUS })
                   ) : (
