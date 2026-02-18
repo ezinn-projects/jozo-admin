@@ -96,7 +96,7 @@ const MENU_ITEMS: MenuItem[] = [
         roles: [Role.Admin],
       },
       {
-        title: "Thống kê FNB",
+        title: "FNB Statistics",
         url: PATHS.FNB_STATS,
         icon: BarChart3,
         roles: [Role.Admin],
