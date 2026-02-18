@@ -1,4 +1,5 @@
 import {
+  BarChart3,
   BedDouble,
   Calendar,
   Clock,
@@ -92,6 +93,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Menu Items",
         url: PATHS.MENU_ITEMS,
         icon: UtensilsCrossed,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Thống kê FNB",
+        url: PATHS.FNB_STATS,
+        icon: BarChart3,
         roles: [Role.Admin],
       },
       {

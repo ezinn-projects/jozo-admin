@@ -20,7 +20,6 @@ import {
   useMarkAllAsRead,
   useMarkAsRead,
   useNotifications,
-  useUnreadCount,
 } from "@/hooks/use-notifications";
 import { formatUTCToLocal, timeAgo } from "@/lib/dayjs";
 import { cn } from "@/lib/utils";
@@ -41,8 +40,7 @@ function NotificationsPage() {
   const navigate = useNavigate();
   const [currentPage, setCurrentPage] = useState(1);
 
-  // Fetch notifications
-  const { data: unreadCountData } = useUnreadCount();
+  // Fetch notifications (unread count tính từ trang hiện tại)
   const { data: notificationsData, isLoading } = useNotifications({
     page: currentPage,
     limit: ITEMS_PER_PAGE,
@@ -53,8 +51,8 @@ function NotificationsPage() {
   const { mutate: markAllAsRead } = useMarkAllAsRead();
   const { mutate: deleteNotification } = useDeleteNotification();
 
-  const unreadCount = unreadCountData?.count || 0;
   const notifications = notificationsData?.notifications || [];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
   const totalPages = notificationsData?.totalPages || 1;
   const total = notificationsData?.total || 0;
 

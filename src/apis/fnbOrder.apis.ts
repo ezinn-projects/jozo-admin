@@ -51,6 +51,40 @@ export interface ICompleteOrderRequestBody {
   createdBy: string;
 }
 
+// Thống kê FNB - query params
+export type FnbStatsPeriod = "day" | "week" | "month";
+
+export type FnbStatsCategory = "drink" | "snack";
+
+export interface IFnbOrderStatsParams {
+  period: FnbStatsPeriod;
+  date?: string; // YYYY-MM-DD, optional
+  category?: FnbStatsCategory; // drink | snack, optional
+  search?: string; // tùy chọn, lọc theo tên (không phân biệt hoa thường, trim)
+}
+
+// Thống kê FNB - response
+export interface IFnbOrderStatsItemBreakdown {
+  itemId: string;
+  name: string;
+  category: string;
+  quantity: number;
+}
+
+export interface IFnbOrderStatsPeriod {
+  from: string;
+  to: string;
+  fromFormatted: string;
+  toFormatted: string;
+}
+
+export interface IFnbOrderStatsResult {
+  period: IFnbOrderStatsPeriod;
+  totalItemsSold: number;
+  ordersCount: number;
+  itemsBreakdown: IFnbOrderStatsItemBreakdown[];
+}
+
 const fnbOrderApis = {
   // Tạo mới FNB Order
   createFnbOrder: (payload: ICreateFnbOrderRequestBody) => {
@@ -132,6 +166,21 @@ const fnbOrderApis = {
   markOrderAsServed: (roomId: string, orderId: string) => {
     return http.post<HTTPResponse<{ success: boolean; message: string }>>(
       `/rooms/${roomId}/orders/${orderId}/serve`
+    );
+  },
+  // Thống kê FNB: period, date (optional), category (optional drink|snack), search (optional)
+  getFnbOrderStats: (params: IFnbOrderStatsParams) => {
+    const searchParams = new URLSearchParams({ period: params.period });
+    if (params.date) searchParams.set("date", params.date);
+    if (params.category === "drink" || params.category === "snack") {
+      searchParams.set("category", params.category);
+    }
+    const searchTrimmed = params.search?.trim();
+    if (searchTrimmed !== undefined && searchTrimmed !== "") {
+      searchParams.set("search", searchTrimmed);
+    }
+    return http.get<HTTPResponse<IFnbOrderStatsResult>>(
+      `${FNB_ORDER_CONTROLLER}/stats?${searchParams.toString()}`
     );
   },
 };
