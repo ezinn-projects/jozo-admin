@@ -2,7 +2,6 @@ import {
   INotification,
   INotificationListResponse,
   INotificationQuery,
-  IUnreadCountResponse,
 } from "@/@types/Notification";
 import http from "@/utils/http";
 
@@ -12,11 +11,6 @@ const notificationApis = {
     return http.get<HTTPResponse<INotificationListResponse>>("/notifications", {
       params,
     });
-  },
-
-  // Lấy số lượng notifications chưa đọc
-  getUnreadCount: () => {
-    return http.get<HTTPResponse<IUnreadCountResponse>>("/notifications/unread-count");
   },
 
   // Đánh dấu một notification đã đọc

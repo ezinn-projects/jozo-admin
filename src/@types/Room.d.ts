@@ -35,6 +35,8 @@ interface IRoomSchedule {
   createdBy: string;
   updatedBy: string;
   actualEndTime: string | null;
+  newRoomId?: string;
+  roomChangeNote?: string;
   // Customer information
   customerName?: string;
   customerPhone?: string;

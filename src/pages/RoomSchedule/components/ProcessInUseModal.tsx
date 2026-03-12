@@ -3,7 +3,10 @@ import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
-import roomsScheduleApis, { ICreateRoomScheduleRequest } from "@/apis/roomSchedule.api";
+import roomsScheduleApis, {
+  IChangeRoomRequest,
+  ICreateRoomScheduleRequest,
+} from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import ClaimGiftModal from "./ClaimGiftModal";
 import MemberInfoModal from "./MemberInfoModal";
@@ -50,6 +53,8 @@ import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { Clock, Gift, Minus, Plus, Printer, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
+import roomApis from "@/apis/room.apis";
+import { Textarea } from "@/components/ui/textarea";
 
 // Define bill interfaces
 interface BillItem {
@@ -133,8 +138,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [customerPhoneValue, setCustomerPhoneValue] = useState<string>("");
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
-    schedule.giftEnabled || false
+    schedule.giftEnabled || false,
   );
+  const [targetRoomId, setTargetRoomId] = useState<string>("");
+  const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -149,6 +156,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
+      // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setIsGiftEnabled(schedule.giftEnabled || false);
       setCustomerPhoneValue(schedule.customerPhone || "");
@@ -172,9 +180,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     AxiosResponse<HTTPResponse<IRoom[]>>
   >(["rooms"]);
 
+  // Fetch rooms để luôn có danh sách mới nhất cho dropdown đổi phòng
+  const { data: fetchedRooms, isLoading: isLoadingRooms } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: () => roomApis.getRooms(),
+    staleTime: 5 * 60 * 1000,
+  });
+
   const room = roomsData?.data.result?.find(
-    (room) => room._id === schedule.roomId
+    (room) => room._id === schedule.roomId,
   );
+  const rooms = fetchedRooms?.data?.result || roomsData?.data.result || [];
+  const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
@@ -223,6 +240,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
         toast({
@@ -279,8 +297,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const { mutate: updateCustomerPhone, isPending: isUpdatingCustomerPhone } =
     useMutation({
       mutationFn: (customerPhone: string) =>
-        roomsScheduleApis.updateSchedule(schedule._id, { 
-          customerPhone 
+        roomsScheduleApis.updateSchedule(schedule._id, {
+          customerPhone,
         } as Partial<ICreateRoomScheduleRequest>),
       onSuccess: () => {
         refetchSchedules?.();
@@ -297,6 +315,58 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
       },
     });
+  // Mutation đổi phòng
+  const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
+    mutationFn: (payload: IChangeRoomRequest) =>
+      roomsScheduleApis.changeRoom(schedule._id, payload),
+    onSuccess: () => {
+      refetchSchedules?.();
+      toast({
+        title: "Success",
+        description: "Đã đổi phòng thành công",
+      });
+      onClose();
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Không thể đổi phòng, vui lòng thử lại",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleChangeRoom = () => {
+    if (!targetRoomId) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn phòng mới để chuyển.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (targetRoomId === schedule.roomId) {
+      toast({
+        title: "Phòng mới phải khác phòng hiện tại",
+        description: "Chọn phòng khác để tiếp tục.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: IChangeRoomRequest = {
+      roomId: schedule.roomId,
+      newRoomId: targetRoomId,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      status: schedule.status,
+      roomChangeNote: roomChangeNote || undefined,
+      updatedBy: user?._id,
+    };
+
+    changeRoom(payload);
+  };
 
   // Mutation để cập nhật số lượng item (dùng add/remove)
   const { mutate: updateItemQuantity, isPending: isUpdatingQuantity } =
@@ -351,6 +421,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
 
@@ -366,6 +437,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           selectedPromotion,
           customEndTime,
           customStartTime,
+          applyFreeHourPromo,
         ]);
 
         const previousOrderData = queryClient.getQueryData([
@@ -391,6 +463,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
           (
             old:
@@ -404,18 +477,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     };
                   };
                 }
-              | undefined
+              | undefined,
           ) => {
             if (!old?.data?.result?.items) return old;
 
             const updatedItems = old.data.result.items.map((item: BillItem) =>
-              item.itemId === itemId ? { ...item, quantity } : item
+              item.itemId === itemId ? { ...item, quantity } : item,
             );
 
             // Recalculate totals
             const newFnBTotal = updatedItems.reduce(
               (sum: number, item: BillItem) => sum + item.price * item.quantity,
-              0
+              0,
             );
 
             const newTotalAmount =
@@ -433,7 +506,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 },
               },
             };
-          }
+          },
         );
 
         // Optimistically update orderDetailData
@@ -443,10 +516,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             if (!old) return old;
 
             const newDrinks = old.items.drinks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item
+              item.itemId === itemId ? { ...item, quantity } : item,
             );
             const newSnacks = old.items.snacks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item
+              item.itemId === itemId ? { ...item, quantity } : item,
             );
 
             return {
@@ -456,7 +529,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 snacks: newSnacks,
               },
             };
-          }
+          },
         );
 
         // Optimistically update menuItems inventory
@@ -480,7 +553,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         ...menuItem.inventory,
                         quantity: Math.max(
                           0,
-                          (menuItem.inventory?.quantity || 0) - quantityDiff
+                          (menuItem.inventory?.quantity || 0) - quantityDiff,
                         ),
                       },
                     };
@@ -489,7 +562,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 }),
               },
             };
-          }
+          },
         );
 
         return { previousBillData, previousOrderData, currentQuantity };
@@ -504,14 +577,15 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               selectedPromotion,
               customEndTime,
               customStartTime,
+              applyFreeHourPromo,
             ],
-            context.previousBillData
+            context.previousBillData,
           );
         }
         if (context?.previousOrderData) {
           queryClient.setQueryData(
             ["fnbOrderDetail", schedule._id],
-            context.previousOrderData
+            context.previousOrderData,
           );
         }
         // Rollback menuItems inventory
@@ -537,7 +611,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                           ...menuItem.inventory,
                           quantity: Math.max(
                             0,
-                            (menuItem.inventory?.quantity || 0) + quantityDiff
+                            (menuItem.inventory?.quantity || 0) + quantityDiff,
                           ),
                         },
                       };
@@ -546,7 +620,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   }),
                 },
               };
-            }
+            },
           );
         }
         toast({
@@ -564,6 +638,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
         });
         queryClient.invalidateQueries({
@@ -582,6 +657,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       selectedPromotion,
       customEndTime,
       customStartTime,
+      applyFreeHourPromo,
     ],
     queryFn: () => {
       // Convert custom times to ISO strings
@@ -605,7 +681,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         schedule._id,
         selectedPromotion || undefined,
         actualEndTime,
-        actualStartTime
+        actualStartTime,
+        applyFreeHourPromo,
       );
     },
     enabled: isOpen && !!customEndTime && !!customStartTime,
@@ -657,13 +734,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       let orderItem = orderItems.find(
         (orderItem) =>
           orderItem.name === item.description ||
-          orderItem.itemId === item.itemId
+          orderItem.itemId === item.itemId,
       );
 
       // Nếu không tìm thấy trong orderDetailData, thử tìm trong menuItems
       if (!orderItem && menuItems) {
         const menuItem = menuItems.find(
-          (menuItem) => menuItem.name === item.description
+          (menuItem) => menuItem.name === item.description,
         );
         if (menuItem) {
           orderItem = {
@@ -687,6 +764,35 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     });
   }, [billData?.data.result, orderDetailData, menuItems]);
 
+  // Tính tổng tiền snack + nước để kiểm tra điều kiện khuyến mãi
+  const totalSnackDrinkAmount = React.useMemo(() => {
+    if (!itemsWithDetails || itemsWithDetails.length === 0) return 0;
+
+    return itemsWithDetails.reduce((total, item) => {
+      const category = item.category?.toLowerCase() || "";
+      // Kiểm tra nếu là snack hoặc drink (hỗ trợ cả số ít và số nhiều)
+      const isSnackOrDrink =
+        category === "snack" ||
+        category === "snacks" ||
+        category === "drink" ||
+        category === "drinks";
+
+      if (isSnackOrDrink) {
+        return total + item.price * item.quantity;
+      }
+      return total;
+    }, 0);
+  }, [itemsWithDetails]);
+
+  // Kiểm tra xem có phải cuối tuần không (thứ 7 = 6, chủ nhật = 0)
+  const isWeekend = React.useMemo(() => {
+    const dayOfWeek = dayjs().day(); // 0 = chủ nhật, 6 = thứ 7
+    return dayOfWeek === 0 || dayOfWeek === 6;
+  }, []);
+
+  // Kiểm tra xem có đủ điều kiện để áp dụng khuyến mãi không (>= 35k và không phải cuối tuần)
+  const canApplyFreeHourPromo = totalSnackDrinkAmount >= 35000 && !isWeekend;
+
   // Sử dụng trực tiếp dữ liệu từ API vì backend đã tính toán promotion
   const billResult = (billData?.data.result || {}) as BillData;
   const {
@@ -703,11 +809,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     freeHourPromotion,
     giftDiscountAmount = 0,
   } = billResult;
-
-  // Debug: Log items khi thay đổi
-  useEffect(() => {
-    console.log("Items changed:", items);
-  }, [items]);
 
   const handleCompleteSession = () => {
     const actualEndTime = customEndTime
@@ -768,7 +869,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handlePaymentMethodChange = (value: string) => {
     queryClient.setQueryData(
-      ["bill", schedule._id, selectedPromotion, customEndTime, customStartTime],
+      [
+        "bill",
+        schedule._id,
+        selectedPromotion,
+        customEndTime,
+        customStartTime,
+        applyFreeHourPromo,
+      ],
       (oldData: unknown) => {
         console.log("oldData", oldData);
         if (!oldData) return oldData;
@@ -789,7 +897,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             },
           },
         };
-      }
+      },
     );
   };
 
@@ -824,6 +932,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             selectedPromotion,
             customEndTime,
             customStartTime,
+            applyFreeHourPromo,
           ],
           (oldData: AxiosResponse<HTTPResponse<BillResponse>>) => {
             console.log("oldData", oldData.data.result);
@@ -843,7 +952,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             console.log("updatedData", updatedData);
 
             return updatedData;
-          }
+          },
         );
         toast({
           title: "Success",
@@ -873,7 +982,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     itemId: string,
     currentQuantity: number,
     change: number,
-    category: string
+    category: string,
   ) => {
     const newQuantity = Math.max(0, currentQuantity + change);
     if (newQuantity === currentQuantity) return;
@@ -905,6 +1014,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               .toISOString()
           : dayjs(startTime || schedule.startTime).toISOString(),
         promotionId: selectedPromotion || undefined,
+        applyFreeHourPromotion: applyFreeHourPromo,
       }),
     onSuccess: () => {
       toast({
@@ -961,7 +1071,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             <div className="mb-4">
               <div
                 className={`${
-                  gift || isGiftEnabled ? "bg-gradient-to-r from-blue-50 to-pink-50" : "bg-blue-50"
+                  gift || isGiftEnabled
+                    ? "bg-gradient-to-r from-blue-50 to-pink-50"
+                    : "bg-blue-50"
                 } p-4 rounded-lg border ${
                   gift || isGiftEnabled ? "border-pink-200" : "border-blue-200"
                 }`}
@@ -969,7 +1081,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 <div className="space-y-3">
                   {/* Phone Input */}
                   <div>
-                    <Label htmlFor="customer-phone" className="text-sm font-medium mb-2 block flex items-center gap-2">
+                    <Label
+                      htmlFor="customer-phone"
+                      className="text-sm font-medium mb-2 block flex items-center gap-2"
+                    >
                       <User className="w-4 h-4 text-blue-600" />
                       Số điện thoại thành viên
                     </Label>
@@ -984,6 +1099,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     <p className="text-xs text-gray-600 mt-1">
                       Nhập số điện thoại để tích điểm và quản lý quà tặng
                     </p>
+                    <span className="text-sm font-medium">
+                      Trạng thái quà tặng:
+                    </span>
+                    <span
+                      className={`text-sm ${
+                        gift || isGiftEnabled
+                          ? "text-pink-600 font-semibold"
+                          : "text-gray-600"
+                      }`}
+                    >
+                      {gift
+                        ? "Đã nhận quà"
+                        : isGiftEnabled
+                          ? "Được phép nhận quà"
+                          : "Không được nhận quà"}
+                    </span>
                   </div>
 
                   {/* Gift Status & Switch */}
@@ -1009,8 +1140,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         {gift
                           ? "Đã nhận quà"
                           : isGiftEnabled
-                          ? "Được phép nhận quà"
-                          : "Không được nhận quà"}
+                            ? "Được phép nhận quà"
+                            : "Không được nhận quà"}
                       </span>
                     </div>
                     <div className="flex items-center gap-2">
@@ -1102,6 +1233,59 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   )}
                 </div>
               </div>
+            </div>
+
+            {/* Đổi phòng */}
+            <div className="mb-4 space-y-2">
+              <h4 className="text-base font-semibold">Đổi phòng</h4>
+              <div className="grid gap-2 md:grid-cols-2">
+                <Select
+                  value={targetRoomId}
+                  onValueChange={setTargetRoomId}
+                  disabled={isLoadingRooms || availableRooms.length === 0}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue
+                      placeholder={
+                        availableRooms.length === 0
+                          ? "Không còn phòng khác để đổi"
+                          : "Chọn phòng mới"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((room) => (
+                      <SelectItem
+                        key={String(room._id)}
+                        value={String(room._id)}
+                      >
+                        {room.roomName} - {room.roomType}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex flex-col gap-1">
+                  <Label className="text-xs sm:text-sm">
+                    Lý do đổi (tuỳ chọn)
+                  </Label>
+                  <Textarea
+                    value={roomChangeNote}
+                    onChange={(e) => setRoomChangeNote(e.target.value)}
+                    placeholder="Ví dụ: Khách yêu cầu đổi phòng"
+                    className="min-h-[60px]"
+                  />
+                </div>
+              </div>
+              <Button
+                variant="secondary"
+                onClick={handleChangeRoom}
+                loading={isChangingRoom}
+                disabled={availableRooms.length === 0}
+                className="w-full md:w-auto"
+              >
+                Chuyển sang phòng mới
+              </Button>
             </div>
 
             {/* Bill Preview Section */}
@@ -1205,19 +1389,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                         item.itemId,
                                         item.quantity,
                                         -1,
-                                        item.category
+                                        item.category,
                                       );
                                     } else if (menuItems) {
                                       const menuItem = menuItems.find(
                                         (menuItem) =>
-                                          menuItem.name === item.description
+                                          menuItem.name === item.description,
                                       );
                                       if (menuItem) {
                                         handleQuantityChange(
                                           menuItem._id,
                                           item.quantity,
                                           -1,
-                                          menuItem.category
+                                          menuItem.category,
                                         );
                                       }
                                     }
@@ -1241,19 +1425,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                         item.itemId,
                                         item.quantity,
                                         1,
-                                        item.category
+                                        item.category,
                                       );
                                     } else if (menuItems) {
                                       const menuItem = menuItems.find(
                                         (menuItem) =>
-                                          menuItem.name === item.description
+                                          menuItem.name === item.description,
                                       );
                                       if (menuItem) {
                                         handleQuantityChange(
                                           menuItem._id,
                                           item.quantity,
                                           1,
-                                          menuItem.category
+                                          menuItem.category,
                                         );
                                       }
                                     }
@@ -1278,7 +1462,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               {
                                 style: "currency",
                                 currency: "VND",
-                              }
+                              },
                             )}
                           </span>
                         </div>
@@ -1329,19 +1513,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                         item.itemId,
                                         item.quantity,
                                         -1,
-                                        item.category
+                                        item.category,
                                       );
                                     } else if (menuItems) {
                                       const menuItem = menuItems.find(
                                         (menuItem) =>
-                                          menuItem.name === item.description
+                                          menuItem.name === item.description,
                                       );
                                       if (menuItem) {
                                         handleQuantityChange(
                                           menuItem._id,
                                           item.quantity,
                                           -1,
-                                          menuItem.category
+                                          menuItem.category,
                                         );
                                       }
                                     }
@@ -1365,19 +1549,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                         item.itemId,
                                         item.quantity,
                                         1,
-                                        item.category
+                                        item.category,
                                       );
                                     } else if (menuItems) {
                                       const menuItem = menuItems.find(
                                         (menuItem) =>
-                                          menuItem.name === item.description
+                                          menuItem.name === item.description,
                                       );
                                       if (menuItem) {
                                         handleQuantityChange(
                                           menuItem._id,
                                           item.quantity,
                                           1,
-                                          menuItem.category
+                                          menuItem.category,
                                         );
                                       }
                                     }
@@ -1411,7 +1595,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                 {
                                   style: "currency",
                                   currency: "VND",
-                                }
+                                },
                               )}
                             </div>
                           </div>
@@ -1437,26 +1621,47 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 <div className="border-t-2 border-dashed border-purple-400" />
 
                 {/* Free Hour Promotion Checkbox */}
-                <div className="flex items-center gap-2 mb-2">
-                  <Checkbox
-                    id="free-hour-promo"
-                    checked={applyFreeHourPromo}
-                    onCheckedChange={(checked) => {
-                      const newValue = checked === true;
-                      setApplyFreeHourPromo(newValue);
-                      updateFreeHourPromo(newValue);
-                    }}
-                    disabled={isUpdatingFreeHourPromo}
-                  />
-                  <Label
-                    htmlFor="free-hour-promo"
-                    className="text-xs sm:text-sm cursor-pointer"
-                  >
-                    Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
-                    có giá trị trên 35k)
-                  </Label>
-                  <p className="text-[10px] sm:text-xs text-muted-foreground">
-                    Chỉ áp dụng từ 10h đến 19h
+                <div className="flex flex-col gap-1 mb-2">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="free-hour-promo"
+                      checked={applyFreeHourPromo}
+                      onCheckedChange={(checked) => {
+                        const newValue = checked === true;
+                        setApplyFreeHourPromo(newValue);
+                        updateFreeHourPromo(newValue);
+                      }}
+                      disabled={isUpdatingFreeHourPromo}
+                    />
+                    <Label
+                      htmlFor="free-hour-promo"
+                      className="text-xs sm:text-sm cursor-pointer"
+                    >
+                      Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
+                      có giá trị trên 35k)
+                    </Label>
+                  </div>
+                  {!canApplyFreeHourPromo && (
+                    <p className="text-[10px] sm:text-xs text-red-500 ml-6">
+                      {isWeekend ? (
+                        <>
+                          Không thể áp dụng khuyến mãi vào cuối tuần (thứ 7 và
+                          chủ nhật).
+                        </>
+                      ) : (
+                        <>
+                          Tổng snack + nước hiện tại:{" "}
+                          {totalSnackDrinkAmount.toLocaleString("vi-VN", {
+                            style: "currency",
+                            currency: "VND",
+                          })}
+                          . Cần đạt tối thiểu 35.000đ để áp dụng khuyến mãi.
+                        </>
+                      )}
+                    </p>
+                  )}
+                  <p className="text-[10px] sm:text-xs text-muted-foreground ml-6">
+                    Chỉ áp dụng từ 10h đến 19h, không áp dụng cuối tuần
                   </p>
                 </div>
 
@@ -1559,17 +1764,17 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                             ? dayjs(schedule.startTime)
                                 .set(
                                   "hour",
-                                  parseInt(customStartTime.split(":")[0])
+                                  parseInt(customStartTime.split(":")[0]),
                                 )
                                 .set(
                                   "minute",
-                                  parseInt(customStartTime.split(":")[1])
+                                  parseInt(customStartTime.split(":")[1]),
                                 )
                                 .set("second", 0)
                             : dayjs(schedule.startTime);
                           const endTime = startTime.add(60, "minute");
                           const timeRange = `${startTime.format(
-                            "HH:mm"
+                            "HH:mm",
                           )} - ${endTime.format("HH:mm")}`;
                           return `Chương trình KM (${timeRange}):`;
                         })()}
@@ -1596,7 +1801,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     if (originalTotal === 0 && items && items.length > 0) {
                       originalTotal = items.reduce(
                         (sum, item) => sum + item.price * item.quantity,
-                        0
+                        0,
                       );
                     }
 
@@ -1608,7 +1813,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     // Tổng sau khi trừ free hour
                     const afterFreeHourTotal = Math.max(
                       0,
-                      originalTotal - freeHourDiscount
+                      originalTotal - freeHourDiscount,
                     );
 
                     // Tính promotion discount (nếu có) dựa trên tổng sau khi trừ free hour

@@ -34,6 +34,7 @@ const UpsertRoomTypePage = lazy(
 );
 // const FnBPage = lazy(() => import("@/pages/FnB"));
 const MenuItemsPage = lazy(() => import("@/pages/FnB/MenuItemsPage"));
+const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const MembershipConfigPage = lazy(() => import("@/pages/Membership"));
 const StaffManagementPage = lazy(() => import("@/pages/StaffManagement"));
@@ -62,6 +63,9 @@ const MyEarningsDetailPage = lazy(
 const ChangePasswordPage = lazy(() => import("@/pages/ChangePasswordPage"));
 const ProfilePage = lazy(() => import("@/pages/ProfilePage"));
 const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
+const SongsCollectionPage = lazy(
+  () => import("@/pages/SongsCollectionPage")
+);
 
 function useRoute() {
   return (
@@ -104,6 +108,10 @@ function useRoute() {
                   element={<NotificationsPage />}
                 />
                 <Route
+                  path={PATHS.SONGS_COLLECTION}
+                  element={<SongsCollectionPage />}
+                />
+                <Route
                   path={PATHS.CHANGE_PASSWORD}
                   element={<ChangePasswordPage />}
                 />
@@ -127,6 +135,7 @@ function useRoute() {
                 <Route path={PATHS.PRICE} element={<PricePage />} />
                 {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
+                <Route path={PATHS.FNB_STATS} element={<FnbStatsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route
                   path={PATHS.MEMBERSHIP_CONFIG}

@@ -14,21 +14,37 @@ interface ICreateRoomScheduleRequest {
   applyFreeHourPromo?: boolean;
 }
 
+interface IChangeRoomRequest {
+  roomId: string;
+  startTime: string;
+  endTime: string | null;
+  status: RoomStatus;
+  newRoomId: string;
+  roomChangeNote?: string;
+  updatedBy?: string;
+}
+
+const SCHEDULE_CONTROLLER = "/room-schedule";
+
 const roomsScheduleApis = {
   getRoomSchedules: (date: string) =>
-    http.get<HTTPResponse<IRoomSchedule[]>>("/room-schedule", {
+    http.get<HTTPResponse<IRoomSchedule[]>>(SCHEDULE_CONTROLLER, {
       params: {
         date,
       },
     }),
-  updateSchedule: (id: string, schedule: Partial<ICreateRoomScheduleRequest>) =>
-    http.put<HTTPResponse>(`/room-schedule/${id}`, schedule),
+  updateSchedule: (
+    id: string,
+    schedule: Partial<ICreateRoomScheduleRequest & IChangeRoomRequest>
+  ) => http.put<HTTPResponse>(`${SCHEDULE_CONTROLLER}/${id}`, schedule),
+  changeRoom: (id: string, payload: IChangeRoomRequest) =>
+    http.put<HTTPResponse>(`${SCHEDULE_CONTROLLER}/${id}`, payload),
   deleteSchedule: (id: string) =>
-    http.delete<HTTPResponse<IRoomSchedule>>(`/room-schedule/${id}`),
+    http.delete<HTTPResponse<IRoomSchedule>>(`${SCHEDULE_CONTROLLER}/${id}`),
   createSchedule: (schedule: ICreateRoomScheduleRequest) =>
-    http.post<HTTPResponse<string>>(`/room-schedule`, schedule),
+    http.post<HTTPResponse<string>>(SCHEDULE_CONTROLLER, schedule),
   getScheduleById: (id: string) =>
-    http.get<HTTPResponse<IRoomSchedule>>(`/room-schedule/${id}`),
+    http.get<HTTPResponse<IRoomSchedule>>(`${SCHEDULE_CONTROLLER}/${id}`),
 };
 export default roomsScheduleApis;
-export type { ICreateRoomScheduleRequest };
+export type { ICreateRoomScheduleRequest, IChangeRoomRequest };

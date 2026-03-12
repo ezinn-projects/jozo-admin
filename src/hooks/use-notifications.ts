@@ -1,7 +1,6 @@
 import { 
   INotificationQuery, 
   INotificationListResponse, 
-  IUnreadCountResponse 
 } from "@/@types/Notification";
 import notificationApis from "@/apis/notification.apis";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -9,7 +8,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 export const NOTIFICATION_QUERY_KEYS = {
   all: ["notifications"] as const,
   list: (params?: INotificationQuery) => [...NOTIFICATION_QUERY_KEYS.all, "list", params] as const,
-  unreadCount: () => [...NOTIFICATION_QUERY_KEYS.all, "unread-count"] as const,
 };
 
 // Hook để lấy danh sách notifications
@@ -21,19 +19,6 @@ export const useNotifications = (params?: INotificationQuery) => {
       // API trả về { message, result: { notifications, total, page, limit, totalPages } }
       return response.data.result as INotificationListResponse;
     },
-  });
-};
-
-// Hook để lấy số lượng unread
-export const useUnreadCount = () => {
-  return useQuery({
-    queryKey: NOTIFICATION_QUERY_KEYS.unreadCount(),
-    queryFn: async (): Promise<IUnreadCountResponse> => {
-      const response = await notificationApis.getUnreadCount();
-      // API có thể trả về { message, result: { unreadCount } } hoặc { unreadCount }
-      return response.data.result as IUnreadCountResponse;
-    },
-    refetchInterval: 30000, // Refetch mỗi 30 giây
   });
 };
 

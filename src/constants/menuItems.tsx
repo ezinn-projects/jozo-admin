@@ -1,9 +1,11 @@
 import {
+  BarChart3,
   BedDouble,
   Calendar,
   Clock,
   DoorOpenIcon,
   Home,
+  Music,
   PercentIcon,
   Settings2,
   UtensilsCrossed,
@@ -95,6 +97,12 @@ const MENU_ITEMS: MenuItem[] = [
         roles: [Role.Admin],
       },
       {
+        title: "FNB Statistics",
+        url: PATHS.FNB_STATS,
+        icon: BarChart3,
+        roles: [Role.Admin],
+      },
+      {
         title: "Promotion",
         url: PATHS.PROMOTION,
         icon: PercentIcon,
@@ -104,6 +112,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Membership",
         url: PATHS.MEMBERSHIP_CONFIG,
         icon: Sparkles,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Songs Collection",
+        url: PATHS.SONGS_COLLECTION,
+        icon: Music,
         roles: [Role.Admin],
       },
       {

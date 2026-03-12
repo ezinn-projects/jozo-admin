@@ -42,6 +42,7 @@ const PATHS = {
   MENU_ITEMS: "/menu-items",
   MENU_ITEMS_NEW: "/menu-items/new",
   MENU_ITEMS_EDIT: "/menu-items/:id/edit",
+  FNB_STATS: "/fnb-stats",
 
   // promotion management
   PROMOTION: "/promotion",
@@ -70,6 +71,9 @@ const PATHS = {
 
   // total revenue
   TOTAL_REVENUE: "/total-revenue",
+
+  // room music
+  SONGS_COLLECTION: "/songs-collection",
 } as const;
 
 export default PATHS;

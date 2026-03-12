@@ -7,7 +7,8 @@ const billAPis = {
     scheduleId: string,
     promotionId?: string,
     actualEndTime?: string,
-    actualStartTime?: string
+    actualStartTime?: string,
+    applyFreeHourPromotion?: boolean
   ) => {
     const params = new URLSearchParams();
 
@@ -22,6 +23,10 @@ const billAPis = {
 
     if (actualStartTime) {
       params.append("actualStartTime", actualStartTime);
+    }
+
+    if (applyFreeHourPromotion !== undefined) {
+      params.append("applyFreeHourPromotion", applyFreeHourPromotion.toString());
     }
 
     return http.get<HTTPResponse<IBill>>(
@@ -65,6 +70,7 @@ const billAPis = {
       actualEndTime: string;
       promotionId?: string;
       actualStartTime?: string;
+      applyFreeHourPromotion?: boolean;
     }
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
 

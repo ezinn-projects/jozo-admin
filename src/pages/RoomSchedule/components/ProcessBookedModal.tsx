@@ -1,5 +1,5 @@
-import { IRoomSchedule } from "@/@types/Room";
-import roomsScheduleApis from "@/apis/roomSchedule.api";
+import { IRoom, IRoomSchedule } from "@/@types/Room";
+import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -9,7 +9,17 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { RoomStatus } from "@/constants/enum";
+import roomApis from "@/apis/room.apis";
+import useAuth from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
@@ -72,6 +82,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   schedule,
   refetchSchedules,
 }) => {
+  const { user } = useAuth();
   const eventStart = dayjs(schedule.startTime);
   const eventEnd = schedule.endTime
     ? dayjs(schedule.endTime)
@@ -102,7 +113,18 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const [currentSchedule, setCurrentSchedule] =
     React.useState<IRoomSchedule>(schedule);
 
+  // State đổi phòng
+  const [targetRoomId, setTargetRoomId] = React.useState<string>("");
+  const [roomChangeNote, setRoomChangeNote] = React.useState<string>("");
+
   const queryClient = useQueryClient();
+
+  // Query danh sách phòng để đổi
+  const { data: roomsData, isLoading: isLoadingRooms } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: () => roomApis.getRooms(),
+    staleTime: 5 * 60 * 1000,
+  });
 
   // Query lấy menu items
   const { data: menuItemsData } = useQuery({
@@ -309,6 +331,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
+  const rooms = (roomsData?.data?.result || []) as IRoom[];
+  const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
 
   // Hàm lấy thông tin source và màu sắc
   const getSourceInfo = (source?: string) => {
@@ -375,6 +399,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       setAdjustedEndTime(defaultEnd.format("HH:mm"));
       setNoteValue(schedule.note || "");
       setIsEditingNote(false);
+      setTargetRoomId("");
+      setRoomChangeNote("");
     }
   }, [schedule]);
 
@@ -471,6 +497,59 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       });
     },
   });
+
+  // Mutation đổi phòng
+  const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
+    mutationFn: (payload: IChangeRoomRequest) =>
+      roomsScheduleApis.changeRoom(schedule._id, payload),
+    onSuccess: () => {
+      refetchSchedules();
+      onClose();
+      toast({
+        title: "Success",
+        description: "Đã đổi phòng thành công",
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Error",
+        description: "Không thể đổi phòng, vui lòng thử lại",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handleChangeRoom = () => {
+    if (!targetRoomId) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng chọn phòng mới trước khi chuyển.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (targetRoomId === schedule.roomId) {
+      toast({
+        title: "Phòng mới phải khác phòng cũ",
+        description: "Vui lòng chọn phòng khác để chuyển.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const payload: IChangeRoomRequest = {
+      roomId: schedule.roomId,
+      newRoomId: targetRoomId,
+      startTime: schedule.startTime,
+      endTime: schedule.endTime,
+      status: schedule.status,
+      roomChangeNote: roomChangeNote || undefined,
+      updatedBy: user?._id,
+    };
+
+    changeRoom(payload);
+  };
 
   const handleUpdate = async (newStatus: RoomStatus) => {
     const updateData: Partial<IRoomSchedule> = { status: newStatus };
@@ -707,6 +786,51 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Đổi phòng */}
+        <div className="mt-4 space-y-2">
+          <h3 className="font-semibold">Đổi phòng</h3>
+          <div className="space-y-2">
+            <Select
+              value={targetRoomId}
+              onValueChange={setTargetRoomId}
+              disabled={isLoadingRooms || availableRooms.length === 0}
+            >
+              <SelectTrigger className="w-full">
+                <SelectValue
+                  placeholder={
+                    availableRooms.length === 0
+                      ? "Không còn phòng khác để đổi"
+                      : "Chọn phòng muốn chuyển"
+                  }
+                />
+              </SelectTrigger>
+              <SelectContent>
+                {availableRooms.map((room) => (
+                  <SelectItem key={String(room._id)} value={String(room._id)}>
+                    {room.roomName} - {room.roomType}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Textarea
+              placeholder="Lý do đổi phòng (tuỳ chọn)"
+              value={roomChangeNote}
+              onChange={(e) => setRoomChangeNote(e.target.value)}
+              className="min-h-[80px]"
+            />
+
+            <Button
+              variant="secondary"
+              onClick={handleChangeRoom}
+              loading={isChangingRoom}
+              disabled={availableRooms.length === 0}
+            >
+              Chuyển sang phòng mới
+            </Button>
+          </div>
+        </div>
 
         {/* Thông tin quà tặng */}
         {(hasGift || schedule.giftEnabled !== undefined) && (

@@ -13,7 +13,6 @@ import {
   useMarkAllAsRead,
   useMarkAsRead,
   useNotifications,
-  useUnreadCount,
   NOTIFICATION_QUERY_KEYS,
 } from "@/hooks/use-notifications";
 import { useSocket } from "@/hooks/useSocket";
@@ -41,9 +40,7 @@ export const NotificationBell = () => {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
 
-  // Fetch notifications
-  const { data: unreadCountData } = useUnreadCount();
-  const unreadCount = unreadCountData?.count || 0;
+  // Fetch notifications (unread count tính từ danh sách đã fetch)
   const { data: notificationsData, isLoading } = useNotifications({
     page: 1,
     limit: 10,
@@ -83,6 +80,7 @@ export const NotificationBell = () => {
   }, [onNewNotification, offNewNotification, toast, queryClient]);
 
   const notifications = notificationsData?.notifications || [];
+  const unreadCount = notifications.filter((n) => !n.isRead).length;
 
   const handleNotificationClick = (notification: INotification) => {
     if (!notification.isRead) {
