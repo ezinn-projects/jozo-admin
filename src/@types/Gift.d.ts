@@ -5,6 +5,7 @@ export type GiftType =
   | "snacks_drinks"
   | "discount_percentage"
   | "discount_amount"
+  | "fnb_discount_amount"
   | "discount";
 
 export interface GiftBundleItem {
@@ -25,6 +26,7 @@ export interface Gift {
   discountPercentage?: number;
   discountAmount?: number;
   items?: GiftBundleItem[];
+  categories?: FnBCategory[];
   totalQuantity: number; // tổng số suất quà (bundle) tạo ra
   remainingQuantity: number; // số suất còn lại để random
   isActive: boolean;
@@ -40,6 +42,7 @@ export interface GiftCreateRequest {
   discountPercentage?: number;
   discountAmount?: number;
   items?: GiftBundleItem[];
+  categories?: FnBCategory[];
   totalQuantity: number;
   isActive?: boolean;
 }
@@ -56,6 +59,7 @@ export interface ScheduleGift {
   discountPercentage?: number;
   discountAmount?: number;
   items?: GiftBundleItem[];
+  categories?: FnBCategory[];
 }
 
 // Interface cho gift trong bill response
@@ -66,5 +70,6 @@ export interface BillGift {
   discountPercentage?: number;
   discountAmount?: number;
   items?: GiftBundleItem[];
+  categories?: FnBCategory[];
 }
 

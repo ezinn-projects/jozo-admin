@@ -14,6 +14,7 @@ import {
   Briefcase,
   KeyRound,
   Gift,
+  Sparkles,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -105,6 +106,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Promotion",
         url: PATHS.PROMOTION,
         icon: PercentIcon,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Membership",
+        url: PATHS.MEMBERSHIP_CONFIG,
+        icon: Sparkles,
         roles: [Role.Admin],
       },
       {

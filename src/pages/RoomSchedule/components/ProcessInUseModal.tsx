@@ -3,8 +3,13 @@ import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
-import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
+import roomsScheduleApis, {
+  IChangeRoomRequest,
+  ICreateRoomScheduleRequest,
+} from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
+import ClaimGiftModal from "./ClaimGiftModal";
+import MemberInfoModal from "./MemberInfoModal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -46,7 +51,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
-import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
+import { Clock, Gift, Minus, Plus, Printer, User } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import roomApis from "@/apis/room.apis";
 import { Textarea } from "@/components/ui/textarea";
@@ -123,11 +128,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 }) => {
   const [isMenuItemsModalOpen, setIsMenuItemsModalOpen] = useState(false);
   const [isConfirmEndOpen, setIsConfirmEndOpen] = useState(false);
+  const [isClaimGiftModalOpen, setIsClaimGiftModalOpen] = useState(false);
+  const [isMemberInfoModalOpen, setIsMemberInfoModalOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [customStartTime, setCustomStartTime] = useState<string>("");
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
+  const [customerPhoneValue, setCustomerPhoneValue] = useState<string>("");
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
     schedule.giftEnabled || false,
@@ -151,14 +159,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setIsGiftEnabled(schedule.giftEnabled || false);
-      setTargetRoomId("");
-      setRoomChangeNote("");
+      setCustomerPhoneValue(schedule.customerPhone || "");
     }
   }, [
     isOpen,
     schedule.startTime,
     schedule.applyFreeHourPromo,
     schedule.giftEnabled,
+    schedule.customerPhone,
   ]);
 
   const getAppliedPromotion = () => {
@@ -285,6 +293,28 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       },
     });
 
+  // Mutation để cập nhật customerPhone
+  const { mutate: updateCustomerPhone, isPending: isUpdatingCustomerPhone } =
+    useMutation({
+      mutationFn: (customerPhone: string) =>
+        roomsScheduleApis.updateSchedule(schedule._id, {
+          customerPhone,
+        } as Partial<ICreateRoomScheduleRequest>),
+      onSuccess: () => {
+        refetchSchedules?.();
+        toast({
+          title: "Success",
+          description: "Đã cập nhật số điện thoại khách hàng",
+        });
+      },
+      onError: () => {
+        toast({
+          title: "Error",
+          description: "Không thể cập nhật số điện thoại",
+          variant: "destructive",
+        });
+      },
+    });
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
     mutationFn: (payload: IChangeRoomRequest) =>
@@ -803,6 +833,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       roomId: schedule.roomId,
       items: items || [],
       totalAmount: totalAmount || 0,
+      customerPhone: customerPhoneValue || schedule.customerPhone,
       paymentMethod: paymentMethod,
       startTime: actualStartTime,
       endTime: actualEndTime,
@@ -813,6 +844,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     // Save bill trước khi update schedule status
     saveBillMutation(billToSave, {
       onSuccess: () => {
+        // Invalidate pending-gifts query để refresh member info
+        if (customerPhoneValue) {
+          queryClient.invalidateQueries({
+            queryKey: ["pending-gifts", customerPhoneValue],
+          });
+        }
+
         // Sau khi save bill thành công, update schedule status
         const updateData: Partial<IRoomSchedule> = {
           ...schedule,
@@ -1029,24 +1067,38 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            {/* Thông tin quà tặng */}
+            {/* Membership & Quà tặng */}
             <div className="mb-4">
               <div
                 className={`${
-                  gift || isGiftEnabled ? "bg-pink-50" : "bg-gray-50"
-                } p-3 rounded-lg border ${
-                  gift || isGiftEnabled ? "border-pink-200" : "border-gray-200"
+                  gift || isGiftEnabled
+                    ? "bg-gradient-to-r from-blue-50 to-pink-50"
+                    : "bg-blue-50"
+                } p-4 rounded-lg border ${
+                  gift || isGiftEnabled ? "border-pink-200" : "border-blue-200"
                 }`}
               >
-                <div className="flex flex-col gap-2">
-                  <div className="flex items-center gap-2">
-                    <Gift
-                      className={`w-4 h-4 ${
-                        gift || isGiftEnabled
-                          ? "text-pink-500"
-                          : "text-gray-500"
-                      }`}
+                <div className="space-y-3">
+                  {/* Phone Input */}
+                  <div>
+                    <Label
+                      htmlFor="customer-phone"
+                      className="text-sm font-medium mb-2 block flex items-center gap-2"
+                    >
+                      <User className="w-4 h-4 text-blue-600" />
+                      Số điện thoại thành viên
+                    </Label>
+                    <Input
+                      id="customer-phone"
+                      type="tel"
+                      placeholder="Nhập số điện thoại..."
+                      value={customerPhoneValue}
+                      onChange={(e) => setCustomerPhoneValue(e.target.value)}
+                      disabled={isUpdatingCustomerPhone}
                     />
+                    <p className="text-xs text-gray-600 mt-1">
+                      Nhập số điện thoại để tích điểm và quản lý quà tặng
+                    </p>
                     <span className="text-sm font-medium">
                       Trạng thái quà tặng:
                     </span>
@@ -1064,18 +1116,91 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                           : "Không được nhận quà"}
                     </span>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs sm:text-sm">Allow Gift</span>
-                    <Switch
-                      checked={isGiftEnabled}
-                      onCheckedChange={(checked) =>
-                        updateGiftEnabled(checked === true)
-                      }
-                      disabled={isUpdatingGiftEnabled}
-                    />
+
+                  {/* Gift Status & Switch */}
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
+                    <div className="flex items-center gap-2">
+                      <Gift
+                        className={`w-4 h-4 ${
+                          gift || isGiftEnabled
+                            ? "text-pink-500"
+                            : "text-gray-500"
+                        }`}
+                      />
+                      <span className="text-sm font-medium">
+                        Trạng thái quà tặng:
+                      </span>
+                      <span
+                        className={`text-sm ${
+                          gift || isGiftEnabled
+                            ? "text-pink-600 font-semibold"
+                            : "text-gray-600"
+                        }`}
+                      >
+                        {gift
+                          ? "Đã nhận quà"
+                          : isGiftEnabled
+                            ? "Được phép nhận quà"
+                            : "Không được nhận quà"}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm">Allow Gift</span>
+                      <Switch
+                        checked={isGiftEnabled}
+                        onCheckedChange={(checked) =>
+                          updateGiftEnabled(checked === true)
+                        }
+                        disabled={isUpdatingGiftEnabled}
+                      />
+                    </div>
                   </div>
+
+                  {/* Action Buttons */}
+                  {customerPhoneValue && (
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUpdatingCustomerPhone}
+                        onClick={() => {
+                          if (customerPhoneValue !== schedule.customerPhone) {
+                            updateCustomerPhone(customerPhoneValue, {
+                              onSuccess: () => setIsMemberInfoModalOpen(true),
+                            });
+                          } else {
+                            setIsMemberInfoModalOpen(true);
+                          }
+                        }}
+                        className="flex-1 border-blue-300 text-blue-600 hover:bg-blue-100"
+                      >
+                        <User className="w-4 h-4 mr-1" />
+                        Xem thông tin
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        disabled={isUpdatingCustomerPhone}
+                        onClick={() => {
+                          if (customerPhoneValue !== schedule.customerPhone) {
+                            updateCustomerPhone(customerPhoneValue, {
+                              onSuccess: () => setIsClaimGiftModalOpen(true),
+                            });
+                          } else {
+                            setIsClaimGiftModalOpen(true);
+                          }
+                        }}
+                        className="flex-1 border-pink-300 text-pink-600 hover:bg-pink-50"
+                      >
+                        <Gift className="w-4 h-4 mr-1" />
+                        Phục vụ quà tặng
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Gift Details */}
                   {gift && (
-                    <div className="pl-6 space-y-1">
+                    <div className="pt-2 border-t border-pink-200 space-y-1">
                       <div className="text-sm">
                         <span className="font-medium">Tên quà:</span>{" "}
                         <span className="text-pink-700">{gift.name}</span>
@@ -1914,6 +2039,33 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         roomId={schedule.roomId}
         scheduleId={schedule._id}
         createdBy={user?._id || ""}
+      />
+
+      <MemberInfoModal
+        isOpen={isMemberInfoModalOpen}
+        onClose={() => setIsMemberInfoModalOpen(false)}
+        phone={customerPhoneValue || schedule.customerPhone}
+      />
+
+      <ClaimGiftModal
+        isOpen={isClaimGiftModalOpen}
+        onClose={() => setIsClaimGiftModalOpen(false)}
+        scheduleId={schedule._id}
+        defaultPhone={customerPhoneValue || schedule.customerPhone || ""}
+        onGiftClaimed={() => {
+          // Refresh bill query
+          queryClient.invalidateQueries({
+            queryKey: [
+              "bill",
+              schedule._id,
+              selectedPromotion,
+              customEndTime,
+              customStartTime,
+            ],
+          });
+          // Refresh schedules
+          refetchSchedules?.();
+        }}
       />
     </>
   );

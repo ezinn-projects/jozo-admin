@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, Search, UserCircle } from "lucide-react";
+import {
+  Plus,
+  Search,
+  UserCircle,
+  ChevronLeft,
+  ChevronRight,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { useUsers } from "@/hooks/use-users";
 import { User } from "@/@types/user";
@@ -13,15 +19,147 @@ import { useNavigate } from "react-router-dom";
 import PATHS from "@/constants/paths";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { toast } from "@/hooks/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Role } from "@/constants/enum";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+type PaginationControlsProps = {
+  currentPage: number;
+  totalPages: number;
+  pageSize: number;
+  total: number;
+  onPageChange: (page: number) => void;
+  onPageSizeChange: (size: number) => void;
+};
+
+const PaginationControls = ({
+  currentPage,
+  totalPages,
+  pageSize,
+  total,
+  onPageChange,
+  onPageSizeChange,
+}: PaginationControlsProps) => {
+  const displayStart = total === 0 ? 0 : (currentPage - 1) * pageSize + 1;
+  const displayEnd = Math.min(currentPage * pageSize, total);
+
+  const renderPageButtons = () => {
+    const visiblePages = Math.min(5, totalPages);
+    const buttons = [];
+
+    for (let i = 0; i < visiblePages; i++) {
+      let pageNumber: number;
+
+      if (totalPages <= 5) {
+        pageNumber = i + 1;
+      } else if (currentPage <= 3) {
+        pageNumber = i + 1;
+      } else if (currentPage >= totalPages - 2) {
+        pageNumber = totalPages - 4 + i;
+      } else {
+        pageNumber = currentPage - 2 + i;
+      }
+
+      buttons.push(
+        <Button
+          key={pageNumber}
+          variant={currentPage === pageNumber ? "default" : "outline"}
+          size="sm"
+          onClick={() => onPageChange(pageNumber)}
+          className="w-8 h-8"
+        >
+          {pageNumber}
+        </Button>
+      );
+    }
+
+    return buttons;
+  };
+
+  return (
+    <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="text-sm text-gray-600">
+        Hiển thị {displayStart} - {displayEnd} trong tổng số {total} người dùng
+      </div>
+
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+        <div className="flex items-center gap-2">
+          <span className="text-sm text-gray-600">Hiển thị:</span>
+          <Select
+            value={pageSize.toString()}
+            onValueChange={(value) => onPageSizeChange(Number(value))}
+          >
+            <SelectTrigger className="w-20">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PAGE_SIZE_OPTIONS.map((size) => (
+                <SelectItem key={size} value={size.toString()}>
+                  {size}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <span className="text-sm text-gray-600">bản ghi</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage - 1)}
+            disabled={currentPage <= 1}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+
+          <div className="flex items-center gap-1">{renderPageButtons()}</div>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onPageChange(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const UsersManagementPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const { users, isLoadingUsers, deleteUser, isDeletingUser } = useUsers();
+  const {
+    users,
+    isLoadingUsers,
+    isFetchingUsers,
+    deleteUser,
+    isDeletingUser,
+    pagination,
+  } = useUsers({
+    page: currentPage,
+    limit: pageSize,
+    search: searchTerm || undefined,
+    role: Role.User,
+  });
 
   // Lọc chỉ users có role "user" (được map từ Role.Staff ở backend)
-  const regularUsers = users.filter((user: User) => user.role === "user");
+  const regularUsers = users.filter(
+    (user: User) => user.role === Role.User || user.role === Role.Member
+  );
 
   // Lọc users theo search term
   const filteredUsers = regularUsers.filter(
@@ -32,6 +170,17 @@ const UsersManagementPage = () => {
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.phone_number.includes(searchTerm)
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalRecords = pagination?.total ?? filteredUsers.length ?? 0;
+  const effectivePage = pagination?.page ?? currentPage;
+  const effectivePageSize = pagination?.limit ?? pageSize;
+  const totalPages =
+    pagination?.total_pages ??
+    Math.max(1, Math.ceil(totalRecords / (effectivePageSize || 1)));
 
   const handleDeleteUser = (userId: string) => {
     deleteUser(userId, {
@@ -49,6 +198,16 @@ const UsersManagementPage = () => {
     return user.name || user.full_name || "Không có tên";
   };
 
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
+
   if (isLoadingUsers) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -60,13 +219,13 @@ const UsersManagementPage = () => {
   return (
     <div>
       <PageHeader
-        title="Quản lý Users"
+        title="Quản lý Thành viên"
         description="Quản lý danh sách người dùng"
         icon={UserCircle}
         actions={
           <Button onClick={() => navigate(PATHS.USERS_MANAGEMENT_NEW)}>
             <Plus className="mr-2 h-4 w-4" />
-            Thêm User
+            Thêm Thành viên
           </Button>
         }
         className="mb-6"
@@ -82,6 +241,7 @@ const UsersManagementPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              disabled={isFetchingUsers}
             />
           </div>
         </CardContent>
@@ -157,6 +317,17 @@ const UsersManagementPage = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {totalRecords > 0 && (
+        <PaginationControls
+          currentPage={effectivePage}
+          totalPages={totalPages}
+          pageSize={effectivePageSize}
+          total={totalRecords}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+        />
       )}
 
       {/* Delete Confirmation Modal */}

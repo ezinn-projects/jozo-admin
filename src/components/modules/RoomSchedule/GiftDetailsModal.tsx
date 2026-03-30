@@ -40,7 +40,13 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({
 
   const isDiscountPercentage =
     gift.type === "discount_percentage" || gift.type === "discount";
-  const isDiscountAmount = gift.type === "discount_amount";
+  const isDiscountAmount =
+    gift.type === "discount_amount" || gift.type === "fnb_discount_amount";
+  const isFnBDiscountAmount = gift.type === "fnb_discount_amount";
+  const categoryLabelMap: Record<string, string> = {
+    drink: "Đồ uống",
+    snack: "Đồ ăn",
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -91,7 +97,10 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({
                 {gift.name}
               </h2>
               <div className="space-y-2">
-                <Badge variant="outline" className="text-purple-600 border-purple-600">
+                <Badge
+                  variant="outline"
+                  className="text-purple-600 border-purple-600"
+                >
                   {GIFT_TYPE_LABELS[gift.type]}
                 </Badge>
                 {gift.type === "snacks_drinks" && gift.price && (
@@ -109,56 +118,72 @@ const GiftDetailsModal: React.FC<GiftDetailsModalProps> = ({
                     Giảm giá: {formatCurrency(gift.discountAmount)}
                   </div>
                 )}
+                {isFnBDiscountAmount &&
+                  gift.categories &&
+                  gift.categories.length > 0 && (
+                    <div className="text-sm text-gray-700 space-x-2">
+                      <span className="font-medium">Danh mục áp dụng:</span>
+                      {gift.categories.map((category) => (
+                        <Badge key={category} variant="secondary">
+                          {categoryLabelMap[category] || category}
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
               </div>
             </div>
           </div>
 
           {/* Danh sách items (nếu là snacks_drinks) */}
-          {gift.type === "snacks_drinks" && gift.items && gift.items.length > 0 && (
-            <>
-              <Separator />
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
-                  <GiftIcon className="h-4 w-4 text-purple-500" />
-                  Danh sách sản phẩm trong quà
-                </h3>
-                <div className="space-y-3">
-                  {gift.items.map((item, index) => (
-                    <div
-                      key={index}
-                      className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium text-gray-900">
-                          {item.name}
+          {gift.type === "snacks_drinks" &&
+            gift.items &&
+            gift.items.length > 0 && (
+              <>
+                <Separator />
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-3 flex items-center gap-2">
+                    <GiftIcon className="h-4 w-4 text-purple-500" />
+                    Danh sách sản phẩm trong quà
+                  </h3>
+                  <div className="space-y-3">
+                    {gift.items.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between p-3 bg-gray-50 rounded-lg"
+                      >
+                        <div className="flex-1">
+                          <div className="font-medium text-gray-900">
+                            {item.name}
+                          </div>
+                          {item.category && (
+                            <div className="text-sm text-gray-600">
+                              Danh mục: {item.category}
+                            </div>
+                          )}
+                          {item.priceSnapshot && (
+                            <div className="text-sm text-gray-600">
+                              Giá: {formatCurrency(item.priceSnapshot)}
+                            </div>
+                          )}
                         </div>
-                        {item.category && (
-                          <div className="text-sm text-gray-600">
-                            Danh mục: {item.category}
-                          </div>
-                        )}
-                        {item.priceSnapshot && (
-                          <div className="text-sm text-gray-600">
-                            Giá: {formatCurrency(item.priceSnapshot)}
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3">
+                          <Badge variant="secondary" className="text-sm">
+                            Số lượng: {item.quantity}
+                          </Badge>
+                          {item.priceSnapshot && (
+                            <div className="font-semibold text-green-600">
+                              {formatCurrency(
+                                item.priceSnapshot * item.quantity
+                              )}
+                            </div>
+                          )}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="secondary" className="text-sm">
-                          Số lượng: {item.quantity}
-                        </Badge>
-                        {item.priceSnapshot && (
-                          <div className="font-semibold text-green-600">
-                            {formatCurrency(item.priceSnapshot * item.quantity)}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            </>
-          )}
+              </>
+            )}
 
           {/* Thông tin tổng quan */}
           <Separator />

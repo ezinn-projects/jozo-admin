@@ -30,8 +30,8 @@ import {
 } from "@/components/ui/select";
 import { RoomStatus } from "@/constants/enum";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation } from "@tanstack/react-query";
-import { format } from "date-fns";
+import { useMutation, useQuery } from "@tanstack/react-query";
+import dayjs from "dayjs";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
@@ -39,6 +39,8 @@ import { Switch } from "@/components/ui/switch";
 
 // Define schema using zod
 const scheduleSchema = z.object({
+  startDate: z.string().nonempty("Start date is required"),
+  endDate: z.string().nonempty("End date is required"),
   startTime: z.string().nonempty("Start time is required"),
   endTime: z.string().nonempty("End time is required"),
   status: z.nativeEnum(RoomStatus),
@@ -74,6 +76,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const form = useForm<FormValues>({
     resolver: zodResolver(scheduleSchema),
     defaultValues: {
+      startDate: "",
+      endDate: "",
       startTime: "",
       endTime: "",
       status: RoomStatus.Booked,
@@ -83,6 +87,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   });
 
   const { control, handleSubmit, setValue, watch } = form;
+  const startDateValue = watch("startDate");
   const startTimeValue = watch("startTime");
   const statusValue = watch("status");
 
@@ -90,6 +95,32 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [isEndTimeModified, setIsEndTimeModified] = useState(false);
 
   const { user } = useAuth();
+
+  // Load schedule khi mở modal chỉnh sửa (scheduleId có giá trị)
+  const { data: scheduleData } = useQuery({
+    queryKey: ["roomSchedule", scheduleId],
+    queryFn: () => roomsScheduleApis.getScheduleById(scheduleId!),
+    enabled: isOpen && !!scheduleId,
+  });
+
+  const schedule = scheduleData?.data?.result;
+
+  useEffect(() => {
+    if (scheduleId && schedule && isOpen) {
+      const start = dayjs(schedule.startTime);
+      const end = schedule.endTime
+        ? dayjs(schedule.endTime)
+        : start.add(2, "hour");
+      setValue("startDate", start.format("YYYY-MM-DD"));
+      setValue("endDate", end.format("YYYY-MM-DD"));
+      setValue("startTime", start.format("HH:mm"));
+      setValue("endTime", end.format("HH:mm"));
+      setValue("status", schedule.status as RoomStatus);
+      setValue("note", schedule.note ?? "");
+      setValue("giftEnabled", schedule.giftEnabled ?? false);
+      setIsEndTimeModified(true); // Giữ nguyên end từ schedule, không tự động tính lại
+    }
+  }, [scheduleId, schedule, isOpen, setValue]);
 
   const { mutate: updateSchedule, isPending: isUpdating } = useMutation({
     mutationFn: (payload: {
@@ -135,56 +166,58 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   // Dùng ref để đảm bảo khởi tạo giá trị mặc định chỉ chạy 1 lần
   const isInitialized = useRef(false);
 
-  // Set default time values khi tạo mới schedule (chỉ chạy 1 lần)
+  // Set default date & time khi tạo mới schedule (chỉ chạy 1 lần)
   useEffect(() => {
     if (!scheduleId && selectedDate && !isInitialized.current) {
-      const now = new Date();
-      const dateWithCurrentTime = new Date(selectedDate);
-      dateWithCurrentTime.setHours(now.getHours());
-      dateWithCurrentTime.setMinutes(now.getMinutes());
-      // Format to HH:mm cho input type="time"
-      const startTimeStr = format(dateWithCurrentTime, "HH:mm");
+      const base = dayjs(selectedDate);
+      const dateStr = base.format("YYYY-MM-DD");
+      setValue("startDate", dateStr);
+      setValue("endDate", dateStr);
+
+      const now = dayjs();
+      const dateWithCurrentTime = base
+        .hour(now.hour())
+        .minute(now.minute())
+        .second(0)
+        .millisecond(0);
+      const startTimeStr = dateWithCurrentTime.format("HH:mm");
       setValue("startTime", startTimeStr);
 
-      // Tính End Time mặc định dựa trên status Booked (+2 giờ)
-      const endDate = new Date(dateWithCurrentTime);
-      endDate.setHours(endDate.getHours() + 2);
-      const endTimeStr = format(endDate, "HH:mm");
+      const endDateObj = dateWithCurrentTime.add(2, "hour");
+      const endTimeStr = endDateObj.format("HH:mm");
       setValue("endTime", endTimeStr);
 
       isInitialized.current = true;
     }
   }, [selectedDate, scheduleId, setValue]);
 
-  // Cập nhật End Time tự động nếu người dùng chưa chỉnh sửa thủ công
+  // Cập nhật End Date & End Time tự động nếu người dùng chưa chỉnh sửa thủ công
   useEffect(() => {
-    if (!scheduleId && selectedDate && startTimeValue && !isEndTimeModified) {
-      // Parse giờ và phút từ startTime (định dạng "HH:mm")
-      const [hours, minutes] = startTimeValue.split(":");
-      const startDateTime = new Date(selectedDate);
-      startDateTime.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
+    if (
+      !scheduleId &&
+      startDateValue &&
+      startTimeValue &&
+      !isEndTimeModified
+    ) {
+      const startDateTime = dayjs(`${startDateValue}T${startTimeValue}`);
 
-      let endDateTime: Date;
+      let endDateTime;
       if (statusValue === RoomStatus.Locked) {
-        // Nếu Locked: endTime = startTime + 5 phút
-        endDateTime = new Date(startDateTime);
-        endDateTime.setMinutes(endDateTime.getMinutes() + 5);
+        endDateTime = startDateTime.add(5, "minute");
       } else if (statusValue === RoomStatus.Booked) {
-        // Nếu Booked: endTime = startTime + 2 giờ
-        endDateTime = new Date(startDateTime);
-        endDateTime.setHours(endDateTime.getHours() + 2);
+        endDateTime = startDateTime.add(2, "hour");
       } else {
-        // Các trạng thái khác: mặc định +1 giờ
-        endDateTime = new Date(startDateTime);
-        endDateTime.setHours(endDateTime.getHours() + 1);
+        endDateTime = startDateTime.add(1, "hour");
       }
-      const newEndTimeStr = format(endDateTime, "HH:mm");
+      const newEndTimeStr = endDateTime.format("HH:mm");
+      const newEndDateStr = endDateTime.format("YYYY-MM-DD");
       setValue("endTime", newEndTimeStr);
+      setValue("endDate", newEndDateStr);
     }
   }, [
     statusValue,
+    startDateValue,
     startTimeValue,
-    selectedDate,
     scheduleId,
     setValue,
     isEndTimeModified,
@@ -192,16 +225,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   const onSubmit = async (values: FormValues) => {
     try {
-      // Hàm chuyển đổi chuỗi HH:mm thành chuỗi ISO dựa trên selectedDate
-      const parseTime = (timeStr: string, baseDate: Date) => {
-        const [hours, minutes] = timeStr.split(":");
-        const date = new Date(baseDate);
-        date.setHours(parseInt(hours, 10), parseInt(minutes, 10), 0, 0);
-        return date.toISOString();
+      // Ghép date + time thành ISO (dùng startDate/endDate từ form)
+      const toISO = (dateStr: string, timeStr: string) => {
+        return dayjs(`${dateStr}T${timeStr}`).toISOString();
       };
 
-      const startTimeISO = parseTime(values.startTime, selectedDate);
-      const endTimeISO = parseTime(values.endTime, selectedDate);
+      const startDt = dayjs(
+        toISO(values.startDate, values.startTime)
+      );
+      let endDt = dayjs(toISO(values.endDate, values.endTime));
+      let endTimeISO = endDt.toISOString();
+      // Nếu end < start (qua 00h) thì tự động coi end là ngày hôm sau
+      if (!endDt.isAfter(startDt)) {
+        endDt = endDt.add(1, "day");
+        endTimeISO = endDt.toISOString();
+      }
+      const startTimeISO = startDt.toISOString();
 
       if (scheduleId) {
         // Chế độ cập nhật
@@ -238,7 +277,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   };
 
   const formattedDate = selectedDate
-    ? format(selectedDate, "dd/MM/yyyy")
+    ? dayjs(selectedDate).format("DD/MM/YYYY")
     : "Today";
 
   return (
@@ -254,39 +293,76 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
           </DialogHeader>
           <Form {...form}>
             <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={control}
-                name="startTime"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>Start Time</FormLabel>
-                    <FormControl>
-                      <Input type="time" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={control}
-                name="endTime"
-                render={({ field }) => (
-                  <FormItem className="flex flex-col">
-                    <FormLabel>End Time</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="time"
-                        {...field}
-                        onChange={(e) => {
-                          field.onChange(e);
-                          setIsEndTimeModified(true);
-                        }}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="startDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Start Date</FormLabel>
+                      <FormControl>
+                        <Input type="date" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="endDate"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>End Date</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="date"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setIsEndTimeModified(true);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="startTime"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>Start Time</FormLabel>
+                      <FormControl>
+                        <Input type="time" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={control}
+                  name="endTime"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-col">
+                      <FormLabel>End Time</FormLabel>
+                      <FormControl>
+                        <Input
+                          type="time"
+                          {...field}
+                          onChange={(e) => {
+                            field.onChange(e);
+                            setIsEndTimeModified(true);
+                          }}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
               <FormField
                 control={control}
                 name="status"

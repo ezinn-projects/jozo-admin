@@ -1,10 +1,7 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import { Gift as GiftType } from "@/@types/Gift";
 import roomApis from "@/apis/room.apis";
-import {
-  useQuery /* , useMutation */,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery /* , useMutation */ } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import React, { useEffect, useRef, useState } from "react";
 // import roomsScheduleApis from "@/apis/roomSchedule.api";
@@ -24,15 +21,15 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RoomStatus, RoomType } from "@/constants/enum";
+import { RoomType } from "@/constants/enum";
 import {
   useResolveRequest,
   useRoomSchedules,
   useTurnOffAllRooms,
 } from "@/hooks/room-schedule";
 import { useToast } from "@/hooks/use-toast";
-import { useSocket } from "@/hooks/useSocket";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useRoomEvents } from "@/context/RoomEventsContext";
 import {
   BellIcon,
   CalendarIcon,
@@ -113,21 +110,18 @@ export type { OrderData };
 
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const {
-    socket,
-    joinRoom,
-    leaveRoom,
-    onNotification,
-    offNotification,
-    onNewOrderNotification,
-    offNewOrderNotification,
-    onNewBooking,
-    offNewBooking,
-    onGiftClaimed,
-    offGiftClaimed,
-  } = useSocket();
+    supportNotifications,
+    orderNotifications,
+    giftNotifications,
+    blinkingSupportRooms,
+    blinkingOrderRooms,
+    blinkingGiftRooms,
+    clearSupportNotification,
+    clearOrderNotification,
+    clearGiftNotification,
+  } = useRoomEvents();
   const [date, setDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } = useRoomSchedules(date);
   const {
@@ -268,426 +262,12 @@ const RoomTimelineTable: React.FC = () => {
     }
   }, [currentTime, markerLeft, isToday, autoScrollEnabled]);
 
-  const [notifications, setNotifications] = useState<{
-    [roomId: string]: { message: string; timestamp: number };
-  }>({});
-
-  const [orderNotifications, setOrderNotifications] = useState<{
-    [roomId: string]: {
-      message: string;
-      timestamp: number;
-      orderData: OrderData;
-    };
-  }>({});
-
-  const [blinkingRooms, setBlinkingRooms] = useState<{
-    [key: string]: boolean;
-  }>({});
-
-  const [orderBlinkingRooms, setOrderBlinkingRooms] = useState<{
-    [key: string]: boolean;
-  }>({});
-
-  const [giftNotifications, setGiftNotifications] = useState<{
-    [roomId: string]: {
-      gift: GiftType;
-      scheduleId: string;
-      timestamp: number;
-    };
-  }>({});
-
-  const [giftBlinkingRooms, setGiftBlinkingRooms] = useState<{
-    [key: string]: boolean;
-  }>({});
-
-  // Text-to-speech using Web Speech API (vi-VN)
-  const speak = (text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      console.warn("Web Speech API not supported");
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "vi-VN";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-
-    const voices = window.speechSynthesis.getVoices();
-    const vietnameseVoice = voices.find(
-      (voice) => voice.lang?.toLowerCase().startsWith("vi")
-    );
-    if (vietnameseVoice) {
-      utterance.voice = vietnameseVoice;
-    }
-
-    window.speechSynthesis.cancel(); // stop any ongoing speech before speaking new text
-    window.speechSynthesis.speak(utterance);
+  // Helper: map room._id -> socketRoomId (index+1 as string)
+  const getSocketRoomId = (roomId: string): string | null => {
+    const idx = roomsData?.findIndex((room) => room._id === roomId) ?? -1;
+    if (idx < 0) return null;
+    return (idx + 1).toString();
   };
-
-  // Socket connection and notification handling
-  useEffect(() => {
-    // Handle notifications
-    const handleNotification = (data: { roomId: string; message: string }) => {
-      // Convert numeric roomId to actual room ID (subtract 1 because backend sends 1-based index)
-      const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
-
-      if (actualRoomId) {
-        setNotifications((prev) => ({
-          ...prev,
-          [actualRoomId]: {
-            message: data.message,
-            timestamp: Date.now(),
-          },
-        }));
-
-        // Start blinking for the room
-        setBlinkingRooms((prev) => ({
-          ...prev,
-          [actualRoomId]: true,
-        }));
-
-        // Stop blinking after 15 seconds
-        setTimeout(() => {
-          setBlinkingRooms((prev) => ({
-            ...prev,
-            [actualRoomId]: false,
-          }));
-        }, 15000);
-
-        const roomName = roomsData?.find(
-          (r) => r._id === actualRoomId
-        )?.roomName;
-        // Speak the notification
-        speak(`${roomName} ${data.message}`);
-
-        // Show toast notification
-        toast({
-          title: "New Support Request",
-          description: `${roomName}: ${data.message}`,
-        });
-      }
-    };
-
-    // Handle new order notifications
-    const handleNewOrderNotification = (data: {
-      type: string;
-      roomId: string;
-      message: string;
-      timestamp: number;
-      orderData: OrderData;
-    }) => {
-      console.log("new order notification data", data);
-      if (data.type === "new_order") {
-        // Convert numeric roomId to actual room ID
-        const actualRoomId = roomsData?.[parseInt(data.roomId) - 1]?._id;
-
-        if (actualRoomId) {
-          setOrderNotifications((prev) => ({
-            ...prev,
-            [actualRoomId]: {
-              message: data.message,
-              timestamp: data.timestamp,
-              orderData: data.orderData,
-            },
-          }));
-
-          // Start blinking for the room
-          setOrderBlinkingRooms((prev) => ({
-            ...prev,
-            [actualRoomId]: true,
-          }));
-
-          // Stop blinking after 30 seconds
-          setTimeout(() => {
-            setOrderBlinkingRooms((prev) => ({
-              ...prev,
-              [actualRoomId]: false,
-            }));
-          }, 30000);
-
-          const roomName = roomsData?.find(
-            (r) => r._id === actualRoomId
-          )?.roomName;
-
-          // Speak the notification
-          speak(`Đơn hàng mới từ ${roomName}`);
-
-          // Show toast notification
-          toast({
-            title: "Đơn hàng mới",
-            description: `${roomName}: ${data.message}`,
-            variant: "default",
-          });
-        }
-      }
-    };
-
-    // Handle gift claimed notifications
-    const handleGiftClaimed = (data: {
-      roomId: string;
-      scheduleId: string;
-      gift: GiftType;
-    }) => {
-      console.log("gift claimed notification data", data);
-      // Convert numeric roomId to actual room ID if needed
-      // Backend có thể gửi roomId dạng số hoặc string ID
-      let actualRoomId = data.roomId;
-
-      // Nếu roomId là số, convert sang actual room ID
-      if (!isNaN(Number(data.roomId))) {
-        actualRoomId =
-          roomsData?.[parseInt(data.roomId) - 1]?._id || data.roomId;
-      }
-
-      if (actualRoomId && roomsData?.find((r) => r._id === actualRoomId)) {
-        setGiftNotifications((prev) => ({
-          ...prev,
-          [actualRoomId]: {
-            gift: data.gift,
-            scheduleId: data.scheduleId,
-            timestamp: Date.now(),
-          },
-        }));
-
-        // Start blinking for the room
-        setGiftBlinkingRooms((prev) => ({
-          ...prev,
-          [actualRoomId]: true,
-        }));
-
-        // Stop blinking after 30 seconds
-        setTimeout(() => {
-          setGiftBlinkingRooms((prev) => ({
-            ...prev,
-            [actualRoomId]: false,
-          }));
-        }, 30000);
-
-        const roomName = roomsData?.find(
-          (r) => r._id === actualRoomId
-        )?.roomName;
-
-        // Speak the notification
-        speak(`Quà tặng đã được nhận từ ${roomName}`);
-
-        // Show toast notification
-        toast({
-          title: "Quà tặng đã được nhận",
-          description: `${roomName}: ${data.gift.name}`,
-          variant: "default",
-        });
-      }
-    };
-
-    // Handle new booking notifications
-    const handleNewBooking = (data: {
-      roomId: string;
-      booking: {
-        bookingId: string;
-        roomId: string;
-        action: string;
-        customerName: string;
-        customerPhone: string;
-        startTime: string;
-        endTime: string;
-        cancelledAt?: string;
-        source: string;
-        note?: string;
-        createdAt: string;
-        updatedAt: string;
-        createdBy: string;
-        updatedBy: string;
-        actualEndTime: string | null;
-        customerEmail?: string;
-        originalRequest?: string;
-        upgraded?: boolean;
-        roomName?: string;
-      };
-    }) => {
-      const bookingData = data.booking;
-      const roomId = data.roomId;
-
-      if (!bookingData || !roomId) {
-        console.error("Invalid booking data structure:", data);
-        return;
-      }
-
-      // Kiểm tra xem booking có thuộc ngày hiện tại không
-      const bookingDate = dayjs(bookingData.startTime as string);
-
-      if (bookingDate.isSame(date, "day")) {
-        // Tạo IRoomSchedule object từ data backend
-        const newSchedule: IRoomSchedule = {
-          _id: bookingData.bookingId as string,
-          roomId: roomId,
-          startTime: bookingData.startTime as string,
-          endTime: bookingData.endTime as string | null,
-          status: RoomStatus.Booked, // Backend có thể gửi status khác
-          note: bookingData.note as string | undefined,
-          createdAt: bookingData.createdAt as string,
-          updatedAt: bookingData.createdAt as string,
-          createdBy: "system",
-          updatedBy: "system",
-          actualEndTime: null,
-          customerName: bookingData.customerName as string | undefined,
-          customerPhone: bookingData.customerPhone as string | undefined,
-          customerEmail: bookingData.customerEmail as string | undefined,
-          originalRoomType: bookingData.originalRequest as string | undefined,
-          upgraded: Boolean(bookingData.upgraded),
-          source:
-            bookingData.source === "online_booking" ? "customer" : "admin",
-        };
-
-        // Cập nhật query data để thêm booking mới
-        queryClient.setQueryData(
-          ["roomSchedules", date.toISOString()],
-          (oldData: IRoomSchedule[] | undefined) => {
-            if (!oldData) return [newSchedule];
-
-            // Kiểm tra xem booking đã tồn tại chưa (tránh duplicate)
-            const existingBooking = oldData.find(
-              (schedule) => schedule._id === newSchedule._id
-            );
-            if (existingBooking) {
-              return oldData;
-            }
-
-            return [...oldData, newSchedule];
-          }
-        );
-
-        const roomName =
-          roomsData?.find((r) => r._id === roomId)?.roomName ||
-          bookingData.roomName;
-
-        refetch();
-
-        switch (data.booking.action) {
-          case "booked":
-            toast({
-              title: "Booking mới",
-              description: `${roomName}: Đã được đặt`,
-              variant: "default",
-            });
-            speak(`Booking mới từ ${roomName}`);
-            break;
-          case "cancelled":
-            toast({
-              title: "Booking đã bị hủy",
-              description: `${roomName}: Đã bị hủy`,
-              variant: "destructive",
-            });
-            speak(`Booking đã bị hủy từ ${roomName}`);
-            break;
-        }
-        // Speak the notification
-      } else {
-        console.log("Booking not for current date, ignoring");
-      }
-    };
-
-    // Type assertion helper
-    const bookingHandler = handleNewBooking as (
-      data: Record<string, unknown>
-    ) => void;
-
-    // Subscribe to notifications
-    onNotification(handleNotification);
-    onNewOrderNotification(handleNewOrderNotification);
-    onNewBooking(bookingHandler);
-    onGiftClaimed(handleGiftClaimed);
-
-    // Join admin room để nhận tất cả booking notifications
-    joinRoom("admin");
-
-    // Join room channels for all rooms - using index as room ID (add 1 because backend expects 1-based index)
-    roomsData?.forEach((_, index) => {
-      joinRoom((index + 1).toString());
-    });
-
-    // Cleanup
-    return () => {
-      offNotification(handleNotification);
-      offNewOrderNotification(handleNewOrderNotification);
-      offNewBooking(bookingHandler);
-      offGiftClaimed(handleGiftClaimed);
-      leaveRoom("admin");
-      roomsData?.forEach((_, index) => {
-        leaveRoom((index + 1).toString());
-      });
-    };
-  }, [
-    refetch,
-    roomsData,
-    toast,
-    socket,
-    joinRoom,
-    leaveRoom,
-    onNotification,
-    offNotification,
-    onNewOrderNotification,
-    offNewOrderNotification,
-    onNewBooking,
-    offNewBooking,
-    onGiftClaimed,
-    offGiftClaimed,
-    queryClient,
-    date,
-  ]);
-
-  // Clear old notifications (older than 5 minutes)
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setNotifications((prev) => {
-        const now = Date.now();
-        const filtered = Object.entries(prev).reduce(
-          (acc, [roomId, notification]) => {
-            if (now - notification.timestamp < 5 * 60 * 1000) {
-              // Keep notifications less than 5 minutes old
-              acc[roomId] = notification;
-            }
-            return acc;
-          },
-          {} as typeof prev
-        );
-        return filtered;
-      });
-
-      // Clear old order notifications (older than 10 minutes)
-      setOrderNotifications((prev) => {
-        const now = Date.now();
-        const filtered = Object.entries(prev).reduce(
-          (acc, [roomId, notification]) => {
-            if (now - notification.timestamp < 10 * 60 * 1000) {
-              // Keep order notifications less than 10 minutes old
-              acc[roomId] = notification;
-            }
-            return acc;
-          },
-          {} as typeof prev
-        );
-        return filtered;
-      });
-
-      // Clear old gift notifications (older than 10 minutes)
-      setGiftNotifications((prev) => {
-        const now = Date.now();
-        const filtered = Object.entries(prev).reduce(
-          (acc, [roomId, notification]) => {
-            if (now - notification.timestamp < 10 * 60 * 1000) {
-              // Keep gift notifications less than 10 minutes old
-              acc[roomId] = notification;
-            }
-            return acc;
-          },
-          {} as typeof prev
-        );
-        return filtered;
-      });
-    }, 60000); // Check every minute
-
-    return () => clearInterval(interval);
-  }, []);
 
   if (isLoading || loadingRooms) return <div>Loading...</div>;
   if (error) return <div>Error: {error.message}</div>;
@@ -695,16 +275,63 @@ const RoomTimelineTable: React.FC = () => {
 
   const grouped = groupSchedulesByRoom(schedules || []);
 
+  // Build view-level maps keyed by room._id for mobile/desktop UI
+  const viewNotifications: {
+    [roomId: string]: { message: string; timestamp: number };
+  } = {};
+  const viewBlinkingRooms: { [roomId: string]: boolean } = {};
+  const viewOrderNotifications: {
+    [roomId: string]: { message: string; timestamp: number; orderData: OrderData };
+  } = {};
+  const viewOrderBlinkingRooms: { [roomId: string]: boolean } = {};
+  const viewGiftNotifications: {
+    [roomId: string]: { gift: GiftType; scheduleId: string; timestamp: number };
+  } = {};
+  const viewGiftBlinkingRooms: { [roomId: string]: boolean } = {};
+
+  roomsData?.forEach((room, index) => {
+    const socketRoomId = (index + 1).toString();
+
+    const support = supportNotifications[socketRoomId];
+    if (support) {
+      viewNotifications[room._id] = {
+        message: support.message,
+        timestamp: support.timestamp,
+      };
+      viewBlinkingRooms[room._id] = !!blinkingSupportRooms[socketRoomId];
+    }
+
+    const order = orderNotifications[socketRoomId];
+    if (order) {
+      viewOrderNotifications[room._id] = {
+        message: order.message,
+        timestamp: order.timestamp,
+        orderData: order.orderData,
+      };
+      viewOrderBlinkingRooms[room._id] = !!blinkingOrderRooms[socketRoomId];
+    }
+
+    const gift = giftNotifications[socketRoomId];
+    if (gift) {
+      viewGiftNotifications[room._id] = {
+        gift: gift.gift,
+        scheduleId: gift.scheduleId,
+        timestamp: gift.timestamp,
+      };
+      viewGiftBlinkingRooms[room._id] = !!blinkingGiftRooms[socketRoomId];
+    }
+  });
+
   const handleRoomClick = (roomId: string) => {
     const foundRoom = roomsData?.find((room) => room._id === roomId);
     if (foundRoom) {
       setSelectedRoom(foundRoom);
       setModal("create");
       // Stop blinking when clicked
-      setBlinkingRooms((prev) => ({
-        ...prev,
-        [roomId]: false,
-      }));
+      const socketRoomId = getSocketRoomId(roomId);
+      if (socketRoomId) {
+        clearSupportNotification(socketRoomId);
+      }
     }
   };
 
@@ -721,42 +348,39 @@ const RoomTimelineTable: React.FC = () => {
   };
 
   const handleOrderClick = (roomId: string) => {
-    const orderNotification = orderNotifications[roomId];
+    const socketRoomId = getSocketRoomId(roomId);
+    if (!socketRoomId) return;
+    const orderNotification = orderNotifications[socketRoomId];
     if (orderNotification) {
       setOrderData(orderNotification.orderData);
       setOrderRoomId(roomId);
       setModal("orderDetails");
       // Stop blinking when clicked
-      setOrderBlinkingRooms((prev) => ({
-        ...prev,
-        [roomId]: false,
-      }));
+      clearOrderNotification(socketRoomId);
     }
   };
 
   const handleOrderServed = (roomId: string) => {
     // Remove order notification after served
-    setOrderNotifications((prev) => {
-      const newNotifications = { ...prev };
-      delete newNotifications[roomId];
-      return newNotifications;
-    });
+    const socketRoomId = getSocketRoomId(roomId);
+    if (socketRoomId) {
+      clearOrderNotification(socketRoomId);
+    }
   };
 
   const handleGiftClick = (roomId: string) => {
-    const giftNotification = giftNotifications[roomId];
+    const socketRoomId = getSocketRoomId(roomId);
+    if (!socketRoomId) return;
+    const giftNotification = giftNotifications[socketRoomId];
     if (giftNotification) {
       setGiftData({
         gift: giftNotification.gift,
-        roomId: roomId,
+        roomId,
         scheduleId: giftNotification.scheduleId,
       });
       setModal("giftDetails");
       // Stop blinking when clicked
-      setGiftBlinkingRooms((prev) => ({
-        ...prev,
-        [roomId]: false,
-      }));
+      clearGiftNotification(socketRoomId);
     }
   };
 
@@ -868,11 +492,10 @@ const RoomTimelineTable: React.FC = () => {
     resolveRequest(roomIndex.toString(), {
       onSuccess: () => {
         // Remove notification for this room
-        setNotifications((prev) => {
-          const newNotifications = { ...prev };
-          delete newNotifications[roomId];
-          return newNotifications;
-        });
+        const socketRoomId = getSocketRoomId(roomId);
+        if (socketRoomId) {
+          clearSupportNotification(socketRoomId);
+        }
 
         toast({
           title: "Success",
@@ -1137,12 +760,12 @@ const RoomTimelineTable: React.FC = () => {
           date={date}
           currentTime={currentTime}
           isToday={isToday}
-          notifications={notifications}
-          blinkingRooms={blinkingRooms}
-          orderNotifications={orderNotifications}
-          orderBlinkingRooms={orderBlinkingRooms}
-          giftNotifications={giftNotifications}
-          giftBlinkingRooms={giftBlinkingRooms}
+          notifications={viewNotifications}
+          blinkingRooms={viewBlinkingRooms}
+          orderNotifications={viewOrderNotifications}
+          orderBlinkingRooms={viewOrderBlinkingRooms}
+          giftNotifications={viewGiftNotifications}
+          giftBlinkingRooms={viewGiftBlinkingRooms}
           onRoomClick={handleRoomClick}
           onScheduleClick={handleScheduleClick}
           onResolveRequest={handleResolveRequest}
@@ -1223,13 +846,14 @@ const RoomTimelineTable: React.FC = () => {
             )}
 
             {/* Danh sách phòng */}
-            {roomsData?.map((room) => {
+            {roomsData?.map((room, index) => {
               const roomSchedules = grouped[room._id] || [];
-              const hasNotification = notifications[room._id];
-              const isBlinking = blinkingRooms[room._id];
-              const hasOrderNotification = orderNotifications[room._id];
-              const isOrderBlinking = orderBlinkingRooms[room._id];
-              const giftNotification = giftNotifications[room._id];
+              const socketRoomId = (index + 1).toString();
+              const hasNotification = supportNotifications[socketRoomId];
+              const isBlinking = !!blinkingSupportRooms[socketRoomId];
+              const hasOrderNotification = orderNotifications[socketRoomId];
+              const isOrderBlinking = !!blinkingOrderRooms[socketRoomId];
+              const giftNotification = giftNotifications[socketRoomId];
               const giftSchedule = giftNotification
                 ? roomSchedules.find((s) => s._id === giftNotification.scheduleId)
                 : undefined;
@@ -1240,7 +864,7 @@ const RoomTimelineTable: React.FC = () => {
                   giftStatus || ""
                 );
               const isGiftBlinking =
-                showGiftNotification && giftBlinkingRooms[room._id];
+                showGiftNotification && viewGiftBlinkingRooms[room._id];
 
               // Tìm schedule có gift nhưng chưa finished
               const scheduleWithGift = roomSchedules.find((schedule) => {

@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Gift, GiftBundleItem, GiftType } from "@/@types/Gift";
 import { GIFT_TYPES, GIFT_TYPE_LABELS } from "../constants";
 import { useToast } from "@/hooks/use-toast";
@@ -29,6 +30,7 @@ import { useEffect, useRef, useState } from "react";
 import { useFieldArray, useForm } from "react-hook-form";
 import * as z from "zod";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
+import { FnBCategory } from "@/constants/enum";
 
 interface UpsertGiftModalProps {
   isOpen: boolean;
@@ -66,7 +68,13 @@ const formSchema = z
   .object({
     name: z.string().min(1, "Tên quà tặng là bắt buộc"),
     type: z.enum(
-      ["snacks_drinks", "discount_percentage", "discount_amount", "discount"],
+      [
+        "snacks_drinks",
+        "discount_percentage",
+        "discount_amount",
+        "fnb_discount_amount",
+        "discount",
+      ],
       {
         required_error: "Loại quà tặng là bắt buộc",
       }
@@ -85,6 +93,10 @@ const formSchema = z
       (val) =>
         val === null || val === undefined || val === "" ? undefined : val,
       z.number().gt(0, "Số tiền giảm giá phải lớn hơn 0").optional()
+    ),
+    categories: z.preprocess(
+      (val) => (val === null || val === undefined ? [] : val),
+      z.array(z.nativeEnum(FnBCategory)).optional()
     ),
     items: z.array(giftBundleItemSchema).optional(),
     totalQuantity: z.preprocess(
@@ -126,13 +138,26 @@ const formSchema = z
 
     // Nếu type là discount_amount, yêu cầu discountAmount > 0
     if (
-      data.type === "discount_amount" &&
+      (data.type === "discount_amount" ||
+        data.type === "fnb_discount_amount") &&
       (!data.discountAmount || data.discountAmount <= 0)
     ) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Số tiền giảm giá phải lớn hơn 0",
         path: ["discountAmount"],
+      });
+    }
+
+    // Nếu type là fnb_discount_amount, yêu cầu categories ít nhất 1 giá trị
+    if (
+      data.type === "fnb_discount_amount" &&
+      (!data.categories || data.categories.length === 0)
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Chọn ít nhất 1 danh mục FnB",
+        path: ["categories"],
       });
     }
 
@@ -159,6 +184,7 @@ const DEFAULT_GIFT_VALUES: FormData = {
   price: undefined,
   discountPercentage: undefined,
   discountAmount: undefined,
+  categories: [],
   items: [],
   totalQuantity: 1,
   remainingQuantity: 1,
@@ -238,10 +264,23 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
 
   const giftType = form.watch("type");
   const totalQuantityValue = form.watch("totalQuantity");
+  const selectedCategories = form.watch("categories") || [];
+  const categoryError = form.formState.errors.categories;
+  const categoryErrorMessage =
+    categoryError && !Array.isArray(categoryError)
+      ? categoryError.message
+      : undefined;
+  const fnbCategoryOptions = [
+    { value: FnBCategory.DRINK, label: "Đồ uống" },
+    { value: FnBCategory.SNACK, label: "Đồ ăn" },
+  ];
   const isDiscountPercentage =
     giftType === GIFT_TYPES.DISCOUNT_PERCENTAGE ||
     giftType === GIFT_TYPES.DISCOUNT;
-  const isDiscountAmount = giftType === GIFT_TYPES.DISCOUNT_AMOUNT;
+  const isDiscountAmount =
+    giftType === GIFT_TYPES.DISCOUNT_AMOUNT ||
+    giftType === GIFT_TYPES.FNB_DISCOUNT_AMOUNT;
+  const isFnBDiscountAmount = giftType === GIFT_TYPES.FNB_DISCOUNT_AMOUNT;
 
   // Đảm bảo remainingQuantity không vượt quá totalQuantity khi người dùng chỉnh
   useEffect(() => {
@@ -293,6 +332,7 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
         price: detail.price,
         discountPercentage: detail.discountPercentage,
         discountAmount: detail.discountAmount,
+        categories: detail.categories || [],
         items: processedItems,
         totalQuantity: detail.totalQuantity || 1,
         remainingQuantity:
@@ -356,6 +396,14 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
       setMainImageFile(file);
       form.setValue("image", URL.createObjectURL(file));
     }
+  };
+
+  const handleCategoryToggle = (category: FnBCategory, checked: boolean) => {
+    const current = form.getValues("categories") || [];
+    const next = checked
+      ? Array.from(new Set([...current, category]))
+      : current.filter((c) => c !== category);
+    form.setValue("categories", next);
   };
 
   // Handle menu item selection (parent item hoặc item không có variant)
@@ -467,10 +515,21 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
       }
 
       if (
-        data.type === "discount_amount" &&
+        (data.type === "discount_amount" ||
+          data.type === "fnb_discount_amount") &&
         data.discountAmount !== undefined
       ) {
         submitFormData.append("discountAmount", data.discountAmount.toString());
+      }
+
+      if (
+        data.type === "fnb_discount_amount" &&
+        data.categories &&
+        data.categories.length > 0
+      ) {
+        data.categories.forEach((category) =>
+          submitFormData.append("categories", category)
+        );
       }
 
       // File ảnh chính (optional)
@@ -593,7 +652,8 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                       if (
                         newType === GIFT_TYPES.DISCOUNT_PERCENTAGE ||
                         newType === GIFT_TYPES.DISCOUNT ||
-                        newType === GIFT_TYPES.DISCOUNT_AMOUNT
+                        newType === GIFT_TYPES.DISCOUNT_AMOUNT ||
+                        newType === GIFT_TYPES.FNB_DISCOUNT_AMOUNT
                       ) {
                         form.setValue("items", []);
                         form.setValue("price", undefined);
@@ -604,8 +664,14 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                       ) {
                         form.setValue("discountAmount", undefined);
                       }
-                      if (newType === GIFT_TYPES.DISCOUNT_AMOUNT) {
+                      if (
+                        newType === GIFT_TYPES.DISCOUNT_AMOUNT ||
+                        newType === GIFT_TYPES.FNB_DISCOUNT_AMOUNT
+                      ) {
                         form.setValue("discountPercentage", undefined);
+                      }
+                      if (newType !== GIFT_TYPES.FNB_DISCOUNT_AMOUNT) {
+                        form.setValue("categories", []);
                       }
                     }}
                   >
@@ -621,6 +687,9 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                       </SelectItem>
                       <SelectItem value={GIFT_TYPES.DISCOUNT_AMOUNT}>
                         {GIFT_TYPE_LABELS[GIFT_TYPES.DISCOUNT_AMOUNT]}
+                      </SelectItem>
+                      <SelectItem value={GIFT_TYPES.FNB_DISCOUNT_AMOUNT}>
+                        {GIFT_TYPE_LABELS[GIFT_TYPES.FNB_DISCOUNT_AMOUNT]}
                       </SelectItem>
                     </SelectContent>
                   </Select>
@@ -745,6 +814,37 @@ const UpsertGiftModal: React.FC<UpsertGiftModalProps> = ({
                     {form.formState.errors.discountAmount && (
                       <p className="text-sm text-red-500">
                         {form.formState.errors.discountAmount.message}
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Danh mục FnB - chỉ hiển thị khi type = fnb_discount_amount */}
+                {isFnBDiscountAmount && (
+                  <div className="space-y-2 col-span-3">
+                    <Label>Danh mục FnB áp dụng *</Label>
+                    <div className="flex gap-4">
+                      {fnbCategoryOptions.map((option) => (
+                        <label
+                          key={option.value}
+                          className="flex items-center gap-2"
+                        >
+                          <Checkbox
+                            checked={selectedCategories.includes(option.value)}
+                            onCheckedChange={(checked) =>
+                              handleCategoryToggle(
+                                option.value,
+                                Boolean(checked)
+                              )
+                            }
+                          />
+                          <span>{option.label}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {categoryErrorMessage && (
+                      <p className="text-sm text-red-500">
+                        {categoryErrorMessage as string}
                       </p>
                     )}
                   </div>

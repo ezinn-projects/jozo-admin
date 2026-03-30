@@ -55,6 +55,9 @@ const PATHS = {
   // gifts management
   GIFTS: "/gifts",
 
+  // membership config
+  MEMBERSHIP_CONFIG: "/membership-config",
+
   // staff schedule management
   STAFF_SCHEDULE: "/staff-schedule",
   STAFF_EARNINGS_DETAIL: "/staff-schedule/:userId/earnings",

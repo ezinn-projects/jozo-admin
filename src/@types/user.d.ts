@@ -8,7 +8,7 @@ export type User = {
   email?: string;
   phone_number: string;
   date_of_birth: string;
-  role: string; // "admin", "staff", hoặc "user" (user được map từ staff ở backend)
+  role: string; // "admin", "staff", "member" hoặc "user"
   status?: string;
   created_at: string;
   updated_at: string;
@@ -42,7 +42,7 @@ export type UpdateUserRequest = {
 export type UsersResponse = {
   message: string;
   result: {
-    users: User[];
+    items: User[];
     pagination: {
       page: number;
       limit: number;
@@ -55,6 +55,13 @@ export type UsersResponse = {
 export type UserResponse = {
   message: string;
   result: User;
+};
+
+export type UsersQueryParams = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: string;
 };
 
 export type ChangePasswordRequestBody = {

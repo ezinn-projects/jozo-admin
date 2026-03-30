@@ -128,13 +128,8 @@ export function CustomCalendar({
   };
 
   const getEventForDate = (date: dayjs.Dayjs) => {
-    // Ensure events is an array
-    console.log("events", events);
     const eventsArray = Array.isArray(events) ? events : [];
-    console.log(
-      'eventsArray.find((event) => dayjs(event.date).isSame(date, "day"));',
-      eventsArray.find((event) => dayjs(event.date).isSame(date, "day"))
-    );
+
     return eventsArray.find((event) => dayjs(event.date).isSame(date, "day"));
   };
 
@@ -216,7 +211,7 @@ export function CustomCalendar({
                 )}
               </div>
             );
-          })
+          }),
         )}
       </div>
 
