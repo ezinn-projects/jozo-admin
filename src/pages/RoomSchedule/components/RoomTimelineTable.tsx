@@ -1,10 +1,7 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import { Gift as GiftType } from "@/@types/Gift";
 import roomApis from "@/apis/room.apis";
-import {
-  useQuery /* , useMutation */,
-  useQueryClient,
-} from "@tanstack/react-query";
+import { useQuery /* , useMutation */ } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
 import React, { useEffect, useRef, useState } from "react";
 // import roomsScheduleApis from "@/apis/roomSchedule.api";
@@ -24,7 +21,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { RoomStatus, RoomType } from "@/constants/enum";
+import { RoomType } from "@/constants/enum";
 import {
   useResolveRequest,
   useRoomSchedules,
@@ -113,7 +110,6 @@ export type { OrderData };
 
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
-  const queryClient = useQueryClient();
   const isMobile = useIsMobile();
   const {
     supportNotifications,
@@ -265,30 +261,6 @@ const RoomTimelineTable: React.FC = () => {
       }
     }
   }, [currentTime, markerLeft, isToday, autoScrollEnabled]);
-
-  // Text-to-speech using Web Speech API (vi-VN)
-  const speak = (text: string) => {
-    if (typeof window === "undefined" || !("speechSynthesis" in window)) {
-      console.warn("Web Speech API not supported");
-      return;
-    }
-
-    const utterance = new SpeechSynthesisUtterance(text);
-    utterance.lang = "vi-VN";
-    utterance.rate = 1;
-    utterance.pitch = 1;
-
-    const voices = window.speechSynthesis.getVoices();
-    const vietnameseVoice = voices.find(
-      (voice) => voice.lang?.toLowerCase().startsWith("vi")
-    );
-    if (vietnameseVoice) {
-      utterance.voice = vietnameseVoice;
-    }
-
-    window.speechSynthesis.cancel(); // stop any ongoing speech before speaking new text
-    window.speechSynthesis.speak(utterance);
-  };
 
   // Helper: map room._id -> socketRoomId (index+1 as string)
   const getSocketRoomId = (roomId: string): string | null => {
@@ -892,7 +864,7 @@ const RoomTimelineTable: React.FC = () => {
                   giftStatus || ""
                 );
               const isGiftBlinking =
-                showGiftNotification && giftBlinkingRooms[room._id];
+                showGiftNotification && viewGiftBlinkingRooms[room._id];
 
               // Tìm schedule có gift nhưng chưa finished
               const scheduleWithGift = roomSchedules.find((schedule) => {
