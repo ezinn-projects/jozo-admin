@@ -37,13 +37,18 @@ export const addPricingSchema = z
               .array(
                 z.object({
                   roomType: z.enum(
-                    [RoomType.Small, RoomType.Medium, RoomType.Large],
+                    [
+                      RoomType.Small,
+                      RoomType.Medium,
+                      RoomType.Large,
+                      RoomType.Dorm,
+                    ],
                     {
                       errorMap: () => ({ message: "Loại phòng không hợp lệ" }),
-                    }
+                    },
                   ),
                   price: z.string().min(1, { message: "Vui lòng nhập giá" }),
-                })
+                }),
               )
               .min(1, { message: "Vui lòng nhập giá cho các loại phòng" }),
           })
@@ -55,7 +60,7 @@ export const addPricingSchema = z
                 path: ["timeRange"],
               });
             }
-          })
+          }),
       )
       .min(1, { message: "Phải có ít nhất 1 khung giờ" })
       .refine(
@@ -79,7 +84,7 @@ export const addPricingSchema = z
           }
           return true;
         },
-        { message: "Các khung giờ không được trùng nhau" }
+        { message: "Các khung giờ không được trùng nhau" },
       )
       .refine(
         (timeRanges) => {
@@ -94,7 +99,7 @@ export const addPricingSchema = z
             return true;
           });
         },
-        { message: "Thời gian kết thúc phải sau thời gian bắt đầu" }
+        { message: "Thời gian kết thúc phải sau thời gian bắt đầu" },
       ),
     effectiveDate: z
       .string()
@@ -113,5 +118,5 @@ export const addPricingSchema = z
     {
       message: "Ngày kết thúc phải sau ngày hiệu lực",
       path: ["endDate"],
-    }
+    },
   );

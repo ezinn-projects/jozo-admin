@@ -9,11 +9,18 @@ import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
+import { RoomType } from "@/constants/enum";
 import { useDeletePricing, useGetPricingLists } from "@/hooks/pricing";
 import { formatCurrency } from "@/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, TrashIcon } from "lucide-react";
 import { useState } from "react";
+
+const roomTypes = Object.values(RoomType).filter((type) => type);
+
+function formatRoomTypeHeader(value: string) {
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
 
 function PricePage() {
   const [selectedPricing, setSelectedPricing] = useState<Price | null>(null);
@@ -65,31 +72,31 @@ function PricePage() {
             <thead>
               <tr className="border-b">
                 <th className="p-1 text-left">Time</th>
-                <th className="p-1 text-left">Small</th>
-                <th className="p-1 text-left">Medium</th>
-                <th className="p-1 text-left">Large</th>
+                {roomTypes.map((roomType) => (
+                  <th key={roomType} className="p-1 text-left">
+                    {formatRoomTypeHeader(roomType)}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {timeSlots.map((slot, idx) => {
-                const smallPrice =
-                  slot.prices.find((p) => p.room_type === "small")?.price || 0;
-                const mediumPrice =
-                  slot.prices.find((p) => p.room_type === "medium")?.price || 0;
-                const largePrice =
-                  slot.prices.find((p) => p.room_type === "large")?.price || 0;
-
-                return (
-                  <tr key={idx} className="border-b last:border-0">
-                    <td className="p-1">
-                      {slot.start} - {slot.end}
-                    </td>
-                    <td className="p-1">{formatCurrency(smallPrice)}</td>
-                    <td className="p-1">{formatCurrency(mediumPrice)}</td>
-                    <td className="p-1">{formatCurrency(largePrice)}</td>
-                  </tr>
-                );
-              })}
+              {timeSlots.map((slot, idx) => (
+                <tr key={idx} className="border-b last:border-0">
+                  <td className="p-1">
+                    {slot.start} - {slot.end}
+                  </td>
+                  {roomTypes.map((roomType) => {
+                    const cellPrice =
+                      slot.prices.find((p) => p.room_type === roomType)?.price ||
+                      0;
+                    return (
+                      <td key={roomType} className="p-1">
+                        {formatCurrency(cellPrice)}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
             </tbody>
           </table>
         );

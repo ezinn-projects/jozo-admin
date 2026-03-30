@@ -29,17 +29,13 @@ import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { useNavigate, useParams } from "react-router-dom";
 import * as z from "zod";
-
-export enum RoomType {
-  Small = "small",
-  Medium = "medium",
-  Large = "large",
-}
+import { RoomType } from "@/constants/enum";
 
 const roomTypeOptions = [
   { value: RoomType.Small, label: "Small" },
   { value: RoomType.Medium, label: "Medium" },
   { value: RoomType.Large, label: "Large" },
+  { value: RoomType.Dorm, label: "Dorm" },
 ];
 
 const formSchema = z.object({
@@ -139,7 +135,7 @@ function UpsertRoomTypePage() {
 
       // Separate existing and new images
       const existingImages = values.images.filter((url) =>
-        url.startsWith("http")
+        url.startsWith("http"),
       );
       const newImages = values.images.filter((url) => !url.startsWith("http"));
 
@@ -183,7 +179,9 @@ function UpsertRoomTypePage() {
     <div className="max-w-3xl">
       <PageHeader
         title={title}
-        description={id ? "Chỉnh sửa thông tin loại phòng" : "Tạo loại phòng mới"}
+        description={
+          id ? "Chỉnh sửa thông tin loại phòng" : "Tạo loại phòng mới"
+        }
         icon={Building2}
         showBackButton
         backUrl={PATHS.ROOM_TYPES_LISTS}
@@ -317,8 +315,8 @@ function UpsertRoomTypePage() {
             {isCreating || isUpdating
               ? "Loading..."
               : id
-              ? "Update Room Type"
-              : "Create Room Type"}
+                ? "Update Room Type"
+                : "Create Room Type"}
           </Button>
         </form>
       </Form>

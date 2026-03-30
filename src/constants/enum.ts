@@ -31,11 +31,13 @@ export enum DayType {
  * @property {string} Small - A small room
  * @property {string} Medium - A medium room
  * @property {string} Large - A large room
+ * @property {string} Dorm - A dorm zone
  */
 export enum RoomType {
   Small = "small",
   Medium = "medium",
   Large = "large",
+  Dorm = "dorm",
 }
 
 /**

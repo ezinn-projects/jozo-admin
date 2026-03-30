@@ -145,7 +145,7 @@ function UpsertPricingModal(props: Props) {
         note: price.note || undefined,
       });
     }
-  }, [price]);
+  }, [form, price]);
 
   const {
     control,
@@ -228,7 +228,7 @@ function UpsertPricingModal(props: Props) {
                   }
                 }
               },
-            }
+            },
           );
         } else {
           addPricing(data, {
@@ -262,7 +262,7 @@ function UpsertPricingModal(props: Props) {
       toast({
         title: "Error",
         description: error?.timeSlots?.root?.message || "",
-      })
+      }),
   );
 
   const handleClose = () => {
@@ -311,7 +311,7 @@ function UpsertPricingModal(props: Props) {
                                   variant={"outline"}
                                   className={cn(
                                     "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
+                                    !field.value && "text-muted-foreground",
                                   )}
                                 >
                                   {field.value ? (
@@ -421,7 +421,7 @@ function UpsertPricingModal(props: Props) {
                             className={cn(
                               "border rounded-lg",
                               errors.timeSlots?.[index]?.start?.message &&
-                                "border-red-500"
+                                "border-red-500",
                             )}
                           >
                             <AccordionTrigger className="px-4">
@@ -432,7 +432,7 @@ function UpsertPricingModal(props: Props) {
                                 <Typography
                                   className={cn(
                                     "text-muted-foreground",
-                                    errors.timeSlots?.[index] && "text-red-500"
+                                    errors.timeSlots?.[index] && "text-red-500",
                                   )}
                                 >
                                   {timeSlot.start && timeSlot.end
@@ -522,7 +522,7 @@ function UpsertPricingModal(props: Props) {
                                     <div className="grid gap-3">
                                       {roomTypes.map((roomType, priceIndex) => {
                                         const priceObj = field.value?.find(
-                                          (p) => p.roomType === roomType
+                                          (p) => p.roomType === roomType,
                                         );
 
                                         return (
@@ -547,7 +547,7 @@ function UpsertPricingModal(props: Props) {
                                                   const existingPriceIndex =
                                                     newPrices.findIndex(
                                                       (p) =>
-                                                        p.roomType === roomType
+                                                        p.roomType === roomType,
                                                     );
                                                   const price = e.target.value;
 
@@ -608,7 +608,7 @@ function UpsertPricingModal(props: Props) {
                                   variant={"outline"}
                                   className={cn(
                                     "w-full pl-3 text-left font-normal",
-                                    !field.value && "text-muted-foreground"
+                                    !field.value && "text-muted-foreground",
                                   )}
                                 >
                                   {field.value ? (
