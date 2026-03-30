@@ -99,6 +99,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       : [];
 
   // State cho thời gian điều chỉnh
+  const [adjustedStartDate, setAdjustedStartDate] = React.useState<string>("");
+  const [adjustedEndDate, setAdjustedEndDate] = React.useState<string>("");
   const [adjustedStartTime, setAdjustedStartTime] = React.useState<string>("");
   const [adjustedEndTime, setAdjustedEndTime] = React.useState<string>("");
 
@@ -218,10 +220,10 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             if (!old) return old;
 
             const newDrinks = old.items.drinks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item
+              item.itemId === itemId ? { ...item, quantity } : item,
             );
             const newSnacks = old.items.snacks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item
+              item.itemId === itemId ? { ...item, quantity } : item,
             );
 
             return {
@@ -231,7 +233,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 snacks: newSnacks,
               },
             };
-          }
+          },
         );
 
         // Optimistically update inventory
@@ -255,7 +257,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                         ...menuItem.inventory,
                         quantity: Math.max(
                           0,
-                          (menuItem.inventory?.quantity || 0) - quantityDiff
+                          (menuItem.inventory?.quantity || 0) - quantityDiff,
                         ),
                       },
                     };
@@ -264,7 +266,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 }),
               },
             };
-          }
+          },
         );
 
         return { previousOrderData, currentQuantity };
@@ -274,7 +276,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         if (context?.previousOrderData) {
           queryClient.setQueryData(
             ["fnbOrderDetail", schedule._id],
-            context.previousOrderData
+            context.previousOrderData,
           );
         }
         // Rollback inventory
@@ -300,7 +302,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                           ...menuItem.inventory,
                           quantity: Math.max(
                             0,
-                            (menuItem.inventory?.quantity || 0) + quantityDiff
+                            (menuItem.inventory?.quantity || 0) + quantityDiff,
                           ),
                         },
                       };
@@ -309,7 +311,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                   }),
                 },
               };
-            }
+            },
           );
         }
         toast({
@@ -326,7 +328,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         // Refetch menuItems để đảm bảo inventory được cập nhật từ server
         queryClient.invalidateQueries({ queryKey: ["menuItems"] });
       },
-    }
+    },
   );
 
   const menuItems = (menuItemsData?.data?.result ||
@@ -392,10 +394,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   React.useEffect(() => {
     if (schedule) {
       setCurrentSchedule(schedule);
-      setAdjustedStartTime(dayjs(schedule.startTime).format("HH:mm"));
+      const start = dayjs(schedule.startTime);
       const defaultEnd = schedule.endTime
         ? dayjs(schedule.endTime)
-        : dayjs(schedule.startTime).add(120, "minute");
+        : start.add(120, "minute");
+
+      setAdjustedStartDate(start.format("YYYY-MM-DD"));
+      setAdjustedEndDate(defaultEnd.format("YYYY-MM-DD"));
+      setAdjustedStartTime(start.format("HH:mm"));
       setAdjustedEndTime(defaultEnd.format("HH:mm"));
       setNoteValue(schedule.note || "");
       setIsEditingNote(false);
@@ -409,7 +415,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     itemId: string,
     currentQuantity: number,
     change: number,
-    category: string
+    category: string,
   ) => {
     const newQuantity = Math.max(0, currentQuantity + change);
     updateQuantity({
@@ -455,7 +461,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       queryClient.setQueryData<IRoomSchedule[]>(queryKey, (old) => {
         if (!old) return old;
         return old.map((s) =>
-          s._id === schedule._id ? { ...s, note: newNote } : s
+          s._id === schedule._id ? { ...s, note: newNote } : s,
         );
       });
 
@@ -558,7 +564,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     if (newStatus === RoomStatus.InUse) {
       if (adjustedStartTime) {
         // Sử dụng thời gian đã điều chỉnh
-        const datePart = dayjs(schedule.startTime).format("YYYY-MM-DD");
+        const datePart =
+          adjustedStartDate || dayjs(schedule.startTime).format("YYYY-MM-DD");
         const newStartTime = dayjs(`${datePart}T${adjustedStartTime}`);
         if (newStartTime.isValid()) {
           updateData.startTime = newStartTime.toISOString();
@@ -591,10 +598,13 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
 
   // Hàm cập nhật thời gian mới dựa vào input
   const handleUpdateTime = () => {
-    // Lấy phần ngày từ schedule hiện có
-    const datePart = dayjs(schedule.startTime).format("YYYY-MM-DD");
-    const newStartTime = dayjs(`${datePart}T${adjustedStartTime}`);
-    const newEndTime = dayjs(`${datePart}T${adjustedEndTime}`);
+    // Lấy phần ngày, cho phép chỉnh riêng start date và end date
+    const fallbackDate = dayjs(schedule.startTime).format("YYYY-MM-DD");
+    const startDatePart = adjustedStartDate || fallbackDate;
+    const endDatePart = adjustedEndDate || startDatePart;
+
+    const newStartTime = dayjs(`${startDatePart}T${adjustedStartTime}`);
+    let newEndTime = dayjs(`${endDatePart}T${adjustedEndTime}`);
 
     if (!newStartTime.isValid() || !newEndTime.isValid()) {
       toast({
@@ -604,12 +614,10 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       return;
     }
 
+    // Nếu end time nhỏ hơn start time (qua 00:00) thì tự động sang ngày hôm sau
     if (newEndTime.isBefore(newStartTime)) {
-      toast({
-        title: "Invalid time",
-        description: "End time must be after start time.",
-      });
-      return;
+      newEndTime = newEndTime.add(1, "day");
+      setAdjustedEndDate(newEndTime.format("YYYY-MM-DD"));
     }
 
     const updateData: Partial<IRoomSchedule> = {
@@ -844,7 +852,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
               className={`flex items-center gap-2 ${
                 hasGift || schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
               } p-3 rounded-lg border ${
-                hasGift || schedule.giftEnabled ? "border-pink-200" : "border-gray-200"
+                hasGift || schedule.giftEnabled
+                  ? "border-pink-200"
+                  : "border-gray-200"
               }`}
             >
               <Badge
@@ -860,8 +870,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                     ? "Đã nhận quà"
                     : "Đã được gán quà"
                   : schedule.giftEnabled
-                  ? "Được nhận quà"
-                  : "Không được nhận quà"}
+                    ? "Được nhận quà"
+                    : "Không được nhận quà"}
               </Badge>
               {hasGift && (
                 <div className="text-sm space-y-1">
@@ -869,35 +879,39 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                   <p className="text-xs text-gray-600">
                     Trạng thái: {giftStatus || "N/A"}
                   </p>
-                  {giftInfo?.type === "snacks_drinks" && giftItems.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="font-semibold text-gray-700">
-                        Bao gồm:
-                      </p>
-                      <ul className="list-disc pl-5 space-y-0.5">
-                        {giftItems.map(
-                          (item: {
-                            itemId: string;
-                            name?: string;
-                            quantity?: number;
-                            category?: string;
-                          }) => (
-                            <li key={item.itemId} className="text-xs text-gray-700">
-                              <span className="font-medium">{item.name || "Món"}</span>
-                              {item.quantity !== undefined && (
-                                <span className="ml-1">x{item.quantity}</span>
-                              )}
-                              {item.category && (
-                                <span className="ml-2 text-gray-500">
-                                  ({item.category})
+                  {giftInfo?.type === "snacks_drinks" &&
+                    giftItems.length > 0 && (
+                      <div className="mt-2 space-y-1">
+                        <p className="font-semibold text-gray-700">Bao gồm:</p>
+                        <ul className="list-disc pl-5 space-y-0.5">
+                          {giftItems.map(
+                            (item: {
+                              itemId: string;
+                              name?: string;
+                              quantity?: number;
+                              category?: string;
+                            }) => (
+                              <li
+                                key={item.itemId}
+                                className="text-xs text-gray-700"
+                              >
+                                <span className="font-medium">
+                                  {item.name || "Món"}
                                 </span>
-                              )}
-                            </li>
-                          )
-                        )}
-                      </ul>
-                    </div>
-                  )}
+                                {item.quantity !== undefined && (
+                                  <span className="ml-1">x{item.quantity}</span>
+                                )}
+                                {item.category && (
+                                  <span className="ml-2 text-gray-500">
+                                    ({item.category})
+                                  </span>
+                                )}
+                              </li>
+                            ),
+                          )}
+                        </ul>
+                      </div>
+                    )}
                 </div>
               )}
             </div>
@@ -936,7 +950,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                                     item.itemId,
                                     item.quantity,
                                     -1,
-                                    "drinks"
+                                    "drinks",
                                   )
                                 }
                                 disabled={isUpdatingQuantity}
@@ -953,7 +967,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                                     item.itemId,
                                     item.quantity,
                                     1,
-                                    "drinks"
+                                    "drinks",
                                   )
                                 }
                                 disabled={isUpdatingQuantity}
@@ -996,7 +1010,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                                     item.itemId,
                                     item.quantity,
                                     -1,
-                                    "snacks"
+                                    "snacks",
                                   )
                                 }
                                 disabled={isUpdatingQuantity}
@@ -1013,7 +1027,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                                     item.itemId,
                                     item.quantity,
                                     1,
-                                    "snacks"
+                                    "snacks",
                                   )
                                 }
                                 disabled={isUpdatingQuantity}
@@ -1032,32 +1046,60 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           </div>
         )}
 
-        {/* Phần điều chỉnh thời gian */}
-        <div className="mt-4 space-y-2">
-          <h3 className="font-semibold">Adjust Time</h3>
-          <div className="flex flex-col space-y-1">
-            <label htmlFor="adjustedStartTime" className="text-sm">
-              Start Time:
-            </label>
-            <input
-              id="adjustedStartTime"
-              type="time"
-              value={adjustedStartTime}
-              onChange={(e) => setAdjustedStartTime(e.target.value)}
-              className="border rounded p-1"
-            />
+        {/* Phần điều chỉnh ngày & thời gian */}
+        <div className="mt-4 space-y-3">
+          <h3 className="font-semibold">Adjust Date & Time</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="adjustedStartDate" className="text-sm">
+                Start Date:
+              </label>
+              <input
+                id="adjustedStartDate"
+                type="date"
+                value={adjustedStartDate}
+                onChange={(e) => setAdjustedStartDate(e.target.value)}
+                className="border rounded p-1 w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="adjustedEndDate" className="text-sm">
+                End Date:
+              </label>
+              <input
+                id="adjustedEndDate"
+                type="date"
+                value={adjustedEndDate}
+                onChange={(e) => setAdjustedEndDate(e.target.value)}
+                className="border rounded p-1 w-full"
+              />
+            </div>
           </div>
-          <div className="flex flex-col space-y-1">
-            <label htmlFor="adjustedEndTime" className="text-sm">
-              End Time:
-            </label>
-            <input
-              id="adjustedEndTime"
-              type="time"
-              value={adjustedEndTime}
-              onChange={(e) => setAdjustedEndTime(e.target.value)}
-              className="border rounded p-1"
-            />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="space-y-1">
+              <label htmlFor="adjustedStartTime" className="text-sm">
+                Start Time:
+              </label>
+              <input
+                id="adjustedStartTime"
+                type="time"
+                value={adjustedStartTime}
+                onChange={(e) => setAdjustedStartTime(e.target.value)}
+                className="border rounded p-1 w-full"
+              />
+            </div>
+            <div className="space-y-1">
+              <label htmlFor="adjustedEndTime" className="text-sm">
+                End Time:
+              </label>
+              <input
+                id="adjustedEndTime"
+                type="time"
+                value={adjustedEndTime}
+                onChange={(e) => setAdjustedEndTime(e.target.value)}
+                className="border rounded p-1 w-full"
+              />
+            </div>
           </div>
           <Button
             variant="default"

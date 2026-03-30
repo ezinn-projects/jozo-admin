@@ -4,42 +4,7 @@ import { useToast } from "./use-toast";
 import useAuth from "./useAuth";
 import { INotification } from "@/@types/Notification";
 import { Gift } from "@/@types/Gift";
-
-interface BookingData {
-  roomId: string;
-  booking?: {
-    bookingId?: string;
-    _id?: string;
-    roomId: string;
-    roomName?: string;
-    roomType?: string;
-    originalRequest?: string;
-    upgraded?: boolean;
-    customerName?: string;
-    customerPhone?: string;
-    customerEmail?: string;
-    startTime: string;
-    endTime: string;
-    note?: string;
-    source?: string;
-    createdAt: string;
-  };
-  bookingId?: string;
-  _id?: string;
-  roomName?: string;
-  roomType?: string;
-  originalRequest?: string;
-  upgraded?: boolean;
-  customerName?: string;
-  customerPhone?: string;
-  customerEmail?: string;
-  startTime: string;
-  endTime: string;
-  note?: string;
-  source?: string;
-  createdAt: string;
-  [key: string]: unknown;
-}
+import { IBookingSocketData } from "@/@types/Booking";
 
 export const useSocket = () => {
   const { toast } = useToast();
@@ -181,11 +146,11 @@ export const useSocket = () => {
     socketRef.current?.off("new_order_notification", callback);
   };
 
-  const onNewBooking = (callback: (data: BookingData) => void) => {
+  const onNewBooking = (callback: (data: IBookingSocketData) => void) => {
     socketRef.current?.on("booking_notification", callback);
   };
 
-  const offNewBooking = (callback: (data: BookingData) => void) => {
+  const offNewBooking = (callback: (data: IBookingSocketData) => void) => {
     socketRef.current?.off("booking_notification", callback);
   };
 

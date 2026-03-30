@@ -1,4 +1,12 @@
-import React, { useEffect, useState } from "react";
+import {
+  IClaimGiftPayload,
+  IEligibleGift,
+  IPendingGift,
+} from "@/@types/Membership";
+import membershipApis from "@/apis/membership.apis";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -7,22 +15,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery } from "@tanstack/react-query";
-import membershipApis from "@/apis/membership.apis";
-import {
-  IClaimGiftPayload,
-  IEligibleGift,
-  IPendingGift,
-  IPendingGiftsResponse,
-} from "@/@types/Membership";
-import { Gift, Loader2, Search, User } from "lucide-react";
+import { AxiosError } from "axios";
 import dayjs from "dayjs";
+import { Gift, History, Loader2, Search, Star, User } from "lucide-react";
+import React, { useEffect, useState } from "react";
 
 interface ClaimGiftModalProps {
   isOpen: boolean;
@@ -90,7 +91,7 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
       onGiftClaimed();
       onClose();
     },
-    onError: (error: any) => {
+    onError: (error: AxiosError<{ message: string }>) => {
       console.error("Error claiming gift:", error);
       toast({
         title: "Lỗi",
@@ -132,9 +133,21 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
   const pendingGifts = giftsResult?.pending || [];
   const eligibleGifts = giftsResult?.eligible || [];
 
+  // Query to fetch gift claim history
+  const {
+    data: streakData,
+    isLoading: isLoadingHistory,
+  } = useQuery({
+    queryKey: ["streakInfo", user?.userId],
+    queryFn: () => membershipApis.getMemberStreakInfo(user!.userId),
+    enabled: !!user?.userId,
+  });
+
+  const claimedRewards = streakData?.data?.result?.claimedRewards || [];
+
   const renderGiftCard = (
     gift: IPendingGift | IEligibleGift,
-    type: "pending" | "eligible"
+    type: "pending" | "eligible",
   ) => {
     const isPending = type === "pending";
     const isSelected =
@@ -167,7 +180,10 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
             <div className="flex-1">
               <h4 className="font-semibold text-lg">{gift.giftName}</h4>
               <p className="text-sm text-gray-600">
-                Loại: {gift.giftType === "snacks_drinks" ? "Đồ ăn/Nước" : gift.giftType}
+                Loại:{" "}
+                {gift.giftType === "snacks_drinks"
+                  ? "Đồ ăn/Nước"
+                  : gift.giftType}
               </p>
               <p className="text-sm text-purple-600 font-medium">
                 Streak: {gift.streakCount}
@@ -198,10 +214,9 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
             Phục vụ quà tặng
           </DialogTitle>
           <DialogDescription>
-            {defaultPhone && isPhoneValid 
+            {defaultPhone && isPhoneValid
               ? "Chọn quà tặng để phục vụ cho khách hàng"
-              : "Nhập số điện thoại để tra cứu quà tặng của khách hàng"
-            }
+              : "Nhập số điện thoại để tra cứu quà tặng của khách hàng"}
           </DialogDescription>
         </DialogHeader>
 
@@ -222,7 +237,9 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
                       handleSearch();
                     }
                   }}
-                  className={!isPhoneValid && phoneNumber ? "border-red-500" : ""}
+                  className={
+                    !isPhoneValid && phoneNumber ? "border-red-500" : ""
+                  }
                 />
                 {!isPhoneValid && phoneNumber && (
                   <p className="text-xs text-red-500 mt-1">
@@ -254,7 +271,9 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
               <User className="w-4 h-4 text-blue-600" />
               <span className="text-sm">
                 <span className="text-gray-600">Đang tra cứu cho: </span>
-                <span className="font-semibold text-blue-700">{phoneNumber}</span>
+                <span className="font-semibold text-blue-700">
+                  {phoneNumber}
+                </span>
               </span>
             </div>
           )}
@@ -312,12 +331,16 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
           {/* Gifts Section */}
           {user && (
             <Tabs defaultValue="pending" className="w-full">
-              <TabsList className="grid w-full grid-cols-2">
+              <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="pending">
                   Pending ({pendingGifts.length})
                 </TabsTrigger>
                 <TabsTrigger value="eligible">
                   Eligible ({eligibleGifts.length})
+                </TabsTrigger>
+                <TabsTrigger value="history" className="flex items-center gap-1">
+                  <History className="w-3.5 h-3.5" />
+                  Lịch sử ({claimedRewards.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -344,6 +367,92 @@ const ClaimGiftModal: React.FC<ClaimGiftModalProps> = ({
                   </Card>
                 ) : (
                   eligibleGifts.map((gift) => renderGiftCard(gift, "eligible"))
+                )}
+              </TabsContent>
+
+              <TabsContent value="history" className="space-y-3 mt-4">
+                {isLoadingHistory ? (
+                  <Card>
+                    <CardContent className="p-8 text-center text-gray-500">
+                      <Loader2 className="w-8 h-8 mx-auto mb-2 animate-spin opacity-50" />
+                      <p>Đang tải lịch sử...</p>
+                    </CardContent>
+                  </Card>
+                ) : claimedRewards.length === 0 ? (
+                  <Card>
+                    <CardContent className="p-8 text-center text-gray-500">
+                      <History className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                      <p>Chưa có lịch sử nhận quà tặng</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-2">
+                    {[...claimedRewards]
+                      .sort(
+                        (a, b) =>
+                          dayjs(b.claimedAt).valueOf() -
+                          dayjs(a.claimedAt).valueOf(),
+                      )
+                      .map((reward, idx) => (
+                        <Card
+                          key={idx}
+                          className="border-gray-200 hover:shadow-sm transition-shadow"
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-start gap-3 flex-1">
+                                <div className="p-2 bg-purple-50 rounded-lg shrink-0">
+                                  <Gift className="w-5 h-5 text-purple-500" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                  {reward.gift ? (
+                                    <>
+                                      <p className="font-semibold text-gray-800 truncate">
+                                        {reward.gift.giftName}
+                                      </p>
+                                      <p className="text-xs text-gray-500 mt-0.5">
+                                        Loại:{" "}
+                                        {reward.gift.giftType === "snacks_drinks"
+                                          ? "Đồ ăn/Nước"
+                                          : reward.gift.giftType}
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className="font-semibold text-gray-800">
+                                      Thưởng điểm
+                                    </p>
+                                  )}
+                                  <div className="flex items-center gap-2 mt-1 flex-wrap">
+                                    <span className="flex items-center gap-1 text-xs text-orange-600">
+                                      <Star className="w-3 h-3" />
+                                      Streak {reward.streakCount}
+                                    </span>
+                                    {reward.points && reward.points > 0 && (
+                                      <Badge
+                                        variant="secondary"
+                                        className="text-xs bg-green-100 text-green-700 px-1.5 py-0"
+                                      >
+                                        +{reward.points} điểm
+                                      </Badge>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="text-right shrink-0">
+                                <p className="text-xs text-gray-500">
+                                  {dayjs(reward.claimedAt).format(
+                                    "DD/MM/YYYY",
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-400">
+                                  {dayjs(reward.claimedAt).format("HH:mm")}
+                                </p>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                  </div>
                 )}
               </TabsContent>
             </Tabs>
