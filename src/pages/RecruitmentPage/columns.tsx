@@ -342,6 +342,15 @@ export const columns: ColumnDef<Recruitment>[] = [
 
                 <div>
                   <label className="text-sm font-medium text-gray-700">
+                    Ghi chú
+                  </label>
+                  <p className="text-sm whitespace-pre-wrap break-words">
+                    {recruitment.note?.trim() || "Không có ghi chú"}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="text-sm font-medium text-gray-700">
                     Ca làm việc
                   </label>
                   <div className="flex flex-wrap gap-2 mt-1">
