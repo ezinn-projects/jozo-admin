@@ -13,6 +13,7 @@ export interface Recruitment {
   submittedAt: string; // API trả về string thay vì Date
   status: string;
   workDays?: string[] | null; // Optional - backward compatibility
+  note?: string | null;
 }
 
 export interface RecruitmentStats {
