@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { roomTypeOptions } from "@/pages/RoomsManagement/constants";
 
 interface EditRoomTypeModalProps {
   isOpen: boolean;
@@ -34,7 +35,7 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedType, setSelectedType] = React.useState<RoomType>(
-    room?.roomType || RoomType.Small
+    room?.roomType || RoomType.Small,
   );
 
   React.useEffect(() => {
@@ -73,19 +74,6 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
     updateRoomMutation.mutate(updatedRoom);
   };
 
-  const getRoomTypeLabel = (type: RoomType) => {
-    switch (type) {
-      case RoomType.Small:
-        return "Nhỏ";
-      case RoomType.Medium:
-        return "Vừa";
-      case RoomType.Large:
-        return "Lớn";
-      default:
-        return "Nhỏ";
-    }
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
@@ -106,20 +94,19 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
               Loại phòng
             </Label>
             <div className="col-span-3">
-              <Select value={selectedType} onValueChange={(value) => setSelectedType(value as RoomType)}>
+              <Select
+                value={selectedType}
+                onValueChange={(value) => setSelectedType(value as RoomType)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Chọn loại phòng" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value={RoomType.Small}>
-                    {getRoomTypeLabel(RoomType.Small)}
-                  </SelectItem>
-                  <SelectItem value={RoomType.Medium}>
-                    {getRoomTypeLabel(RoomType.Medium)}
-                  </SelectItem>
-                  <SelectItem value={RoomType.Large}>
-                    {getRoomTypeLabel(RoomType.Large)}
-                  </SelectItem>
+                  {roomTypeOptions.map((option) => (
+                    <SelectItem value={option.value} key={option.label}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -129,7 +116,7 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
           <Button variant="outline" onClick={onClose}>
             Hủy
           </Button>
-          <Button 
+          <Button
             onClick={handleSubmit}
             disabled={updateRoomMutation.isPending}
           >
@@ -141,4 +128,4 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
   );
 };
 
-export default EditRoomTypeModal; 
+export default EditRoomTypeModal;

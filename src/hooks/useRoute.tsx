@@ -26,14 +26,24 @@ const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
 const PricePage = lazy(() => import("@/pages/PricePage"));
+const CoffeePricingPage = lazy(() => import("@/pages/CoffeePricingPage"));
 const RoomTypesListPage = lazy(
   () => import("@/pages/RoomTypes/RoomTypesListPage")
 );
 const UpsertRoomTypePage = lazy(
   () => import("@/pages/RoomTypes/UpsertRoomTypePage")
 );
+const CoffeeTablesListPage = lazy(
+  () => import("@/pages/CoffeeTables/CoffeeTablesListPage")
+);
+const UpsertCoffeeTablePage = lazy(
+  () => import("@/pages/CoffeeTables/UpsertCoffeeTablePage")
+);
 // const FnBPage = lazy(() => import("@/pages/FnB"));
 const MenuItemsPage = lazy(() => import("@/pages/FnB/MenuItemsPage"));
+const CustomizationGroupTemplatesPage = lazy(
+  () => import("@/pages/FnB/CustomizationGroupTemplatesPage")
+);
 const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const MembershipConfigPage = lazy(() => import("@/pages/Membership"));
@@ -93,6 +103,21 @@ function useRoute() {
                   <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
                   <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
                 </Route>
+                <Route path={PATHS.COFFEE_TABLES}>
+                  <Route index element={<CoffeeTablesListPage />} />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_NEW}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_EDIT}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                </Route>
+                <Route
+                  path={PATHS.COFFEE_PRICING}
+                  element={<CoffeePricingPage />}
+                />
                 <Route
                   path={PATHS.TOTAL_REVENUE}
                   element={<RevenueStatisticsPage />}
@@ -135,6 +160,10 @@ function useRoute() {
                 <Route path={PATHS.PRICE} element={<PricePage />} />
                 {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
+                <Route
+                  path={PATHS.CUSTOMIZATION_GROUP_TEMPLATES}
+                  element={<CustomizationGroupTemplatesPage />}
+                />
                 <Route path={PATHS.FNB_STATS} element={<FnbStatsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route

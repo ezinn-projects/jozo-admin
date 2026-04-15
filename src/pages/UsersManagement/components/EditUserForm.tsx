@@ -381,11 +381,14 @@ const EditUserForm = () => {
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 Streak: {reward.streakCount}
-                                {reward.gift && ` • Loại: ${reward.gift.giftType}`}
+                                {reward.gift &&
+                                  ` • Loại: ${reward.gift.giftType}`}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 Nhận lúc:{" "}
-                                {new Date(reward.claimedAt).toLocaleString("vi-VN")}
+                                {new Date(reward.claimedAt).toLocaleString(
+                                  "vi-VN",
+                                )}
                               </div>
                             </div>
                           </div>
@@ -417,11 +420,14 @@ const EditUserForm = () => {
                             <div className="flex-1">
                               <div className="font-medium">{gift.giftName}</div>
                               <div className="text-sm text-muted-foreground">
-                                Loại: {gift.giftType} • Streak: {gift.streakCount}
+                                Loại: {gift.giftType} • Streak:{" "}
+                                {gift.streakCount}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 Nhận lúc:{" "}
-                                {new Date(gift.assignedAt).toLocaleString("vi-VN")}
+                                {new Date(gift.assignedAt).toLocaleString(
+                                  "vi-VN",
+                                )}
                               </div>
                             </div>
                           </div>
@@ -435,7 +441,8 @@ const EditUserForm = () => {
                   pendingGiftsData.eligible.length > 0 && (
                     <div className="space-y-3">
                       <div className="text-base font-medium text-green-600">
-                        Quà đủ điều kiện nhận ({pendingGiftsData.eligible.length})
+                        Quà đủ điều kiện nhận (
+                        {pendingGiftsData.eligible.length})
                       </div>
                       <div className="grid gap-3">
                         {pendingGiftsData.eligible.map((gift, index) => (
@@ -453,7 +460,8 @@ const EditUserForm = () => {
                             <div className="flex-1">
                               <div className="font-medium">{gift.giftName}</div>
                               <div className="text-sm text-muted-foreground">
-                                Loại: {gift.giftType} • Streak: {gift.streakCount}
+                                Loại: {gift.giftType} • Streak:{" "}
+                                {gift.streakCount}
                               </div>
                               {gift.bonusPoints && (
                                 <div className="text-xs text-green-600 font-medium">
@@ -489,7 +497,9 @@ const EditUserForm = () => {
                               : "text-red-600"
                           }`}
                         >
-                          {streakInfoData.streak.isActive ? "Đang hoạt động" : "Không hoạt động"}
+                          {streakInfoData.streak.isActive
+                            ? "Đang hoạt động"
+                            : "Không hoạt động"}
                         </span>
                       </div>
                       <div>
@@ -503,9 +513,9 @@ const EditUserForm = () => {
                       <div>
                         Hết hạn lúc:{" "}
                         <span className="font-medium text-foreground">
-                          {new Date(streakInfoData.streak.expiredAt).toLocaleString(
-                            "vi-VN",
-                          )}
+                          {new Date(
+                            streakInfoData.streak.expiredAt,
+                          ).toLocaleString("vi-VN")}
                         </span>
                       </div>
                     </div>

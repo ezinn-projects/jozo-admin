@@ -10,6 +10,7 @@ export enum RoomType {
   LARGE = "large",
   MEDIUM = "medium",
   SMALL = "small",
+  DORM = "dorm",
 }
 
 /**

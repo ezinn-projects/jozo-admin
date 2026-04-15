@@ -1,4 +1,10 @@
 import fnbMenuApis from "@/apis/fnbMenu.apis";
+import customizationGroupTemplateApis from "@/apis/customizationGroupTemplate.apis";
+import {
+  FnBMenuCustomizationOverride,
+  FnBMenuCustomizationTemplateRef,
+  IFnBCustomizationGroupTemplate,
+} from "@/@types/FnBCustomization";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -60,6 +66,37 @@ const variantSchema = z.object({
     .optional(),
 });
 
+const customizationOptionSchema = z.object({
+  optionKey: z.string().min(1, "optionKey là bắt buộc"),
+  label: z.string().min(1, "Tên option là bắt buộc"),
+  priceDelta: z.number().optional(),
+});
+
+const customizationGroupSchema = z
+  .object({
+    groupKey: z.string().min(1, "groupKey là bắt buộc"),
+    label: z.string().min(1, "Tên nhóm là bắt buộc"),
+    minSelect: z.number().min(0, "minSelect phải >= 0"),
+    maxSelect: z.number().min(0, "maxSelect phải >= 0"),
+    options: z
+      .array(customizationOptionSchema)
+      .min(1, "Nhóm tuỳ chọn cần ít nhất 1 option"),
+  })
+  .refine((group) => group.maxSelect >= group.minSelect, {
+    message: "maxSelect phải lớn hơn hoặc bằng minSelect",
+    path: ["maxSelect"],
+  });
+
+const customizationTemplateRefSchema = z.object({
+  templateKey: z.string().min(1, "templateKey là bắt buộc"),
+});
+
+const customizationOverrideSchema = z.object({
+  groupKey: z.string().min(1, "groupKey là bắt buộc"),
+  optionKey: z.string().min(1, "optionKey là bắt buộc"),
+  priceDelta: z.number(),
+});
+
 const formSchema = z.object({
   name: z.string().min(1, "Tên sản phẩm là bắt buộc"),
   category: z.nativeEnum(FnBCategory, {
@@ -78,6 +115,9 @@ const formSchema = z.object({
     })
     .optional(),
   variants: z.array(variantSchema).optional(),
+  customizationTemplateRefs: z.array(customizationTemplateRefSchema).optional(),
+  customizationOverrides: z.array(customizationOverrideSchema).optional(),
+  customizationGroups: z.array(customizationGroupSchema).optional(),
 });
 
 type FormData = z.infer<typeof formSchema>;
@@ -95,6 +135,14 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
   const [mainImageFile, setMainImageFile] = useState<File | null>(null);
 
   const isEdit = !!item?._id;
+  const { data: templateResponse } = useQuery({
+    queryKey: ["customizationGroupTemplates"],
+    queryFn: () => customizationGroupTemplateApis.getTemplates(),
+    enabled: isOpen,
+  });
+
+  const activeTemplates: IFnBCustomizationGroupTemplate[] =
+    templateResponse?.data?.result?.filter((template) => template.isActive) || [];
 
   // Query để lấy chi tiết item khi edit
   const {
@@ -120,6 +168,9 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         quantity: 0,
       },
       variants: [],
+      customizationTemplateRefs: [],
+      customizationOverrides: [],
+      customizationGroups: [],
     },
   });
 
@@ -148,6 +199,30 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
           },
         })) || [];
 
+      const processedCustomizationGroups =
+        detail.customizationGroups?.map((group) => ({
+          groupKey: group.groupKey || "",
+          label: group.label || "",
+          minSelect: group.minSelect || 0,
+          maxSelect: group.maxSelect || 0,
+          options:
+            group.options?.map((option) => ({
+              optionKey: option.optionKey || "",
+              label: option.label || "",
+              priceDelta: option.priceDelta || 0,
+            })) || [],
+        })) || [];
+      const processedTemplateRefs: FnBMenuCustomizationTemplateRef[] =
+        detail.customizationTemplateRefs?.map((ref) => ({
+          templateKey: ref.templateKey || "",
+        })) || [];
+      const processedOverrides: FnBMenuCustomizationOverride[] =
+        detail.customizationOverrides?.map((override) => ({
+          groupKey: override.groupKey || "",
+          optionKey: override.optionKey || "",
+          priceDelta: override.priceDelta || 0,
+        })) || [];
+
       form.reset({
         name: detail.name || "",
         category: detail.category || FnBCategory.SNACK,
@@ -159,6 +234,9 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
           quantity: detail.inventory?.quantity || 0,
         },
         variants: processedVariants,
+        customizationTemplateRefs: processedTemplateRefs,
+        customizationOverrides: processedOverrides,
+        customizationGroups: processedCustomizationGroups,
       });
     } else if (!item) {
       // Reset form khi tạo mới
@@ -173,6 +251,9 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
           quantity: 0,
         },
         variants: [],
+        customizationTemplateRefs: [],
+        customizationOverrides: [],
+        customizationGroups: [],
       });
     }
     // Reset files
@@ -219,6 +300,92 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
     });
   };
 
+  const addCustomizationGroup = () => {
+    const currentGroups = form.getValues("customizationGroups") || [];
+    form.setValue("customizationGroups", [
+      ...currentGroups,
+      {
+        groupKey: "",
+        label: "",
+        minSelect: 0,
+        maxSelect: 1,
+        options: [{ optionKey: "", label: "", priceDelta: 0 }],
+      },
+    ]);
+  };
+
+  const toggleCustomizationTemplate = (templateKey: string, checked: boolean) => {
+    const currentRefs = form.getValues("customizationTemplateRefs") || [];
+    if (checked) {
+      const existed = currentRefs.some((ref) => ref.templateKey === templateKey);
+      if (!existed) {
+        form.setValue("customizationTemplateRefs", [...currentRefs, { templateKey }]);
+      }
+      return;
+    }
+
+    form.setValue(
+      "customizationTemplateRefs",
+      currentRefs.filter((ref) => ref.templateKey !== templateKey)
+    );
+  };
+
+  const addCustomizationOverride = () => {
+    const currentOverrides = form.getValues("customizationOverrides") || [];
+    form.setValue("customizationOverrides", [
+      ...currentOverrides,
+      { groupKey: "", optionKey: "", priceDelta: 0 },
+    ]);
+  };
+
+  const removeCustomizationOverride = (index: number) => {
+    const currentOverrides = form.getValues("customizationOverrides") || [];
+    form.setValue(
+      "customizationOverrides",
+      currentOverrides.filter((_, currentIndex) => currentIndex !== index)
+    );
+  };
+
+  const removeCustomizationGroup = (groupIndex: number) => {
+    const currentGroups = form.getValues("customizationGroups") || [];
+    form.setValue(
+      "customizationGroups",
+      currentGroups.filter((_, index) => index !== groupIndex)
+    );
+  };
+
+  const addCustomizationOption = (groupIndex: number) => {
+    const currentGroups = form.getValues("customizationGroups") || [];
+    const targetGroup = currentGroups[groupIndex];
+    if (!targetGroup) return;
+
+    const updatedGroups = [...currentGroups];
+    updatedGroups[groupIndex] = {
+      ...targetGroup,
+      options: [
+        ...(targetGroup.options || []),
+        { optionKey: "", label: "", priceDelta: 0 },
+      ],
+    };
+    form.setValue("customizationGroups", updatedGroups);
+  };
+
+  const removeCustomizationOption = (groupIndex: number, optionIndex: number) => {
+    const currentGroups = form.getValues("customizationGroups") || [];
+    const targetGroup = currentGroups[groupIndex];
+    if (!targetGroup) return;
+
+    const updatedOptions = (targetGroup.options || []).filter(
+      (_, index) => index !== optionIndex
+    );
+    const updatedGroups = [...currentGroups];
+    updatedGroups[groupIndex] = {
+      ...targetGroup,
+      options: updatedOptions,
+    };
+    form.setValue("customizationGroups", updatedGroups);
+  };
+
   const handleVariantImagesChange = (
     index: number,
     e: React.ChangeEvent<HTMLInputElement>
@@ -255,6 +422,27 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
     setIsLoading(true);
 
     try {
+      const selectedTemplateKeys = (data.customizationTemplateRefs || []).map(
+        (ref) => ref.templateKey
+      );
+      if (selectedTemplateKeys.length > 0) {
+        const validateResponse =
+          await customizationGroupTemplateApis.validateTemplateRefs(
+            selectedTemplateKeys
+          );
+        const invalidTemplateKeys =
+          validateResponse.data.result?.invalidTemplateKeys || [];
+        if (invalidTemplateKeys.length > 0) {
+          toast({
+            title: "Template không hợp lệ",
+            description: `Các template không hợp lệ: ${invalidTemplateKeys.join(", ")}`,
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+      }
+
       const submitFormData = new FormData();
 
       // Các trường text bắt buộc
@@ -319,6 +507,24 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         submitFormData.append("variants", JSON.stringify(processedVariants));
       }
 
+      if (data.customizationGroups && data.customizationGroups.length > 0) {
+        submitFormData.append(
+          "customizationGroups",
+          JSON.stringify(data.customizationGroups)
+        );
+      } else {
+        submitFormData.append("customizationGroups", JSON.stringify([]));
+      }
+
+      submitFormData.append(
+        "customizationTemplateRefs",
+        JSON.stringify(data.customizationTemplateRefs || [])
+      );
+      submitFormData.append(
+        "customizationOverrides",
+        JSON.stringify(data.customizationOverrides || [])
+      );
+
       if (isEdit && item?._id) {
         await fnbMenuApis.updateMenuItem(item._id, submitFormData);
       } else {
@@ -368,6 +574,9 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         quantity: 0,
       },
       variants: [],
+      customizationTemplateRefs: [],
+      customizationOverrides: [],
+      customizationGroups: [],
     });
     onClose();
   };
@@ -654,6 +863,260 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
                 ))}
               </div>
             )}
+
+            <div className="space-y-4">
+              <div className="space-y-3">
+                <h3 className="text-lg font-medium">Customization Templates</h3>
+                <p className="text-sm text-gray-500">
+                  Chọn template dùng chung trước, sau đó cấu hình override giá theo món.
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {activeTemplates.length === 0 && (
+                    <div className="text-sm text-gray-400">
+                      Chưa có template đang hoạt động.
+                    </div>
+                  )}
+                  {activeTemplates.map((template) => {
+                    const checked = (
+                      form.watch("customizationTemplateRefs") || []
+                    ).some((ref) => ref.templateKey === template.templateKey);
+                    return (
+                      <label
+                        key={template.templateKey}
+                        className="flex items-start gap-2 rounded-md border p-3 cursor-pointer"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(event) =>
+                            toggleCustomizationTemplate(
+                              template.templateKey,
+                              event.target.checked
+                            )
+                          }
+                        />
+                        <div className="text-sm">
+                          <div className="font-medium">{template.label}</div>
+                          <div className="text-gray-500">
+                            {template.group.label} ({template.group.groupKey})
+                          </div>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-medium">Price Overrides</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={addCustomizationOverride}
+                  >
+                    <PlusCircle className="mr-2 h-4 w-4" />
+                    Thêm override
+                  </Button>
+                </div>
+                {(form.watch("customizationOverrides") || []).map(
+                  (_, overrideIndex) => (
+                    <div
+                      key={`override-${overrideIndex}`}
+                      className="grid grid-cols-12 gap-2 items-end"
+                    >
+                      <div className="col-span-4 space-y-2">
+                        <Label>groupKey *</Label>
+                        <Input
+                          {...form.register(
+                            `customizationOverrides.${overrideIndex}.groupKey`
+                          )}
+                          placeholder="vd: sugar_level"
+                        />
+                      </div>
+                      <div className="col-span-4 space-y-2">
+                        <Label>optionKey *</Label>
+                        <Input
+                          {...form.register(
+                            `customizationOverrides.${overrideIndex}.optionKey`
+                          )}
+                          placeholder="vd: less_sugar"
+                        />
+                      </div>
+                      <div className="col-span-3 space-y-2">
+                        <Label>priceDelta</Label>
+                        <Input
+                          type="number"
+                          {...form.register(
+                            `customizationOverrides.${overrideIndex}.priceDelta`,
+                            { valueAsNumber: true }
+                          )}
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeCustomizationOverride(overrideIndex)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  )
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-medium">Customization Groups</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={addCustomizationGroup}
+                >
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Thêm nhóm
+                </Button>
+              </div>
+
+              {(form.watch("customizationGroups") || []).map(
+                (group, groupIndex) => (
+                  <div
+                    key={`customization-group-${groupIndex}`}
+                    className="rounded-lg border p-4 space-y-4"
+                  >
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-medium">Nhóm {groupIndex + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => removeCustomizationGroup(groupIndex)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>groupKey *</Label>
+                        <Input
+                          {...form.register(
+                            `customizationGroups.${groupIndex}.groupKey`
+                          )}
+                          placeholder="vd: size, topping"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Tên nhóm *</Label>
+                        <Input
+                          {...form.register(
+                            `customizationGroups.${groupIndex}.label`
+                          )}
+                          placeholder="vd: Size, Topping"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>minSelect</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          {...form.register(
+                            `customizationGroups.${groupIndex}.minSelect`,
+                            { valueAsNumber: true }
+                          )}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>maxSelect</Label>
+                        <Input
+                          type="number"
+                          min={0}
+                          {...form.register(
+                            `customizationGroups.${groupIndex}.maxSelect`,
+                            { valueAsNumber: true }
+                          )}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>Options</Label>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => addCustomizationOption(groupIndex)}
+                        >
+                          <PlusCircle className="mr-2 h-4 w-4" />
+                          Thêm option
+                        </Button>
+                      </div>
+
+                      {(group.options || []).map((_, optionIndex) => (
+                        <div
+                          key={`customization-option-${groupIndex}-${optionIndex}`}
+                          className="grid grid-cols-12 gap-2 items-end"
+                        >
+                          <div className="col-span-4 space-y-2">
+                            <Label>optionKey *</Label>
+                            <Input
+                              {...form.register(
+                                `customizationGroups.${groupIndex}.options.${optionIndex}.optionKey`
+                              )}
+                              placeholder="vd: m, l, pearl"
+                            />
+                          </div>
+                          <div className="col-span-4 space-y-2">
+                            <Label>Tên option *</Label>
+                            <Input
+                              {...form.register(
+                                `customizationGroups.${groupIndex}.options.${optionIndex}.label`
+                              )}
+                              placeholder="vd: M, L, Trân châu"
+                            />
+                          </div>
+                          <div className="col-span-3 space-y-2">
+                            <Label>priceDelta</Label>
+                            <Input
+                              type="number"
+                              {...form.register(
+                                `customizationGroups.${groupIndex}.options.${optionIndex}.priceDelta`,
+                                { valueAsNumber: true }
+                              )}
+                              placeholder="0"
+                            />
+                          </div>
+                          <div className="col-span-1">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              onClick={() =>
+                                removeCustomizationOption(
+                                  groupIndex,
+                                  optionIndex
+                                )
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              )}
+            </div>
 
             <DialogFooter>
               <Button

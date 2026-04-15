@@ -1,6 +1,11 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
+import {
+  FnBMenuCustomizationGroup,
+  FnBMenuCustomizationOverride,
+  FnBMenuCustomizationTemplateRef,
+} from "@/@types/FnBCustomization";
 import fnbOrderApis, {
   ICompleteOrderRequestBody,
   ICompleteOrderResult,
@@ -25,6 +30,9 @@ export interface FnBMenuItem {
   };
   parent?: FnBMenuItem; // Thông tin parent item
   variants?: FnBMenuItem[]; // Danh sách variants
+  customizationGroups?: FnBMenuCustomizationGroup[];
+  customizationTemplateRefs?: FnBMenuCustomizationTemplateRef[];
+  customizationOverrides?: FnBMenuCustomizationOverride[];
 }
 
 // Interface cho menu item theo cấu trúc mới

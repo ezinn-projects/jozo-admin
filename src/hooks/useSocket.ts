@@ -5,6 +5,7 @@ import useAuth from "./useAuth";
 import { INotification } from "@/@types/Notification";
 import { Gift } from "@/@types/Gift";
 import { IBookingSocketData } from "@/@types/Booking";
+import { ICoffeeOrderNewSocketPayload } from "@/@types/CoffeeSessionOrder";
 
 export const useSocket = () => {
   const { toast } = useToast();
@@ -83,13 +84,13 @@ export const useSocket = () => {
   };
 
   const onNotification = (
-    callback: (data: { roomId: string; message: string }) => void
+    callback: (data: { roomId: string; message: string }) => void,
   ) => {
     socketRef.current?.on("notification", callback);
   };
 
   const offNotification = (
-    callback: (data: { roomId: string; message: string }) => void
+    callback: (data: { roomId: string; message: string }) => void,
   ) => {
     socketRef.current?.off("notification", callback);
   };
@@ -115,7 +116,7 @@ export const useSocket = () => {
         };
         createdAt: string;
       };
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.on("new_order_notification", callback);
   };
@@ -141,9 +142,29 @@ export const useSocket = () => {
         };
         createdAt: string;
       };
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.off("new_order_notification", callback);
+  };
+
+  const onOrderNew = (
+    callback: (data: ICoffeeOrderNewSocketPayload) => void,
+  ) => {
+    socketRef.current?.on("order:new", callback);
+  };
+
+  const offOrderNew = (
+    callback: (data: ICoffeeOrderNewSocketPayload) => void,
+  ) => {
+    socketRef.current?.off("order:new", callback);
+  };
+
+  const onOrderSupportRequested = (callback: (data: unknown) => void) => {
+    socketRef.current?.on("order:support_requested", callback);
+  };
+
+  const offOrderSupportRequested = (callback: (data: unknown) => void) => {
+    socketRef.current?.off("order:support_requested", callback);
   };
 
   const onNewBooking = (callback: (data: IBookingSocketData) => void) => {
@@ -165,7 +186,7 @@ export const useSocket = () => {
         status: string;
       }>;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.on("new_schedule_registration", callback);
   };
@@ -180,7 +201,7 @@ export const useSocket = () => {
         status: string;
       }>;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.off("new_schedule_registration", callback);
   };
@@ -197,7 +218,7 @@ export const useSocket = () => {
       };
       status: string;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.on("schedule_status_updated", callback);
   };
@@ -214,7 +235,7 @@ export const useSocket = () => {
       };
       status: string;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.off("schedule_status_updated", callback);
   };
@@ -229,7 +250,7 @@ export const useSocket = () => {
         note?: string;
       }>;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.on("schedule_assigned", callback);
   };
@@ -244,33 +265,41 @@ export const useSocket = () => {
         note?: string;
       }>;
       message: string;
-    }) => void
+    }) => void,
   ) => {
     socketRef.current?.off("schedule_assigned", callback);
   };
 
   // Notification listeners
   const onNewNotification = (
-    callback: (notification: INotification) => void
+    callback: (notification: INotification) => void,
   ) => {
     socketRef.current?.on("new_notification", callback);
   };
 
   const offNewNotification = (
-    callback: (notification: INotification) => void
+    callback: (notification: INotification) => void,
   ) => {
     socketRef.current?.off("new_notification", callback);
   };
 
   // Gift claimed event listener
   const onGiftClaimed = (
-    callback: (data: { roomId: string; scheduleId: string; gift: Gift }) => void
+    callback: (data: {
+      roomId: string;
+      scheduleId: string;
+      gift: Gift;
+    }) => void,
   ) => {
     socketRef.current?.on("gift_claimed", callback);
   };
 
   const offGiftClaimed = (
-    callback: (data: { roomId: string; scheduleId: string; gift: Gift }) => void
+    callback: (data: {
+      roomId: string;
+      scheduleId: string;
+      gift: Gift;
+    }) => void,
   ) => {
     socketRef.current?.off("gift_claimed", callback);
   };
@@ -283,6 +312,10 @@ export const useSocket = () => {
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onOrderNew,
+    offOrderNew,
+    onOrderSupportRequested,
+    offOrderSupportRequested,
     onNewBooking,
     offNewBooking,
     onNewScheduleRegistration,

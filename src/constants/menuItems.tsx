@@ -3,6 +3,8 @@ import {
   BedDouble,
   Calendar,
   Clock,
+  Coffee,
+  DollarSign,
   DoorOpenIcon,
   Home,
   Music,
@@ -50,6 +52,20 @@ const MENU_ITEMS: MenuItem[] = [
     roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
   },
   {
+    title: "Coffee Tables",
+    url: PATHS.COFFEE_TABLES,
+    icon: Coffee,
+    subItems: [],
+    roles: [Role.Admin, Role.Staff],
+  },
+  {
+    title: "Coffee Pricing",
+    url: PATHS.COFFEE_PRICING,
+    icon: DollarSign,
+    subItems: [],
+    roles: [Role.Admin, Role.Staff],
+  },
+  {
     title: "General management",
     icon: Settings2,
     roles: [Role.Admin], // Chỉ admin mới có thể truy cập
@@ -93,6 +109,12 @@ const MENU_ITEMS: MenuItem[] = [
       {
         title: "Menu Items",
         url: PATHS.MENU_ITEMS,
+        icon: UtensilsCrossed,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Customization Templates",
+        url: PATHS.CUSTOMIZATION_GROUP_TEMPLATES,
         icon: UtensilsCrossed,
         roles: [Role.Admin],
       },

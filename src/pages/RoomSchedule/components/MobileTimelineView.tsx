@@ -1,7 +1,14 @@
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import dayjs, { Dayjs } from "dayjs";
 import React, { useEffect, useState } from "react";
-import { BellIcon, EditIcon, Gift, UtensilsCrossed } from "lucide-react";
+import {
+  BellIcon,
+  DoorOpen,
+  EditIcon,
+  Gamepad2,
+  Gift,
+  UtensilsCrossed,
+} from "lucide-react";
 import {
   Tooltip,
   TooltipContent,
@@ -66,9 +73,19 @@ const getRoomTypeLabel = (type: RoomType) => {
       return "Vừa";
     case RoomType.Large:
       return "Lớn";
+    case RoomType.Dorm:
+      return "Dorm";
     default:
       return "Nhỏ";
   }
+};
+
+const getRoomTypeLeadIcon = (type: RoomType) => {
+  const className = "h-4 w-4 sm:h-5 sm:w-5 shrink-0 text-slate-500";
+  if (type === RoomType.Dorm) {
+    return <Gamepad2 className={className} aria-hidden />;
+  }
+  return <DoorOpen className={className} aria-hidden />;
 };
 
 // Tính toán vị trí và chiều cao cho schedule block trong layout dọc
@@ -262,12 +279,13 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         e.stopPropagation();
                         onRoomClick(room._id);
                       }}
-                      className={`text-blue-600 hover:underline active:opacity-70 text-left font-medium text-sm sm:text-base touch-manipulation min-h-[44px] flex items-center ${
+                      className={`text-blue-600 hover:underline active:opacity-70 text-left font-medium text-sm sm:text-base touch-manipulation min-h-[44px] inline-flex items-center gap-1.5 ${
                         isBlinking
                           ? "animate-[blink_1s_ease-in-out_infinite]"
                           : ""
                       }`}
                     >
+                      {getRoomTypeLeadIcon(room.roomType)}
                       {room.roomName}
                     </button>
                     <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">

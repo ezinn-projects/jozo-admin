@@ -38,6 +38,17 @@ interface MenuItem {
   existingImage?: string;
   quantity?: string;
   variants?: string; // JSON string của variants
+  customizationGroups?: {
+    groupKey: string;
+    label: string;
+    minSelect: number;
+    maxSelect: number;
+    options: {
+      optionKey: string;
+      label: string;
+      priceDelta?: number;
+    }[];
+  }[];
 }
 
 interface MenuItemsModalProps {
@@ -450,6 +461,9 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   // Render lại card: nếu có con thì hiển thị các con, không thì hiển thị như món đơn giản
   const renderMenuItem = (item: MenuItem) => {
+    const hasRequiredCustomization = (item.customizationGroups || []).some(
+      (group) => group.minSelect > 0
+    );
     const children = groupedItems.childrenMap[item._id] || [];
     if (children.length > 0) {
       // Card group cho parent có children
@@ -514,7 +528,10 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                           variant="outline"
                           size="sm"
                           onClick={() => handleRemoveOne(key)}
-                          disabled={Number(quantities[key] || 0) === 0}
+                          disabled={
+                            hasRequiredCustomization ||
+                            Number(quantities[key] || 0) === 0
+                          }
                           className="w-8 h-8 p-0"
                         >
                           -
@@ -532,6 +549,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                             }
                           }}
                           disabled={
+                            hasRequiredCustomization ||
                             (child.inventory.quantity || 0) === 0 &&
                             (quantities[key] || 0) === 0
                           }
@@ -553,6 +571,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                             }
                           }}
                           disabled={
+                            hasRequiredCustomization ||
                             (child.inventory.quantity || 0) === 0 ||
                             Number(quantities[key] || 0) >=
                               Number(child.inventory.quantity || 0)
@@ -596,6 +615,11 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
               <p className="text-lg font-bold text-green-600">
                 {item.price.toLocaleString("vi-VN")} VND
               </p>
+              {hasRequiredCustomization && (
+                <p className="text-xs text-amber-600 mt-1">
+                  Cần chọn tuỳ chọn trước khi thêm món
+                </p>
+              )}
             </div>
           </div>
         </CardHeader>
@@ -609,7 +633,9 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                 variant="outline"
                 size="sm"
                 onClick={() => handleRemoveOne(key)}
-                disabled={Number(quantities[key] || 0) === 0}
+                disabled={
+                  hasRequiredCustomization || Number(quantities[key] || 0) === 0
+                }
                 className="w-8 h-8 p-0"
               >
                 -
@@ -627,6 +653,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                   }
                 }}
                 disabled={
+                  hasRequiredCustomization ||
                   (item.inventory?.quantity || 0) === 0 &&
                   (quantities[key] || 0) === 0
                 }
@@ -648,6 +675,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                   }
                 }}
                 disabled={
+                  hasRequiredCustomization ||
                   (item.inventory?.quantity || 0) === 0 ||
                   Number(quantities[key] || 0) >=
                     Number(item.inventory?.quantity || 0)

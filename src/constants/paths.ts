@@ -34,6 +34,10 @@ const PATHS = {
   ROOM_TYPES_LISTS: "/room-types",
   ROOM_TYPES_NEW: "/room-types/new",
   ROOM_TYPES_EDIT: "/room-types/:id/edit",
+  COFFEE_TABLES: "/coffee-tables",
+  COFFEE_TABLES_NEW: "/coffee-tables/new",
+  COFFEE_TABLES_EDIT: "/coffee-tables/:id/edit",
+  COFFEE_PRICING: "/coffee-pricing",
 
   // fnb management
   FNB: "/fnb",
@@ -42,6 +46,7 @@ const PATHS = {
   MENU_ITEMS: "/menu-items",
   MENU_ITEMS_NEW: "/menu-items/new",
   MENU_ITEMS_EDIT: "/menu-items/:id/edit",
+  CUSTOMIZATION_GROUP_TEMPLATES: "/customization-group-templates",
   FNB_STATS: "/fnb-stats",
 
   // promotion management

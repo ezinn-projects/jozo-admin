@@ -322,7 +322,7 @@ export const columns: ColumnDef<Recruitment>[] = [
                       {Array.isArray(recruitment.position)
                         ? recruitment.position
                             .map(
-                              (pos) => positionLabels[pos as Position] || pos
+                              (pos) => positionLabels[pos as Position] || pos,
                             )
                             .join(", ")
                         : positionLabels[recruitment.position as Position] ||
@@ -380,7 +380,7 @@ export const columns: ColumnDef<Recruitment>[] = [
                           <Badge key={index} variant="secondary">
                             {day}
                           </Badge>
-                        )
+                        ),
                       )}
                     </div>
                   </div>

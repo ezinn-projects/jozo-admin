@@ -161,6 +161,7 @@ const MenuItemsPage = () => {
                 <TableHead>Tên</TableHead>
                 <TableHead>Loại</TableHead>
                 <TableHead>Giá</TableHead>
+                <TableHead>Tuỳ chọn</TableHead>
                 <TableHead>Tồn kho</TableHead>
                 <TableHead>Variants</TableHead>
                 <TableHead>Thao tác</TableHead>
@@ -198,6 +199,15 @@ const MenuItemsPage = () => {
                     </Badge>
                   </TableCell>
                   <TableCell>{item.price.toLocaleString()} VND</TableCell>
+                  <TableCell>
+                    {(item.customizationGroups?.length || 0) > 0 ? (
+                      <Badge variant="outline">
+                        {item.customizationGroups?.length || 0} nhóm
+                      </Badge>
+                    ) : (
+                      <span className="text-gray-400 text-sm">Không có</span>
+                    )}
+                  </TableCell>
                   <TableCell>
                     {item.hasVariant ? (
                       <div className="flex items-center gap-2">
