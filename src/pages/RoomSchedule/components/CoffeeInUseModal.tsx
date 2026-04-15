@@ -40,6 +40,43 @@ const EMPTY_ORDER: ICoffeeSessionOrder = {
   variants: {},
 };
 
+const toLegacyOrderShape = (
+  order: ICoffeeSessionOrder | undefined | null,
+): ICoffeeSessionOrder => {
+  if (!order) return EMPTY_ORDER;
+
+  if (order.drinks || order.snacks) {
+    return {
+      drinks: order.drinks || {},
+      snacks: order.snacks || {},
+      variants: order.variants || {},
+      lines: order.lines,
+    };
+  }
+
+  if (!Array.isArray(order.lines)) return EMPTY_ORDER;
+
+  return order.lines.reduce<ICoffeeSessionOrder>(
+    (acc, line) => {
+      const category = String(line.category || "").toLowerCase();
+      const targetKey =
+        category === "drink" || category === "drinks" ? "drinks" : "snacks";
+      const itemId = String(line.itemId || "");
+      const quantity = Number(line.quantity) || 0;
+
+      if (!itemId || quantity <= 0) return acc;
+      acc[targetKey][itemId] = (acc[targetKey][itemId] || 0) + quantity;
+      return acc;
+    },
+    {
+      drinks: {},
+      snacks: {},
+      variants: order.variants || {},
+      lines: order.lines,
+    },
+  );
+};
+
 const sanitizeOrder = (order: ICoffeeSessionOrder): ICoffeeSessionOrder => ({
   drinks: Object.fromEntries(
     Object.entries(order.drinks || {}).filter(([, quantity]) => quantity > 0),
@@ -67,6 +104,7 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   const [customerPhone, setCustomerPhone] = React.useState("");
   const [peopleCount, setPeopleCount] = React.useState("1");
   const [note, setNote] = React.useState("");
+  const [isOrderModalOpen, setIsOrderModalOpen] = React.useState(false);
   const [draftOrder, setDraftOrder] =
     React.useState<ICoffeeSessionOrder>(EMPTY_ORDER);
   const sessionDetailQuery = useQuery({
@@ -111,8 +149,14 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   });
 
   React.useEffect(() => {
-    setDraftOrder(orderQuery.data?.order || EMPTY_ORDER);
+    setDraftOrder(toLegacyOrderShape(orderQuery.data?.order));
   }, [orderQuery.data]);
+
+  React.useEffect(() => {
+    if (!isOpen) {
+      setIsOrderModalOpen(false);
+    }
+  }, [isOpen]);
 
   const updateSessionMutation = useMutation({
     mutationFn: (status: CoffeeSessionStatus) =>
@@ -220,167 +264,271 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   const planSnapshot = sessionDetail?.planSnapshot;
   const startedAt = sessionDetail?.startTime || sessionDetail?.createdAt;
   const usageDurationMinutes = sessionDetail?.usageDurationMinutes;
+  const totalOrderItems = React.useMemo(
+    () =>
+      Object.values(draftOrder.drinks || {}).reduce(
+        (sum, qty) => sum + (Number(qty) || 0),
+        0,
+      ) +
+      Object.values(draftOrder.snacks || {}).reduce(
+        (sum, qty) => sum + (Number(qty) || 0),
+        0,
+      ),
+    [draftOrder.drinks, draftOrder.snacks],
+  );
+  const orderHistoryItems = React.useMemo(() => {
+    if (orderQuery.data?.lineItems?.length) {
+      return orderQuery.data.lineItems.map((item) => ({
+        key: item.lineId || `${item.itemId}-${item.name}`,
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+      }));
+    }
+
+    const legacyItems = [
+      ...(orderQuery.data?.items?.drinks || []),
+      ...(orderQuery.data?.items?.snacks || []),
+    ];
+
+    return legacyItems.map((item, index) => ({
+      key: `${item.itemId}-${index}`,
+      name: item.name,
+      quantity: item.quantity,
+      category: item.category,
+    }));
+  }, [orderQuery.data]);
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-5xl w-[95vw] max-h-[94vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>In-use coffee session</DialogTitle>
-          <DialogDescription>
-            Bàn{" "}
-            <span className="font-medium">{tableName || "Coffee table"}</span>{" "}
-            đang được sử dụng. Có thể cập nhật thông tin phiên và quản lý order
-            ngay tại đây.
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-5xl w-[95vw] max-h-[94vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>In-use coffee session</DialogTitle>
+            <DialogDescription>
+              Bàn{" "}
+              <span className="font-medium">{tableName || "Coffee table"}</span>{" "}
+              đang được sử dụng. Có thể cập nhật thông tin phiên tại đây.
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="space-y-6">
-          <div className="grid gap-4 md:grid-cols-3">
-            <div className="rounded-lg border bg-muted/20 p-4">
-              <div className="flex items-center gap-2">
-                <Badge variant="default">In use</Badge>
-                {sessionDetailQuery.isLoading && (
-                  <Badge variant="secondary">Đang tải chi tiết...</Badge>
+          <div className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <div className="flex items-center gap-2">
+                  <Badge variant="default">In use</Badge>
+                  {sessionDetailQuery.isLoading && (
+                    <Badge variant="secondary">Đang tải chi tiết...</Badge>
+                  )}
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Bắt đầu sử dụng
+                </p>
+                <p className="font-medium">
+                  {startedAt
+                    ? dayjs(startedAt).format("HH:mm DD/MM/YYYY")
+                    : "Chưa có"}
+                </p>
+                <p className="mt-2 text-sm text-muted-foreground">PIN code</p>
+                <p className="font-mono text-base font-semibold tracking-widest">
+                  {sessionDetail?.pinCode || "Chưa có"}
+                </p>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">Giá snapshot</p>
+                <p className="font-medium">
+                  {planSnapshot?.pricePerPerson
+                    ? `${planSnapshot.pricePerPerson.toLocaleString("vi-VN")} ${
+                        planSnapshot.currency || "VND"
+                      }/người`
+                    : "Backend chưa trả snapshot giá"}
+                </p>
+              </div>
+
+              <div className="rounded-lg border bg-muted/20 p-4">
+                <p className="text-sm text-muted-foreground">
+                  Tổng snapshot / thời lượng
+                </p>
+                <p className="font-medium">
+                  {planSnapshot?.totalPrice
+                    ? `${planSnapshot.totalPrice.toLocaleString("vi-VN")} ${
+                        planSnapshot.currency || "VND"
+                      }`
+                    : `${peopleCount || "1"} người`}
+                </p>
+                {typeof usageDurationMinutes === "number" && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Đã dùng: {usageDurationMinutes} phút
+                  </p>
                 )}
               </div>
-              <p className="mt-3 text-sm text-muted-foreground">
-                Bắt đầu sử dụng
-              </p>
-              <p className="font-medium">
-                {startedAt
-                  ? dayjs(startedAt).format("HH:mm DD/MM/YYYY")
-                  : "Chưa có"}
-              </p>
-              <p className="mt-2 text-sm text-muted-foreground">PIN code</p>
-              <p className="font-mono text-base font-semibold tracking-widest">
-                {sessionDetail?.pinCode || "Chưa có"}
-              </p>
             </div>
 
-            <div className="rounded-lg border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">Giá snapshot</p>
-              <p className="font-medium">
-                {planSnapshot?.pricePerPerson
-                  ? `${planSnapshot.pricePerPerson.toLocaleString("vi-VN")} ${
-                      planSnapshot.currency || "VND"
-                    }/người`
-                  : "Backend chưa trả snapshot giá"}
-              </p>
-            </div>
-
-            <div className="rounded-lg border bg-muted/20 p-4">
-              <p className="text-sm text-muted-foreground">
-                Tổng snapshot / thời lượng
-              </p>
-              <p className="font-medium">
-                {planSnapshot?.totalPrice
-                  ? `${planSnapshot.totalPrice.toLocaleString("vi-VN")} ${
-                      planSnapshot.currency || "VND"
-                    }`
-                  : `${peopleCount || "1"} người`}
-              </p>
-              {typeof usageDurationMinutes === "number" && (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Đã dùng: {usageDurationMinutes} phút
-                </p>
-              )}
-            </div>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="in-use-customer-name">Tên khách</Label>
-              <Input
-                id="in-use-customer-name"
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                placeholder="Nhập tên khách"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="in-use-customer-phone">Số điện thoại</Label>
-              <Input
-                id="in-use-customer-phone"
-                value={customerPhone}
-                onChange={(event) => setCustomerPhone(event.target.value)}
-                placeholder="Nhập số điện thoại"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="in-use-people-count">Số người</Label>
-            <Input
-              id="in-use-people-count"
-              type="number"
-              min={1}
-              value={peopleCount}
-              onChange={(event) => setPeopleCount(event.target.value)}
-              placeholder="Nhập số người"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="in-use-note">Ghi chú</Label>
-            <Textarea
-              id="in-use-note"
-              value={note}
-              onChange={(event) => setNote(event.target.value)}
-              placeholder="Ghi chú thêm cho ca sử dụng"
-            />
-          </div>
-
-          <div className="rounded-lg border p-4">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <h3 className="font-semibold">Order của phiên</h3>
-                <p className="text-sm text-muted-foreground">
-                  Quản lý đồ ăn và đồ uống qua `coffee-session-orders`.
-                </p>
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="in-use-customer-name">Tên khách</Label>
+                <Input
+                  id="in-use-customer-name"
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  placeholder="Nhập tên khách"
+                />
               </div>
-              {(orderQuery.isLoading || menuItemsQuery.isLoading) && (
-                <Badge variant="secondary">Đang tải dữ liệu...</Badge>
-              )}
+
+              <div className="space-y-2">
+                <Label htmlFor="in-use-customer-phone">Số điện thoại</Label>
+                <Input
+                  id="in-use-customer-phone"
+                  value={customerPhone}
+                  onChange={(event) => setCustomerPhone(event.target.value)}
+                  placeholder="Nhập số điện thoại"
+                />
+              </div>
             </div>
 
-            <CoffeeOrderEditor
-              menuItems={menuItemsQuery.data || []}
-              order={draftOrder}
-              orderDetail={orderQuery.data}
-              isUpdating={
-                updateOrderMutation.isPending || deleteOrderMutation.isPending
-              }
-              onQuantityChange={handleQuantityChange}
-              onClearOrder={() => deleteOrderMutation.mutate()}
-            />
-          </div>
-        </div>
+            <div className="space-y-2">
+              <Label htmlFor="in-use-people-count">Số người</Label>
+              <Input
+                id="in-use-people-count"
+                type="number"
+                min={1}
+                value={peopleCount}
+                onChange={(event) => setPeopleCount(event.target.value)}
+                placeholder="Nhập số người"
+              />
+            </div>
 
-        <DialogFooter className="sticky bottom-0 -mx-6 flex flex-wrap justify-between gap-2 border-t bg-background px-6 py-4">
-          <div className="flex flex-wrap gap-2">
+            <div className="space-y-2">
+              <Label htmlFor="in-use-note">Ghi chú</Label>
+              <Textarea
+                id="in-use-note"
+                value={note}
+                onChange={(event) => setNote(event.target.value)}
+                placeholder="Ghi chú thêm cho ca sử dụng"
+              />
+            </div>
+
+            <div className="rounded-lg border bg-muted/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold">Order</h3>
+                </div>
+                <Badge variant="secondary">
+                  {totalOrderItems > 0
+                    ? `${totalOrderItems} món đã chọn`
+                    : "Chưa có món"}
+                </Badge>
+              </div>
+              {orderQuery.isLoading ? (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Đang tải order...
+                </p>
+              ) : orderHistoryItems.length > 0 ? (
+                <div className="mt-3 space-y-2 rounded-md border bg-background p-3">
+                  {orderHistoryItems.map((item) => (
+                    <div
+                      key={item.key}
+                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border px-3 py-2"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate font-medium">{item.name}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {String(item.category || "")
+                            .toLowerCase()
+                            .startsWith("drink")
+                            ? "Đồ uống"
+                            : "Đồ ăn"}
+                        </p>
+                      </div>
+                      <Badge
+                        variant="secondary"
+                        className="min-w-10 justify-center"
+                      >
+                        x{item.quantity}
+                      </Badge>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted-foreground">
+                  Chưa có order cho phiên này.
+                </p>
+              )}
+            </div>
+          </div>
+
+          <DialogFooter className="sticky bottom-0 -mx-6 flex flex-wrap justify-between gap-2 border-t bg-background px-6 py-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                loading={
+                  updateOrderMutation.isPending || deleteOrderMutation.isPending
+                }
+                onClick={() => setIsOrderModalOpen(true)}
+                disabled={updateSessionMutation.isPending}
+              >
+                Order
+              </Button>
+              <Button
+                variant="outline"
+                loading={updateSessionMutation.isPending}
+                onClick={() => updateSessionMutation.mutate("in-use")}
+              >
+                Lưu thông tin
+              </Button>
+              <Button
+                variant="secondary"
+                loading={updateSessionMutation.isPending}
+                onClick={() => updateSessionMutation.mutate("completed")}
+              >
+                Kết thúc phiên
+              </Button>
+            </div>
+
+            <Button variant="outline" onClick={onClose}>
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Order cho admin/staff</DialogTitle>
+            <DialogDescription>
+              Bàn{" "}
+              <span className="font-medium">{tableName || "Coffee table"}</span>{" "}
+              - quản lý đồ ăn và đồ uống qua `coffee-session-orders`.
+            </DialogDescription>
+          </DialogHeader>
+
+          {(orderQuery.isLoading || menuItemsQuery.isLoading) && (
+            <Badge variant="secondary">Đang tải dữ liệu...</Badge>
+          )}
+
+          <CoffeeOrderEditor
+            menuItems={menuItemsQuery.data || []}
+            order={draftOrder}
+            orderDetail={orderQuery.data}
+            isUpdating={
+              updateOrderMutation.isPending || deleteOrderMutation.isPending
+            }
+            onQuantityChange={handleQuantityChange}
+            onClearOrder={() => deleteOrderMutation.mutate()}
+          />
+
+          <DialogFooter>
             <Button
               variant="outline"
-              loading={updateSessionMutation.isPending}
-              onClick={() => updateSessionMutation.mutate("in-use")}
+              onClick={() => setIsOrderModalOpen(false)}
             >
-              Lưu thông tin
+              Đóng
             </Button>
-            <Button
-              variant="secondary"
-              loading={updateSessionMutation.isPending}
-              onClick={() => updateSessionMutation.mutate("completed")}
-            >
-              Kết thúc phiên
-            </Button>
-          </div>
-
-          <Button variant="outline" onClick={onClose}>
-            Đóng
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 };
 

@@ -1,11 +1,14 @@
-import { ICoffeeSessionOrder, ICoffeeSessionOrderDetail } from "@/@types/CoffeeSessionOrder";
-import { FnBMenuItem } from "@/hooks/use-menu-items";
+import {
+  ICoffeeSessionOrder,
+  ICoffeeSessionOrderDetail,
+} from "@/@types/CoffeeSessionOrder";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Coffee, Search, Trash2, Utensils } from "lucide-react";
+import { FnBMenuItem } from "@/hooks/use-menu-items";
+import { Coffee, Search, Utensils } from "lucide-react";
 import React from "react";
 
 interface CoffeeOrderEditorProps {
@@ -28,10 +31,8 @@ const normalize = (value: string) =>
 const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
   menuItems,
   order,
-  orderDetail,
   isUpdating,
   onQuantityChange,
-  onClearOrder,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState("all");
@@ -78,38 +79,27 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
       }
 
       return (groupedItems.childrenMap[parent._id || ""] || []).some((child) =>
-        normalize(child.name).includes(term)
+        normalize(child.name).includes(term),
       );
     });
   }, [groupedItems, searchTerm, selectedCategory]);
 
   const quantities = React.useMemo(() => {
+    if (Array.isArray(order.lines) && order.lines.length > 0) {
+      return order.lines.reduce<Record<string, number>>((acc, line) => {
+        const itemId = String(line.itemId || "");
+        const quantity = Number(line.quantity) || 0;
+        if (!itemId || quantity <= 0) return acc;
+        acc[itemId] = (acc[itemId] || 0) + quantity;
+        return acc;
+      }, {});
+    }
+
     return {
       ...(order.drinks || {}),
       ...(order.snacks || {}),
     };
   }, [order]);
-
-  const orderedItems = React.useMemo(() => {
-    if (orderDetail?.items) {
-      return [...orderDetail.items.drinks, ...orderDetail.items.snacks];
-    }
-
-    return Object.entries(quantities)
-      .filter(([, quantity]) => quantity > 0)
-      .map(([itemId, quantity]) => {
-        const menuItem = menuItems.find((item) => item._id === itemId);
-        return {
-          itemId,
-          name: menuItem?.name || itemId,
-          category: menuItem?.category || "other",
-          quantity,
-          price: menuItem?.price || 0,
-        };
-      });
-  }, [menuItems, orderDetail, quantities]);
-
-  const totalItems = orderedItems.reduce((sum, item) => sum + item.quantity, 0);
 
   const renderMenuItem = (item: FnBMenuItem) => {
     const children = groupedItems.childrenMap[item._id || ""] || [];
@@ -141,12 +131,18 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
                       disabled={isUpdating || currentQuantity <= 0}
                       onClick={() =>
                         child._id &&
-                        onQuantityChange(child, Math.max(0, currentQuantity - 1))
+                        onQuantityChange(
+                          child,
+                          Math.max(0, currentQuantity - 1),
+                        )
                       }
                     >
                       -
                     </Button>
-                    <Badge variant="secondary" className="min-w-10 justify-center">
+                    <Badge
+                      variant="secondary"
+                      className="min-w-10 justify-center"
+                    >
                       {currentQuantity}
                     </Badge>
                     <Button
@@ -154,7 +150,8 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
                       size="sm"
                       disabled={isUpdating}
                       onClick={() =>
-                        child._id && onQuantityChange(child, currentQuantity + 1)
+                        child._id &&
+                        onQuantityChange(child, currentQuantity + 1)
                       }
                     >
                       +
@@ -184,7 +181,10 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
               variant="outline"
               size="sm"
               disabled={isUpdating || currentQuantity <= 0}
-              onClick={() => item._id && onQuantityChange(item, Math.max(0, currentQuantity - 1))}
+              onClick={() =>
+                item._id &&
+                onQuantityChange(item, Math.max(0, currentQuantity - 1))
+              }
             >
               -
             </Button>
@@ -195,7 +195,9 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
               variant="outline"
               size="sm"
               disabled={isUpdating}
-              onClick={() => item._id && onQuantityChange(item, currentQuantity + 1)}
+              onClick={() =>
+                item._id && onQuantityChange(item, currentQuantity + 1)
+              }
             >
               +
             </Button>
@@ -207,36 +209,6 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col gap-3 rounded-lg border bg-muted/20 p-4">
-        <div className="flex items-center justify-between gap-2">
-          <div>
-            <p className="font-medium">Order hiện tại</p>
-            <p className="text-sm text-muted-foreground">
-              {totalItems > 0 ? `${totalItems} món đã chọn` : "Chưa có món nào"}
-            </p>
-          </div>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={isUpdating || totalItems === 0}
-            onClick={onClearOrder}
-          >
-            <Trash2 className="h-4 w-4" />
-            Xóa order
-          </Button>
-        </div>
-
-        {orderedItems.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {orderedItems.map((item) => (
-              <Badge key={item.itemId} variant="secondary">
-                {item.name} x{item.quantity}
-              </Badge>
-            ))}
-          </div>
-        )}
-      </div>
-
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input

@@ -4,6 +4,27 @@ export interface ICoffeeSessionOrder {
   drinks: Record<string, number>;
   snacks: Record<string, number>;
   variants?: Record<string, Record<string, number>>;
+  lines?: ICoffeeSessionOrderLine[];
+}
+
+export interface ICoffeeSessionOrderSelection {
+  groupKey: string;
+  optionKey: string;
+}
+
+export interface ICoffeeSessionOrderLine {
+  lineId: string;
+  itemId: string;
+  category: string;
+  quantity: number;
+  note?: string | null;
+  selections?: ICoffeeSessionOrderSelection[] | null;
+}
+
+export interface ICoffeeSessionOrderLineItem extends OrderDetailItem {
+  lineId: string;
+  note?: string | null;
+  selections?: ICoffeeSessionOrderSelection[] | null;
 }
 
 export interface ICoffeeSessionOrderDetail {
@@ -13,6 +34,7 @@ export interface ICoffeeSessionOrderDetail {
     drinks: OrderDetailItem[];
     snacks: OrderDetailItem[];
   };
+  lineItems?: ICoffeeSessionOrderLineItem[];
   createdAt?: string;
   updatedAt?: string;
   createdBy?: string;
