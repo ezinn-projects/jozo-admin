@@ -157,9 +157,16 @@ const StaffSchedulePage = () => {
     const map = new Map<string, IEmployeeSchedule>();
     if (Array.isArray(schedules)) {
       schedules.forEach((schedule) => {
-        // Use shift if available, otherwise use shiftType, normalize "evening" to "afternoon"
+        // Use shift if available, otherwise use shiftType, normalize old keys
         const shift = schedule.shift || schedule.shiftType;
-        const normalizedShift = shift === "evening" ? "afternoon" : shift;
+        const normalizedShift =
+          shift === "evening" || shift === "afternoon"
+            ? ShiftType.Afternoon
+            : shift === "morning"
+            ? ShiftType.Morning
+            : shift === "all"
+            ? ShiftType.All
+            : shift;
         const key = `${schedule.userId}-${schedule.date}-${normalizedShift}`;
         map.set(key, schedule);
       });
@@ -174,15 +181,7 @@ const StaffSchedulePage = () => {
     shift: ShiftType
   ): IEmployeeSchedule | null => {
     const key = `${userId}-${date.format("YYYY-MM-DD")}-${shift}`;
-    const schedule = scheduleMap.get(key);
-
-    // If not found, check if there's an "all" shift for this date
-    if (!schedule) {
-      const allKey = `${userId}-${date.format("YYYY-MM-DD")}-${ShiftType.All}`;
-      return scheduleMap.get(allKey) || null;
-    }
-
-    return schedule;
+    return scheduleMap.get(key) || null;
   };
 
   // Check if date is in the past
@@ -397,7 +396,7 @@ const StaffSchedulePage = () => {
               {dates.map((date) => (
                 <TableHead
                   key={date.format("YYYY-MM-DD")}
-                  colSpan={2}
+                  colSpan={3}
                   className="text-center"
                 >
                   <div className="flex flex-col">
@@ -415,10 +414,13 @@ const StaffSchedulePage = () => {
               {dates.map((date) => (
                 <React.Fragment key={date.format("YYYY-MM-DD")}>
                   <TableHead className="min-w-[80px] text-center text-xs">
-                    Sáng
+                    Shift 1
                   </TableHead>
                   <TableHead className="min-w-[80px] text-center text-xs">
-                    Chiều
+                    Shift 2
+                  </TableHead>
+                  <TableHead className="min-w-[80px] text-center text-xs">
+                    Shift 3
                   </TableHead>
                 </React.Fragment>
               ))}
@@ -428,7 +430,7 @@ const StaffSchedulePage = () => {
             {filteredStaff.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={dates.length * 2 + 1}
+                  colSpan={dates.length * 3 + 1}
                   className="text-center py-8 text-gray-500"
                 >
                   {searchTerm ? "No staff found" : "No staff available"}
@@ -450,59 +452,6 @@ const StaffSchedulePage = () => {
                     </TableCell>
                     {dates.map((date) => {
                       const isPast = isPastDate(date);
-
-                      // Check for "all" shift first
-                      const allKey = `${user._id}-${date.format(
-                        "YYYY-MM-DD"
-                      )}-${ShiftType.All}`;
-                      const allSchedule = scheduleMap.get(allKey);
-
-                      // If there's an "all" shift, render merged cell
-                      if (allSchedule) {
-                        const allStatus = allSchedule.status || null;
-                        const allCanClick = true; // All shifts can be clicked to view details
-
-                        const allTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
-Ca: Cả ngày
-Trạng thái: ${allStatus || "Không có"}${
-                          allSchedule.note
-                            ? `\nGhi chú: ${allSchedule.note}`
-                            : ""
-                        }`;
-
-                        return (
-                          <React.Fragment key={date.format("YYYY-MM-DD")}>
-                            <TableCell
-                              colSpan={2}
-                              className={cn(
-                                "px-2 py-6 text-center min-w-[160px]",
-                                getStatusColor(allStatus, isPast),
-                                allCanClick &&
-                                  "cursor-pointer transition-colors"
-                              )}
-                              title={allTooltip}
-                              onClick={
-                                allCanClick
-                                  ? () =>
-                                      handleCellClick(
-                                        allSchedule,
-                                        user._id,
-                                        userName,
-                                        date,
-                                        ShiftType.All
-                                      )
-                                  : undefined
-                              }
-                            >
-                              <span className="text-xs font-medium">
-                                Cả ngày
-                              </span>
-                            </TableCell>
-                          </React.Fragment>
-                        );
-                      }
-
-                      // Otherwise, render separate morning and afternoon cells
                       const morningSchedule = getScheduleStatus(
                         user._id,
                         date,
@@ -519,8 +468,16 @@ Trạng thái: ${allStatus || "Không có"}${
                       const afternoonStatus = afternoonSchedule?.status || null;
                       const afternoonCanClick = afternoonSchedule || !isPast;
 
+                      const allSchedule = getScheduleStatus(
+                        user._id,
+                        date,
+                        ShiftType.All
+                      );
+                      const allStatus = allSchedule?.status || null;
+                      const allCanClick = allSchedule || !isPast;
+
                       const morningTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
-Ca: Sáng
+Ca: Shift 1
 Trạng thái: ${morningSchedule ? morningStatus || "Không có" : "Chưa đăng ký"}${
                         morningSchedule?.note
                           ? `\nGhi chú: ${morningSchedule.note}`
@@ -530,7 +487,7 @@ Trạng thái: ${morningSchedule ? morningStatus || "Không có" : "Chưa đăng
                       const afternoonTooltip = `Ngày: ${date.format(
                         "DD/MM/YYYY"
                       )}
-Ca: Chiều
+Ca: Shift 2
 Trạng thái: ${
                         afternoonSchedule
                           ? afternoonStatus || "Không có"
@@ -541,9 +498,14 @@ Trạng thái: ${
                           : ""
                       }`;
 
+                      const allTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
+Ca: Shift 3
+Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
+                        allSchedule?.note ? `\nGhi chú: ${allSchedule.note}` : ""
+                      }`;
+
                       return (
                         <React.Fragment key={date.format("YYYY-MM-DD")}>
-                          {/* Morning shift cell */}
                           <TableCell
                             className={cn(
                               "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
@@ -565,10 +527,9 @@ Trạng thái: ${
                                 : undefined
                             }
                           />
-                          {/* Afternoon shift cell */}
                           <TableCell
                             className={cn(
-                              "px-2 py-6 text-center min-w-[80px]",
+                              "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
                               getStatusColor(afternoonStatus, isPast),
                               afternoonCanClick &&
                                 "cursor-pointer transition-colors"
@@ -583,6 +544,26 @@ Trạng thái: ${
                                       userName,
                                       date,
                                       ShiftType.Afternoon
+                                    )
+                                : undefined
+                            }
+                          />
+                          <TableCell
+                            className={cn(
+                              "px-2 py-6 text-center min-w-[80px]",
+                              getStatusColor(allStatus, isPast),
+                              allCanClick && "cursor-pointer transition-colors"
+                            )}
+                            title={allTooltip}
+                            onClick={
+                              allCanClick
+                                ? () =>
+                                    handleCellClick(
+                                      allSchedule,
+                                      user._id,
+                                      userName,
+                                      date,
+                                      ShiftType.All
                                     )
                                 : undefined
                             }

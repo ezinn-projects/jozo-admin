@@ -85,18 +85,30 @@ export const useStaffSchedules = (
               }
             }
 
-            // Normalize: đảm bảo có cả shift và shiftType để backward compatible
-            // Map "evening" cũ sang "afternoon" mới
+            // Normalize: đảm bảo đọc được cả key cũ lẫn key mới
             let normalizedShift = schedule.shift;
-            if (normalizedShift === "evening") {
-              normalizedShift = "afternoon";
+            if (
+              normalizedShift === "afternoon" ||
+              normalizedShift === "evening"
+            ) {
+              normalizedShift = "shift2";
+            } else if (normalizedShift === "morning") {
+              normalizedShift = "shift1";
+            } else if (normalizedShift === "all") {
+              normalizedShift = "shift3";
             } else if (!normalizedShift && schedule.shiftType) {
               // Nếu chưa có shift, dùng shiftType
               normalizedShift =
-                schedule.shiftType === "afternoon" || schedule.shiftType === "evening"
-                  ? "afternoon"
-                  : schedule.shiftType === "morning"
-                  ? "morning"
+                schedule.shiftType === "shift2" ||
+                schedule.shiftType === "afternoon" ||
+                schedule.shiftType === "evening"
+                  ? "shift2"
+                  : schedule.shiftType === "shift1" ||
+                    schedule.shiftType === "morning"
+                  ? "shift1"
+                  : schedule.shiftType === "shift3" ||
+                    schedule.shiftType === "all"
+                  ? "shift3"
                   : undefined;
             }
 
@@ -104,7 +116,6 @@ export const useStaffSchedules = (
               ...schedule,
               // Normalize date thành YYYY-MM-DD format
               date: normalizedDate,
-              // Normalize shift: dùng "afternoon" thay vì "evening"
               shift: normalizedShift,
             };
             schedules.push(normalizedSchedule);
@@ -211,18 +222,30 @@ export const useStaffSchedulesWithSummary = (
               }
             }
 
-            // Normalize: đảm bảo có cả shift và shiftType để backward compatible
-            // Map "evening" cũ sang "afternoon" mới
+            // Normalize: đảm bảo đọc được cả key cũ lẫn key mới
             let normalizedShift = schedule.shift;
-            if (normalizedShift === "evening") {
-              normalizedShift = "afternoon";
+            if (
+              normalizedShift === "afternoon" ||
+              normalizedShift === "evening"
+            ) {
+              normalizedShift = "shift2";
+            } else if (normalizedShift === "morning") {
+              normalizedShift = "shift1";
+            } else if (normalizedShift === "all") {
+              normalizedShift = "shift3";
             } else if (!normalizedShift && schedule.shiftType) {
               // Nếu chưa có shift, dùng shiftType
               normalizedShift =
-                schedule.shiftType === "afternoon" || schedule.shiftType === "evening"
-                  ? "afternoon"
-                  : schedule.shiftType === "morning"
-                  ? "morning"
+                schedule.shiftType === "shift2" ||
+                schedule.shiftType === "afternoon" ||
+                schedule.shiftType === "evening"
+                  ? "shift2"
+                  : schedule.shiftType === "shift1" ||
+                    schedule.shiftType === "morning"
+                  ? "shift1"
+                  : schedule.shiftType === "shift3" ||
+                    schedule.shiftType === "all"
+                  ? "shift3"
                   : undefined;
             }
 
@@ -230,7 +253,6 @@ export const useStaffSchedulesWithSummary = (
               ...schedule,
               // Normalize date thành YYYY-MM-DD format
               date: normalizedDate,
-              // Normalize shift: dùng "afternoon" thay vì "evening"
               shift: normalizedShift,
             };
             schedules.push(normalizedSchedule);

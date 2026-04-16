@@ -77,19 +77,23 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
     if (schedule.customStartTime && schedule.customEndTime) {
       return `${schedule.customStartTime} - ${schedule.customEndTime}`;
     }
-    if (shift === "morning") return "Ca Sáng (12:00 - 17:00)";
-    if (shift === "afternoon" || shift === "evening")
-      return "Ca Chiều (17:00 - 22:00)";
-    if (shift === "all") return "Cả ngày (12:00 - 22:00)";
+    if (shift === "shift1" || shift === "morning")
+      return "Shift 1 (09:00 - 14:00)";
+    if (shift === "shift2" || shift === "afternoon" || shift === "evening")
+      return "Shift 2 (14:00 - 19:00)";
+    if (shift === "shift3" || shift === "all")
+      return "Shift 3 (19:00 - 01:00)";
     return shift || "Custom";
   };
 
   const getShiftBadgeColor = (schedule: IEmployeeSchedule) => {
     const shift = schedule.shift || schedule.shiftType;
-    if (shift === "morning") return "bg-orange-100 text-orange-800";
-    if (shift === "afternoon" || shift === "evening")
+    if (shift === "shift1" || shift === "morning")
+      return "bg-orange-100 text-orange-800";
+    if (shift === "shift2" || shift === "afternoon" || shift === "evening")
       return "bg-indigo-100 text-indigo-800";
-    if (shift === "all") return "bg-green-100 text-green-800";
+    if (shift === "shift3" || shift === "all")
+      return "bg-green-100 text-green-800";
     return "bg-gray-100 text-gray-800";
   };
 

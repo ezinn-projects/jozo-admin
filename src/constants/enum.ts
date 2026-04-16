@@ -110,11 +110,12 @@ export enum EmployeeScheduleStatus {
 /**
  * Enum for shift types.
  * @enum {string}
- * @property {string} Morning - Ca Sáng: 12:00 - 17:00
- * @property {string} Afternoon - Ca Chiều: 17:00 - 22:00
+ * @property {string} Morning - Shift 1: 09:00 - 14:00
+ * @property {string} Afternoon - Shift 2: 14:00 - 19:00
+ * @property {string} All - Shift 3: 19:00 - 01:00
  */
 export enum ShiftType {
-  All = "all",
-  Morning = "morning", // Ca Sáng: 12:00 - 17:00
-  Afternoon = "afternoon", // Ca Chiều: 17:00 - 22:00
+  All = "shift3", // Shift 3: 19:00 - 01:00
+  Morning = "shift1", // Shift 1: 09:00 - 14:00
+  Afternoon = "shift2", // Shift 2: 14:00 - 19:00
 }

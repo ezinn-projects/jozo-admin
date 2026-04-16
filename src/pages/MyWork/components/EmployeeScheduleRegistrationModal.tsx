@@ -23,9 +23,8 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
-import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
@@ -38,39 +37,42 @@ import { cn } from "@/lib/utils";
 import { Portal } from "@radix-ui/react-portal";
 import { ShiftType } from "@/constants/enum";
 
+const areTimesValid = (startTime?: string, endTime?: string) => {
+  if (!startTime || !endTime) return true;
+
+  const [startHours, startMinutes] = startTime.split(":").map(Number);
+  const [endHours, endMinutes] = endTime.split(":").map(Number);
+  const startTotal = startHours * 60 + startMinutes;
+  let endTotal = endHours * 60 + endMinutes;
+
+  if (endTotal <= startTotal) {
+    endTotal += 24 * 60;
+  }
+
+  return endTotal > startTotal;
+};
+
 // Define schema using zod
 const employeeScheduleSchema = z
   .object({
     date: z.date({
       required_error: "Ngày là bắt buộc",
     }),
-    shift: z.enum([ShiftType.Morning, ShiftType.Afternoon, ShiftType.All], {
-      required_error: "Vui lòng chọn ca làm việc",
-    }),
+    shifts: z
+      .array(z.enum([ShiftType.Morning, ShiftType.Afternoon, ShiftType.All]))
+      .min(1, "Vui lòng chọn ít nhất một ca làm việc"),
     note: z.string().max(500).optional(),
     customStartTime: z.string().optional(),
     customEndTime: z.string().optional(),
   })
   .refine(
     (data) => {
-      // If both times are provided, validate start < end
-      if (data.customStartTime && data.customEndTime) {
-        const [startHours, startMinutes] = data.customStartTime
-          .split(":")
-          .map(Number);
-        const [endHours, endMinutes] = data.customEndTime
-          .split(":")
-          .map(Number);
-        const startTotal = startHours * 60 + startMinutes;
-        const endTotal = endHours * 60 + endMinutes;
-        return startTotal < endTotal;
-      }
-      return true;
+      return areTimesValid(data.customStartTime, data.customEndTime);
     },
     {
-      message: "Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc",
+      message: "Khoảng thời gian không hợp lệ",
       path: ["customEndTime"],
-    }
+    },
   );
 
 type FormValues = z.infer<typeof employeeScheduleSchema>;
@@ -85,20 +87,14 @@ interface EmployeeScheduleRegistrationModalProps {
 
 const EmployeeScheduleRegistrationModal: React.FC<
   EmployeeScheduleRegistrationModalProps
-> = ({
-  isOpen,
-  onClose,
-  refetchSchedules,
-  initialDate,
-  initialShift,
-}) => {
+> = ({ isOpen, onClose, refetchSchedules, initialDate, initialShift }) => {
   const [timeError, setTimeError] = useState("");
 
   const form = useForm<FormValues>({
     resolver: zodResolver(employeeScheduleSchema),
     defaultValues: {
       date: initialDate || new Date(),
-      shift: initialShift || undefined,
+      shifts: initialShift ? [initialShift] : [],
       note: "",
       customStartTime: "",
       customEndTime: "",
@@ -109,7 +105,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
 
   const customStartTime = watch("customStartTime");
   const customEndTime = watch("customEndTime");
-  const shift = watch("shift");
+  const selectedShifts = watch("shifts");
 
   // Update form when modal opens with initial values
   useEffect(() => {
@@ -117,45 +113,35 @@ const EmployeeScheduleRegistrationModal: React.FC<
       if (initialDate) {
         setValue("date", initialDate);
       }
-      if (initialShift) {
-        setValue("shift", initialShift);
-      }
+      setValue("shifts", initialShift ? [initialShift] : []);
     }
   }, [isOpen, initialDate, initialShift, setValue]);
 
-  // Auto-fill time based on selected shift
+  // Auto-fill time when exactly one shift is selected
   useEffect(() => {
-    if (shift) {
-      if (shift === ShiftType.Morning) {
-        // Ca sáng: 12:00 - 17:00
-        setValue("customStartTime", "12:00");
-        setValue("customEndTime", "17:00");
-      } else if (shift === ShiftType.Afternoon) {
-        // Ca chiều: 17:00 - 22:00
-        setValue("customStartTime", "17:00");
-        setValue("customEndTime", "22:00");
-      } else if (shift === ShiftType.All) {
-        // Cả ngày: 12:00 - 22:00
-        setValue("customStartTime", "12:00");
-        setValue("customEndTime", "22:00");
+    if (selectedShifts.length === 1) {
+      const selectedShift = selectedShifts[0];
+      if (selectedShift === ShiftType.Morning) {
+        setValue("customStartTime", "09:00");
+        setValue("customEndTime", "14:00");
+      } else if (selectedShift === ShiftType.Afternoon) {
+        setValue("customStartTime", "14:00");
+        setValue("customEndTime", "19:00");
+      } else if (selectedShift === ShiftType.All) {
+        setValue("customStartTime", "19:00");
+        setValue("customEndTime", "01:00");
       }
     } else {
-      // Nếu không có ca nào được chọn, clear thời gian
       setValue("customStartTime", "");
       setValue("customEndTime", "");
     }
-  }, [shift, setValue]);
+  }, [selectedShifts, setValue]);
 
   // Validate time when values change
   useEffect(() => {
     if (customStartTime && customEndTime) {
-      const [startHours, startMinutes] = customStartTime.split(":").map(Number);
-      const [endHours, endMinutes] = customEndTime.split(":").map(Number);
-      const startTotal = startHours * 60 + startMinutes;
-      const endTotal = endHours * 60 + endMinutes;
-
-      if (startTotal >= endTotal) {
-        setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
+      if (!areTimesValid(customStartTime, customEndTime)) {
+        setTimeError("Khoảng thời gian không hợp lệ");
       } else {
         setTimeError("");
       }
@@ -224,7 +210,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
         // Set lỗi vào form fields tương ứng
         Object.entries(fieldErrors).forEach(([field, message]) => {
           if (
-            field === "shift" ||
+            field === "shifts" ||
             field === "date" ||
             field === "note" ||
             field === "customStartTime" ||
@@ -232,7 +218,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
           ) {
             setError(
               field as
-                | "shift"
+                | "shifts"
                 | "date"
                 | "note"
                 | "customStartTime"
@@ -240,7 +226,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
               {
                 type: "server",
                 message: message,
-              }
+              },
             );
           }
         });
@@ -261,26 +247,15 @@ const EmployeeScheduleRegistrationModal: React.FC<
 
   const onSubmit = (values: FormValues) => {
     // Validate time before submit
-    if (values.customStartTime && values.customEndTime) {
-      const [startHours, startMinutes] = values.customStartTime
-        .split(":")
-        .map(Number);
-      const [endHours, endMinutes] = values.customEndTime
-        .split(":")
-        .map(Number);
-      const startTotal = startHours * 60 + startMinutes;
-      const endTotal = endHours * 60 + endMinutes;
-
-      if (startTotal >= endTotal) {
-        setTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
-        return;
-      }
+    if (!areTimesValid(values.customStartTime, values.customEndTime)) {
+      setTimeError("Khoảng thời gian không hợp lệ");
+      return;
     }
 
     const dateStr = format(values.date, "yyyy-MM-dd");
     const payload: IEmployeeSelfRegisterRequest = {
       date: dateStr,
-      shifts: [values.shift], // Send as array with single shift value
+      shifts: values.shifts,
       note: values.note || undefined,
       customStartTime: values.customStartTime || undefined,
       customEndTime: values.customEndTime || undefined,
@@ -291,7 +266,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
   const handleClose = () => {
     reset({
       date: new Date(),
-      shift: undefined,
+      shifts: [],
       note: "",
       customStartTime: "",
       customEndTime: "",
@@ -320,7 +295,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
                           variant={"outline"}
                           className={cn(
                             "w-full pl-3 text-left font-normal",
-                            !field.value && "text-muted-foreground"
+                            !field.value && "text-muted-foreground",
                           )}
                         >
                           {field.value ? (
@@ -365,78 +340,49 @@ const EmployeeScheduleRegistrationModal: React.FC<
 
             <FormField
               control={control}
-              name="shift"
+              name="shifts"
               render={({ field }) => (
                 <FormItem className="space-y-3">
                   <FormLabel className="text-base">Ca làm việc</FormLabel>
-                  <FormControl>
-                    <RadioGroup
-                      onValueChange={field.onChange}
-                      value={field.value}
-                      className="flex flex-col space-y-1"
-                    >
-                      <FormItem className="flex items-center space-x-3 space-y-0">
+                  <div className="flex flex-col space-y-2">
+                    {[
+                      {
+                        value: ShiftType.Morning,
+                        label: "Shift 1: 09:00 - 14:00",
+                      },
+                      {
+                        value: ShiftType.Afternoon,
+                        label: "Shift 2: 14:00 - 19:00",
+                      },
+                      { value: ShiftType.All, label: "Shift 3: 19:00 - 01:00" },
+                    ].map((shiftOption) => (
+                      <FormItem
+                        key={shiftOption.value}
+                        className="flex items-center space-x-3 space-y-0"
+                      >
                         <FormControl>
-                          <RadioGroupItem value={ShiftType.Morning} />
+                          <Checkbox
+                            checked={field.value?.includes(shiftOption.value)}
+                            onCheckedChange={(isChecked) => {
+                              const nextValues = isChecked
+                                ? [...(field.value || []), shiftOption.value]
+                                : (field.value || []).filter(
+                                    (value) => value !== shiftOption.value,
+                                  );
+                              field.onChange(nextValues);
+                            }}
+                          />
                         </FormControl>
                         <FormLabel className="font-normal cursor-pointer">
-                          Ca Sáng: 12:00 - 17:00
+                          {shiftOption.label}
                         </FormLabel>
                       </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value={ShiftType.Afternoon} />
-                        </FormControl>
-                        <FormLabel className="font-normal cursor-pointer">
-                          Ca Chiều: 17:00 - 22:00
-                        </FormLabel>
-                      </FormItem>
-                      <FormItem className="flex items-center space-x-3 space-y-0">
-                        <FormControl>
-                          <RadioGroupItem value={ShiftType.All} />
-                        </FormControl>
-                        <FormLabel className="font-normal cursor-pointer">
-                          Cả ngày: 12:00 - 22:00
-                        </FormLabel>
-                      </FormItem>
-                    </RadioGroup>
-                  </FormControl>
+                    ))}
+                  </div>
                   <FormMessage />
                 </FormItem>
               )}
             />
-
-            <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={control}
-                name="customStartTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Thời gian bắt đầu (HH:mm) - Tùy chọn</FormLabel>
-                    <FormControl>
-                      <Input type="time" placeholder="08:00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={control}
-                name="customEndTime"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Thời gian kết thúc (HH:mm) - Tùy chọn</FormLabel>
-                    <FormControl>
-                      <Input type="time" placeholder="17:00" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    {timeError && (
-                      <p className="text-sm text-red-500 mt-1">{timeError}</p>
-                    )}
-                  </FormItem>
-                )}
-              />
-            </div>
 
             <FormField
               control={control}
@@ -478,4 +424,3 @@ const EmployeeScheduleRegistrationModal: React.FC<
 };
 
 export default EmployeeScheduleRegistrationModal;
-

@@ -56,7 +56,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const { mutate: updateSchedule, isPending } = useMutation({
     mutationFn: (data: {
       date?: string;
-      shiftType?: "morning" | "afternoon" | "evening";
+      shiftType?: "shift1" | "shift2" | "shift3" | "morning" | "afternoon" | "evening" | "all";
       customStartTime?: string;
       customEndTime?: string;
       note?: string;
@@ -342,10 +342,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   };
 
   const getShiftLabel = (shift?: string) => {
-    if (shift === "morning") return "Morning (12:00 - 17:00)";
-    if (shift === "afternoon") return "Afternoon (17:00 - 22:00)";
-    if (shift === "evening") return "Evening";
-    if (shift === "all") return "All Day (12:00 - 22:00)";
+    if (shift === "shift1" || shift === "morning")
+      return "Shift 1 (09:00 - 14:00)";
+    if (shift === "shift2" || shift === "afternoon" || shift === "evening")
+      return "Shift 2 (14:00 - 19:00)";
+    if (shift === "shift3" || shift === "all")
+      return "Shift 3 (19:00 - 01:00)";
     return shift || "N/A";
   };
 

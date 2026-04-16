@@ -62,15 +62,16 @@ import { useQuery } from "@tanstack/react-query";
 import PATHS from "@/constants/paths";
 
 const MySchedulePage = () => {
+  type ShiftFilterValue = ShiftType | "all_shifts" | "custom" | undefined;
+
   const navigate = useNavigate();
   const [viewMode, setViewMode] = useState<ViewMode>("week");
   const [currentDate, setCurrentDate] = useState<Dayjs>(dayjs());
   const [selectedStatus, setSelectedStatus] = useState<
     EmployeeScheduleStatus | undefined
   >(undefined);
-  const [selectedShiftType, setSelectedShiftType] = useState<
-    ShiftType | undefined
-  >(undefined);
+  const [selectedShiftType, setSelectedShiftType] =
+    useState<ShiftFilterValue>("all_shifts");
   const [selectedSchedule, setSelectedSchedule] =
     useState<IEmployeeSchedule | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
@@ -157,7 +158,11 @@ const MySchedulePage = () => {
       opts.status = selectedStatus;
     }
 
-    if (selectedShiftType !== ShiftType.All) {
+    if (
+      selectedShiftType &&
+      selectedShiftType !== "all_shifts" &&
+      selectedShiftType !== "custom"
+    ) {
       opts.shiftType = selectedShiftType;
     }
 
@@ -475,17 +480,23 @@ const MySchedulePage = () => {
     if (schedule.customStartTime && schedule.customEndTime) {
       return `${schedule.customStartTime} - ${schedule.customEndTime}`;
     }
-    if (shift === "morning") return "Morning (12:00 - 17:00)";
-    if (shift === "afternoon") return "Afternoon (17:00 - 22:00)";
-    if (shift === "all") return "All Day (12:00 - 22:00)";
+    if (shift === "shift1" || shift === "morning")
+      return "Shift 1 (09:00 - 14:00)";
+    if (shift === "shift2" || shift === "afternoon" || shift === "evening")
+      return "Shift 2 (14:00 - 19:00)";
+    if (shift === "shift3" || shift === "all")
+      return "Shift 3 (19:00 - 01:00)";
     return shift || "Custom";
   };
 
   const getShiftBadgeColor = (schedule: IEmployeeSchedule) => {
     const shift = schedule.shift || schedule.shiftType;
-    if (shift === "morning") return "bg-orange-100 text-orange-800";
-    if (shift === "afternoon") return "bg-indigo-100 text-indigo-800";
-    if (shift === "all") return "bg-green-100 text-green-800";
+    if (shift === "shift1" || shift === "morning")
+      return "bg-orange-100 text-orange-800";
+    if (shift === "shift2" || shift === "afternoon" || shift === "evening")
+      return "bg-indigo-100 text-indigo-800";
+    if (shift === "shift3" || shift === "all")
+      return "bg-green-100 text-green-800";
     return "bg-gray-100 text-gray-800";
   };
 
@@ -506,13 +517,24 @@ const MySchedulePage = () => {
           .map(Number);
         const [endHour, endMin] = schedule.customEndTime.split(":").map(Number);
         const startTotal = startHour * 60 + startMin;
-        const endTotal = endHour * 60 + endMin;
+        let endTotal = endHour * 60 + endMin;
+        if (endTotal <= startTotal) {
+          endTotal += 24 * 60;
+        }
         const diffMinutes = endTotal - startTotal;
         totalHours += diffMinutes / 60;
       } else {
         // Default shift hours (5 hours per shift)
         const shift = schedule.shift || schedule.shiftType;
-        if (shift === "morning" || shift === "afternoon") {
+        if (
+          shift === "shift1" ||
+          shift === "shift2" ||
+          shift === "morning" ||
+          shift === "afternoon" ||
+          shift === "evening" ||
+          shift === "shift3" ||
+          shift === "all"
+        ) {
           totalHours += 5; // 5 hours per shift
         } else {
           // Default to 5 hours if unknown
@@ -755,16 +777,17 @@ const MySchedulePage = () => {
               <Select
                 value={selectedShiftType}
                 onValueChange={(value) =>
-                  setSelectedShiftType(value as ShiftType)
+                  setSelectedShiftType(value as ShiftFilterValue)
                 }
               >
                 <SelectTrigger className="w-[150px]">
                   <SelectValue placeholder="Shift Type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Shifts</SelectItem>
-                  <SelectItem value="morning">Morning Shift</SelectItem>
-                  <SelectItem value="afternoon">Afternoon Shift</SelectItem>
+                  <SelectItem value="all_shifts">All Shifts</SelectItem>
+                  <SelectItem value="shift1">Shift 1</SelectItem>
+                  <SelectItem value="shift2">Shift 2</SelectItem>
+                  <SelectItem value="shift3">Shift 3</SelectItem>
                   <SelectItem value="custom">Custom Shift</SelectItem>
                 </SelectContent>
               </Select>

@@ -4,7 +4,7 @@ import { EmployeeScheduleStatus } from "@/constants/enum";
 export interface IRegisterStaffScheduleRequest {
   userId: string;
   date: string; // Format: YYYY-MM-DD
-  shifts: string[]; // ["morning", "afternoon", "all"]
+  shifts: string[]; // ["shift1", "shift2", "shift3"]
   note?: string;
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -12,7 +12,7 @@ export interface IRegisterStaffScheduleRequest {
 
 export interface IEmployeeSelfRegisterRequest {
   date: string; // Format: YYYY-MM-DD
-  shifts: string[]; // ["morning", "afternoon", "all"]
+  shifts: string[]; // ["shift1", "shift2", "shift3"]
   note?: string;
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
@@ -37,8 +37,8 @@ export interface IEmployeeSchedule {
     phone_number?: string;
   };
   date: string; // Format: YYYY-MM-DD hoặc ISO string
-  shift?: "morning" | "afternoon" | "evening" | "all"; // Legacy field (supports afternoon for backward compatibility)
-  shiftType?: "morning" | "afternoon" | "evening" | "all"; // New field
+  shift?: "shift1" | "shift2" | "shift3" | "morning" | "afternoon" | "evening" | "all";
+  shiftType?: "shift1" | "shift2" | "shift3" | "morning" | "afternoon" | "evening" | "all";
   customStartTime?: string; // Format: HH:mm
   customEndTime?: string; // Format: HH:mm
   shiftInfo?: IShiftInfo;
@@ -111,7 +111,7 @@ const staffScheduleApis = {
     id: string,
     data: {
       date?: string; // Format: YYYY-MM-DD
-      shiftType?: "morning" | "afternoon" | "evening";
+      shiftType?: "shift1" | "shift2" | "shift3" | "morning" | "afternoon" | "evening" | "all";
       customStartTime?: string; // Format: HH:mm
       customEndTime?: string; // Format: HH:mm
       note?: string;

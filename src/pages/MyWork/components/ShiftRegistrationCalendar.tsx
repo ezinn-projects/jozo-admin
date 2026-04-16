@@ -100,12 +100,16 @@ export function ShiftRegistrationCalendar({
     
     daySchedules.forEach((schedule) => {
       const shift = schedule.shift || schedule.shiftType;
-      if (shift === "morning") {
-        shiftTypes.add("Ca Sáng");
-      } else if (shift === "afternoon" || shift === "evening") {
-        shiftTypes.add("Ca Chiều");
-      } else if (shift === "all") {
-        shiftTypes.add("Cả ngày");
+      if (shift === "shift1" || shift === "morning") {
+        shiftTypes.add("Shift 1");
+      } else if (
+        shift === "shift2" ||
+        shift === "afternoon" ||
+        shift === "evening"
+      ) {
+        shiftTypes.add("Shift 2");
+      } else if (shift === "shift3" || shift === "all") {
+        shiftTypes.add("Shift 3");
       } else if (schedule.customStartTime && schedule.customEndTime) {
         shiftTypes.add("Ca Tùy chỉnh");
       }
@@ -205,9 +209,9 @@ export function ShiftRegistrationCalendar({
                           key={idx}
                           className={cn(
                             "h-1.5 w-1.5 rounded-full",
-                            shiftType === "Ca Sáng" && "bg-orange-500",
-                            shiftType === "Ca Chiều" && "bg-indigo-500",
-                            shiftType === "Cả ngày" && "bg-green-500",
+                            shiftType === "Shift 1" && "bg-orange-500",
+                            shiftType === "Shift 2" && "bg-indigo-500",
+                            shiftType === "Shift 3" && "bg-green-500",
                             shiftType === "Ca Tùy chỉnh" && "bg-gray-400"
                           )}
                         />
@@ -222,11 +226,11 @@ export function ShiftRegistrationCalendar({
                           variant="outline"
                           className={cn(
                             "text-[10px] sm:text-xs px-1 sm:px-1.5 py-0 sm:py-0.5 w-full justify-center truncate",
-                            shiftType === "Ca Sáng" &&
+                            shiftType === "Shift 1" &&
                               "bg-orange-100 text-orange-800 border-orange-200",
-                            shiftType === "Ca Chiều" &&
+                            shiftType === "Shift 2" &&
                               "bg-indigo-100 text-indigo-800 border-indigo-200",
-                            shiftType === "Cả ngày" &&
+                            shiftType === "Shift 3" &&
                               "bg-green-100 text-green-800 border-green-200",
                             shiftType === "Ca Tùy chỉnh" &&
                               "bg-gray-100 text-gray-800 border-gray-200"

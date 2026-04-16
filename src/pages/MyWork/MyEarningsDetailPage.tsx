@@ -125,23 +125,26 @@ const MyEarningsDetailPage = () => {
               .split(":")
               .map(Number);
             const startTotal = startHour * 60 + startMin;
-            const endTotal = endHour * 60 + endMin;
+            let endTotal = endHour * 60 + endMin;
+            if (endTotal <= startTotal) {
+              endTotal += 24 * 60;
+            }
             const diffMinutes = endTotal - startTotal;
             hours = diffMinutes / 60;
           } else {
             const shift = schedule.shift || schedule.shiftType;
-            if (shift === "morning") {
-              startTime = "12:00";
-              endTime = "17:00";
+            if (shift === "shift1" || shift === "morning") {
+              startTime = "09:00";
+              endTime = "14:00";
               hours = 5;
-            } else if (shift === "afternoon") {
-              startTime = "17:00";
-              endTime = "22:00";
+            } else if (shift === "shift2" || shift === "afternoon" || shift === "evening") {
+              startTime = "14:00";
+              endTime = "19:00";
               hours = 5;
-            } else if (shift === "all") {
-              startTime = "12:00";
-              endTime = "22:00";
-              hours = 10;
+            } else if (shift === "shift3" || shift === "all") {
+              startTime = "19:00";
+              endTime = "01:00";
+              hours = 5;
             } else {
               hours = 5;
               startTime = "N/A";
