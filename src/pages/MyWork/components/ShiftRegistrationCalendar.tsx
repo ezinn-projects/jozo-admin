@@ -19,6 +19,41 @@ export function ShiftRegistrationCalendar({
   currentDate,
   onCurrentDateChange,
 }: ShiftRegistrationCalendarProps) {
+  const getShiftStyles = (shiftType: string) => {
+    if (shiftType === "Shift 1") {
+      return {
+        mobile: "bg-orange-100 text-orange-800 border-orange-200",
+        desktop: "bg-orange-100 text-orange-800 border-orange-200",
+      };
+    }
+
+    if (shiftType === "Shift 2") {
+      return {
+        mobile: "bg-indigo-100 text-indigo-800 border-indigo-200",
+        desktop: "bg-indigo-100 text-indigo-800 border-indigo-200",
+      };
+    }
+
+    if (shiftType === "Shift 3") {
+      return {
+        mobile: "bg-green-100 text-green-800 border-green-200",
+        desktop: "bg-green-100 text-green-800 border-green-200",
+      };
+    }
+
+    return {
+      mobile: "bg-gray-100 text-gray-800 border-gray-200",
+      desktop: "bg-gray-100 text-gray-800 border-gray-200",
+    };
+  };
+
+  const getShiftShortLabel = (shiftType: string) => {
+    if (shiftType === "Shift 1") return "S1";
+    if (shiftType === "Shift 2") return "S2";
+    if (shiftType === "Shift 3") return "S3";
+    return "TC";
+  };
+
   // Group schedules by date
   const schedulesByDate = useMemo(() => {
     const map = new Map<string, IEmployeeSchedule[]>();
@@ -97,7 +132,7 @@ export function ShiftRegistrationCalendar({
   const getShiftTypesForDate = (date: Dayjs): string[] => {
     const daySchedules = getSchedulesForDate(date);
     const shiftTypes = new Set<string>();
-    
+
     daySchedules.forEach((schedule) => {
       const shift = schedule.shift || schedule.shiftType;
       if (shift === "shift1" || shift === "morning") {
@@ -114,52 +149,54 @@ export function ShiftRegistrationCalendar({
         shiftTypes.add("Ca Tùy chỉnh");
       }
     });
-    
+
     return Array.from(shiftTypes);
   };
-
 
   return (
     <div className="w-full">
       {/* Calendar Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-3 sm:mb-4 gap-3 sm:gap-0">
-        <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handlePrevMonth}
-            className="h-8 w-8 sm:h-10 sm:w-10"
-          >
-            <ChevronLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            size="icon" 
-            onClick={handleNextMonth}
-            className="h-8 w-8 sm:h-10 sm:w-10"
-          >
-            <ChevronRight className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-          </Button>
-          <Button 
-            variant="outline" 
-            onClick={handleToday}
-            className="h-8 px-2 sm:h-10 sm:px-4 text-xs sm:text-sm"
-          >
-            Hôm nay
-          </Button>
-          <h2 className="text-base sm:text-lg md:text-xl font-semibold whitespace-nowrap">
+      <div className="mb-4 rounded-xl border bg-white p-3 shadow-sm sm:mb-5 sm:p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handlePrevMonth}
+              className="h-9 w-9 rounded-full sm:h-10 sm:w-10"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleNextMonth}
+              className="h-9 w-9 rounded-full sm:h-10 sm:w-10"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleToday}
+              className="h-9 rounded-full px-3 text-sm sm:h-10 sm:px-4"
+            >
+              Hôm nay
+            </Button>
+          </div>
+
+          <h2 className="text-lg font-semibold capitalize tracking-tight sm:text-xl md:text-2xl">
             {currentDate.format("MMMM YYYY")}
           </h2>
         </div>
       </div>
 
       {/* Calendar Grid */}
-      <div className="grid grid-cols-7 gap-px bg-gray-200 rounded-lg overflow-hidden">
+      <div className="grid grid-cols-7 gap-px rounded-xl bg-slate-200/80 overflow-hidden border">
         {/* Weekday Headers */}
         {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((day) => (
-          <div 
-            key={day} 
-            className="bg-white p-1 sm:p-2 text-center font-medium text-xs sm:text-sm"
+          <div
+            key={day}
+            className="bg-slate-50 py-2 text-center text-[11px] font-semibold text-slate-600 sm:py-3 sm:text-sm"
           >
             {day}
           </div>
@@ -179,12 +216,13 @@ export function ShiftRegistrationCalendar({
               <div
                 key={`${weekIndex}-${dayIndex}`}
                 className={cn(
-                  "min-h-[60px] sm:min-h-[80px] md:min-h-[100px] lg:min-h-[120px] bg-white p-1 sm:p-1.5 md:p-2 relative cursor-pointer transition-colors",
+                  "relative min-h-[84px] bg-white px-1.5 py-2 transition-colors sm:min-h-[110px] sm:p-2 md:min-h-[120px] md:p-2.5 lg:min-h-[132px]",
+                  !isDisabled && "cursor-pointer active:scale-[0.99]",
                   !day.isCurrentMonth && "text-gray-400",
-                  isToday && "bg-blue-50",
-                  isDisabled && "opacity-50 cursor-not-allowed",
-                  isFull && !isPast && "bg-gray-50",
-                  !isDisabled && "hover:bg-gray-50"
+                  isToday && "bg-blue-50 ring-1 ring-inset ring-blue-200",
+                  isDisabled && "cursor-not-allowed opacity-50",
+                  isFull && !isPast && "bg-slate-50",
+                  !isDisabled && "hover:bg-slate-50",
                 )}
                 onClick={() => {
                   if (!isDisabled) {
@@ -192,69 +230,85 @@ export function ShiftRegistrationCalendar({
                   }
                 }}
               >
-                <div
-                  className={cn(
-                    "font-medium mb-0.5 sm:mb-1 text-xs sm:text-sm",
-                    isToday && "text-blue-600 font-bold"
+                <div className="mb-2 flex items-start justify-between gap-1">
+                  <div
+                    className={cn(
+                      "flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold sm:h-8 sm:w-8 sm:text-base",
+                      isToday
+                        ? "bg-blue-600 text-white shadow-sm"
+                        : "text-slate-700",
+                      !day.isCurrentMonth && "text-slate-400",
+                    )}
+                  >
+                    {day.date.date()}
+                  </div>
+
+                  {daySchedules.length > 0 && !isPast && (
+                    <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 sm:text-xs">
+                      {daySchedules.length} ca
+                    </div>
                   )}
-                >
-                  {day.date.date()}
                 </div>
+
                 {shiftTypes.length > 0 && (
-                  <div className="mt-0.5 sm:mt-1 space-y-0.5 sm:space-y-1">
-                    {/* Mobile: show up to 2 small dots instead of text */}
-                    <div className="flex items-center gap-1 sm:hidden">
-                      {shiftTypes.slice(0, 2).map((shiftType, idx) => (
-                        <span
-                          key={idx}
-                          className={cn(
-                            "h-1.5 w-1.5 rounded-full",
-                            shiftType === "Shift 1" && "bg-orange-500",
-                            shiftType === "Shift 2" && "bg-indigo-500",
-                            shiftType === "Shift 3" && "bg-green-500",
-                            shiftType === "Ca Tùy chỉnh" && "bg-gray-400"
-                          )}
-                        />
-                      ))}
+                  <div className="space-y-1 sm:space-y-1.5">
+                    {/* Mobile: show compact chips instead of tiny dots */}
+                    <div className="flex flex-wrap gap-1 sm:hidden">
+                      {shiftTypes.slice(0, 2).map((shiftType, idx) => {
+                        const styles = getShiftStyles(shiftType);
+                        return (
+                          <span
+                            key={idx}
+                            className={cn(
+                              "inline-flex min-h-6 items-center rounded-full border px-2 py-1 text-[10px] font-semibold leading-none",
+                              styles.mobile,
+                            )}
+                          >
+                            {getShiftShortLabel(shiftType)}
+                          </span>
+                        );
+                      })}
+
+                      {shiftTypes.length > 2 && (
+                        <span className="inline-flex min-h-6 items-center rounded-full border border-slate-200 bg-white px-2 py-1 text-[10px] font-semibold text-slate-600">
+                          +{shiftTypes.length - 2}
+                        </span>
+                      )}
                     </div>
 
                     {/* Tablet/Desktop: show text badges */}
-                    <div className="hidden sm:block space-y-0.5">
-                      {shiftTypes.slice(0, 2).map((shiftType, idx) => (
-                        <Badge
-                          key={idx}
-                          variant="outline"
-                          className={cn(
-                            "text-[10px] sm:text-xs px-1 sm:px-1.5 py-0 sm:py-0.5 w-full justify-center truncate",
-                            shiftType === "Shift 1" &&
-                              "bg-orange-100 text-orange-800 border-orange-200",
-                            shiftType === "Shift 2" &&
-                              "bg-indigo-100 text-indigo-800 border-indigo-200",
-                            shiftType === "Shift 3" &&
-                              "bg-green-100 text-green-800 border-green-200",
-                            shiftType === "Ca Tùy chỉnh" &&
-                              "bg-gray-100 text-gray-800 border-gray-200"
-                          )}
-                        >
-                          <span className="truncate block w-full">
-                            {shiftType}
-                          </span>
-                        </Badge>
-                      ))}
+                    <div className="hidden sm:block space-y-1">
+                      {shiftTypes.slice(0, 2).map((shiftType, idx) => {
+                        const styles = getShiftStyles(shiftType);
+                        return (
+                          <Badge
+                            key={idx}
+                            variant="outline"
+                            className={cn(
+                              "w-full justify-center truncate px-1.5 py-1 text-[11px] sm:text-xs",
+                              styles.desktop,
+                            )}
+                          >
+                            <span className="truncate block w-full">
+                              {shiftType}
+                            </span>
+                          </Badge>
+                        );
+                      })}
+
+                      {shiftTypes.length > 2 && (
+                        <div className="text-center text-[11px] font-medium text-slate-500">
+                          +{shiftTypes.length - 2} ca khac
+                        </div>
+                      )}
                     </div>
-                  </div>
-                )}
-                {daySchedules.length > 0 && !isPast && (
-                  <div className="absolute top-0.5 right-0.5 sm:top-1 sm:right-1 text-[9px] sm:text-xs text-muted-foreground font-medium">
-                    {daySchedules.length} ca
                   </div>
                 )}
               </div>
             );
-          })
+          }),
         )}
       </div>
     </div>
   );
 }
-
