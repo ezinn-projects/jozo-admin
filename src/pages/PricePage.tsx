@@ -1,34 +1,31 @@
 import { Price } from "@/@types/general-management";
 import { PageHeader } from "@/components/shared";
-import {
-  default as UpdatePricingModal,
-  default as UpsertPricingModal,
-} from "@/components/modules/Pricing/UpsertPriceModal";
+import UpsertPricingModal from "@/components/modules/Pricing/UpsertPriceModal";
 import { DollarSign } from "lucide-react";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { DataTable } from "@/components/ui/data-table";
-import { RoomType } from "@/constants/enum";
 import { useDeletePricing, useGetPricingLists } from "@/hooks/pricing";
+import { useGetRoomTypes } from "@/hooks/room-type";
 import { formatCurrency } from "@/utils";
 import { ColumnDef } from "@tanstack/react-table";
 import { PencilIcon, TrashIcon } from "lucide-react";
-import { useState } from "react";
-
-const roomTypes = Object.values(RoomType).filter((type) => type);
-
-function formatRoomTypeHeader(value: string) {
-  return value.charAt(0).toUpperCase() + value.slice(1);
-}
+import { useMemo, useState } from "react";
 
 function PricePage() {
   const [selectedPricing, setSelectedPricing] = useState<Price | null>(null);
 
   const { data, isLoading, refetch } = useGetPricingLists();
   const { mutate: deletePricing } = useDeletePricing();
+  const { data: roomTypesRes } = useGetRoomTypes();
+  const roomTypeRows = useMemo(
+    () => roomTypesRes?.data?.result ?? [],
+    [roomTypesRes?.data?.result],
+  );
 
-  const columns: ColumnDef<Price>[] = [
+  const columns: ColumnDef<Price>[] = useMemo(
+    () => [
     // Cột checkbox để chọn hàng
     {
       id: "select",
@@ -72,9 +69,9 @@ function PricePage() {
             <thead>
               <tr className="border-b">
                 <th className="p-1 text-left">Time</th>
-                {roomTypes.map((roomType) => (
-                  <th key={roomType} className="p-1 text-left">
-                    {formatRoomTypeHeader(roomType)}
+                {roomTypeRows.map((rt) => (
+                  <th key={rt._id ?? rt.type} className="p-1 text-left">
+                    {rt.name}
                   </th>
                 ))}
               </tr>
@@ -85,12 +82,12 @@ function PricePage() {
                   <td className="p-1">
                     {slot.start} - {slot.end}
                   </td>
-                  {roomTypes.map((roomType) => {
+                  {roomTypeRows.map((rt) => {
                     const cellPrice =
-                      slot.prices.find((p) => p.room_type === roomType)?.price ||
+                      slot.prices.find((p) => p.room_type === rt.type)?.price ||
                       0;
                     return (
-                      <td key={roomType} className="p-1">
+                      <td key={rt._id ?? rt.type} className="p-1">
                         {formatCurrency(cellPrice)}
                       </td>
                     );
@@ -116,7 +113,7 @@ function PricePage() {
       accessorKey: "price",
       cell: ({ row }) => (
         <div className="flex items-center justify-center gap-2">
-          <UpdatePricingModal
+          <UpsertPricingModal
             id={row.original._id}
             icon={<PencilIcon size={12} />}
             defaultOpen={false}
@@ -131,7 +128,9 @@ function PricePage() {
         </div>
       ),
     },
-  ];
+  ],
+    [roomTypeRows],
+  );
 
   return (
     <div>

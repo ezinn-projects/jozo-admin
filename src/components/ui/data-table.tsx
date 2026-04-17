@@ -67,28 +67,23 @@ export function DataTable<TData, TValue>({
     if (typeof rowKey === "function") {
       return rowKey(record);
     }
-    return (record as unknown as Record<string, string>)[rowKey];
+    const value = (record as unknown as Record<string, unknown>)[rowKey];
+    return value != null ? String(value) : "";
   };
 
   const table = useReactTable({
     data,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getRowId: (original, index) => {
+      const key = getRowKey(original);
+      return key !== "" ? key : String(index);
+    },
     onRowSelectionChange: setRowSelection,
     state: {
       rowSelection,
     },
   });
-
-  // Helper function to generate unique key
-  const generateUniqueKey = (
-    base: string,
-    ...parts: (string | number)[]
-  ): string => {
-    return `${base}_${parts.join("_")}_${Math.random()
-      .toString(36)
-      .substring(2, 11)}`;
-  };
 
   return (
     <div className={cn("rounded-md border", className)}>
@@ -103,11 +98,9 @@ export function DataTable<TData, TValue>({
         <Table className={cn({ "sticky top-0": sticky })}>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={generateUniqueKey("header", headerGroup.id)}>
+              <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <TableHead
-                    key={generateUniqueKey("head", headerGroup.id, header.id)}
-                  >
+                  <TableHead key={header.id}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(
@@ -129,29 +122,22 @@ export function DataTable<TData, TValue>({
                 </TableCell>
               </TableRow>
             ) : table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row, rowIndex) => {
-                const rowKey = getRowKey(row.original);
+              table.getRowModel().rows.map((row) => {
                 return (
                   <TableRow
-                    key={generateUniqueKey("row", rowKey, rowIndex)}
+                    key={row.id}
                     data-state={row.getIsSelected() && "selected"}
                     className={cn(
-                      "cursor-pointer hover:bg-muted/50",
+                      onRowClick && "cursor-pointer hover:bg-muted/50",
+                      !onRowClick && "hover:bg-muted/50",
                       typeof rowClassName === "function"
                         ? rowClassName(row.original)
                         : rowClassName
                     )}
                     onClick={() => onRowClick?.(row.original)}
                   >
-                    {row.getVisibleCells().map((cell, cellIndex) => (
-                      <TableCell
-                        key={generateUniqueKey(
-                          "cell",
-                          rowKey,
-                          cell.column.id,
-                          cellIndex
-                        )}
-                      >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id}>
                         {flexRender(
                           cell.column.columnDef.cell,
                           cell.getContext()

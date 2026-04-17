@@ -2,6 +2,12 @@ import { DayType, RoomType } from "@/constants/enum";
 // import { RoomSize } from "@/constants/enum";
 import { z } from "zod";
 
+/** Chuyển "HH:mm" thành phút từ 00:00 cùng ngày (0–1439). */
+function hhmmToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  return h * 60 + m;
+}
+
 export const loginSchema = z.object({
   username: z.string().min(1, { message: "Username is required" }),
   password: z.string().min(1, { message: "Password is required" }),
@@ -88,18 +94,41 @@ export const addPricingSchema = z
       )
       .refine(
         (timeRanges) => {
+          const maxNextMorningMinutes = 3 * 60; // 03:00 sáng hôm sau
+
           return timeRanges.every((range) => {
             if (range.start && range.end) {
-              // Trường hợp đặc biệt: nếu end time là 00:00, coi như là cuối ngày
+              const startM = hhmmToMinutes(range.start);
+              const endM = hhmmToMinutes(range.end);
+
+              if (startM === endM) {
+                return false;
+              }
+
+              // Nếu end là 00:00: giữ nghĩa đóng cửa lúc nửa đêm (cuối ngày).
               if (range.end === "00:00") {
                 return range.start < "24:00";
               }
-              return range.start < range.end;
+
+              // Cùng ngày: bắt đầu trước kết thúc.
+              if (startM < endM) {
+                return true;
+              }
+
+              // Qua đêm: kết thúc tính sang sáng hôm sau, tối đa 03:00 (ví dụ 22:00–02:30).
+              if (startM > endM && endM <= maxNextMorningMinutes) {
+                return true;
+              }
+
+              return false;
             }
             return true;
           });
         },
-        { message: "Thời gian kết thúc phải sau thời gian bắt đầu" },
+        {
+          message:
+            "Thời gian kết thúc phải sau thời gian bắt đầu, hoặc không quá 03:00 sáng hôm sau nếu kéo dài qua đêm",
+        },
       ),
     effectiveDate: z
       .string()

@@ -14,7 +14,6 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogPortal,
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
@@ -34,6 +33,7 @@ import {
   useGetPricingById,
   useUpdatePricing,
 } from "@/hooks/pricing";
+import { useGetRoomTypes } from "@/hooks/room-type";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { formatCurrency } from "@/utils";
@@ -43,7 +43,14 @@ import { Portal } from "@radix-ui/react-portal";
 import { AxiosError } from "axios";
 import { format } from "date-fns";
 import { CalendarIcon, CircleXIcon, PlusIcon, TrashIcon } from "lucide-react";
-import { ReactNode, useEffect, useRef, useState } from "react";
+import {
+  ReactNode,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useForm } from "react-hook-form";
 import { Calendar } from "../../ui/calendar";
 import { Input } from "../../ui/input";
@@ -80,8 +87,6 @@ type FormValues = {
   note?: string;
 };
 
-const roomTypes = Object.values(RoomType).filter((type) => type);
-
 function UpsertPricingModal(props: Props) {
   const { id = "", icon, defaultOpen = false, onUpsert } = props;
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -90,8 +95,17 @@ function UpsertPricingModal(props: Props) {
   const title = id ? "Edit price" : "Add price";
 
   const { data: priceData } = useGetPricingById(id, !!id && !!open);
+  const { data: roomTypesRes, isLoading: isRoomTypesLoading } =
+    useGetRoomTypes();
 
-  const price = priceData?.data.result || ({} as Price);
+  const price = useMemo(
+    () => priceData?.data.result || ({} as Price),
+    [priceData?.data.result],
+  );
+  const roomTypeRows = useMemo(
+    () => roomTypesRes?.data?.result ?? [],
+    [roomTypesRes?.data?.result],
+  );
 
   const { mutate: addPricing, isPending: isAddPending } = useAddPricing();
   const { mutate: updatePricing, isPending: isUpdatePending } =
@@ -99,53 +113,72 @@ function UpsertPricingModal(props: Props) {
 
   const isPending = isAddPending || isUpdatePending;
 
-  // Tạo time slot mặc định
-  const createDefaultTimeSlot = () => ({
-    start: "",
-    end: "",
-    prices: roomTypes.map((type) => ({ roomType: type, price: "" })),
-  });
+  const createDefaultTimeSlot = useCallback((): FormValues["timeSlots"][number] => {
+    return {
+      start: "",
+      end: "",
+      prices: roomTypeRows.map((rt) => ({ roomType: rt.type, price: "" })),
+    };
+  }, [roomTypeRows]);
 
-  const defaultValues = {
-    dayType: price.day_type || "",
-    timeSlots: price.time_slots?.map((slot) => ({
-      start: slot.start || "",
-      end: slot.end || "",
-      prices:
-        slot.prices?.map((price) => ({
-          roomType: price.room_type,
-          price: formatCurrency(price.price, false),
-        })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
-    })) || [createDefaultTimeSlot()], // Chỉ tạo 1 time slot mặc định
-    effectiveDate: price.effective_date || "",
-    endDate: price.end_date || undefined,
-    note: price.note || undefined,
+  const buildFormValuesFromPrice = useCallback(
+    (p: Price): FormValues => ({
+      dayType: p.day_type || ("" as DayType),
+      timeSlots:
+        p.time_slots?.map((slot) => ({
+          start: slot.start || "",
+          end: slot.end || "",
+          prices: roomTypeRows.map((rt) => {
+            const fromSlot = slot.prices?.find((pr) => pr.room_type === rt.type);
+            return {
+              roomType: rt.type,
+              price: fromSlot ? formatCurrency(fromSlot.price, false) : "",
+            };
+          }),
+        })) || [createDefaultTimeSlot()],
+      effectiveDate: p.effective_date || "",
+      endDate: p.end_date || undefined,
+      note: p.note || undefined,
+    }),
+    [roomTypeRows, createDefaultTimeSlot],
+  );
+
+  const emptyFormValues: FormValues = {
+    dayType: "" as DayType,
+    timeSlots: [{ start: "", end: "", prices: [] }],
+    effectiveDate: "",
+    endDate: undefined,
+    note: undefined,
   };
 
   const form = useForm<FormValues>({
     resolver: zodResolver(addPricingSchema),
-    defaultValues,
+    defaultValues: emptyFormValues,
   });
 
   useEffect(() => {
-    if (price && Object.keys(price).length > 0) {
+    if (!open || roomTypeRows.length === 0) return;
+
+    if (id && price && Object.keys(price).length > 0 && price._id) {
+      form.reset(buildFormValuesFromPrice(price));
+    } else if (!id) {
       form.reset({
-        dayType: price.day_type || "",
-        timeSlots: price.time_slots?.map((slot) => ({
-          start: slot.start || "",
-          end: slot.end || "",
-          prices:
-            slot.prices?.map((price) => ({
-              roomType: price.room_type,
-              price: formatCurrency(price.price, false),
-            })) || roomTypes.map((type) => ({ roomType: type, price: "" })),
-        })) || [createDefaultTimeSlot()], // Chỉ tạo 1 time slot mặc định
-        effectiveDate: price.effective_date || "",
-        endDate: price.end_date || undefined,
-        note: price.note || undefined,
+        dayType: "" as DayType,
+        timeSlots: [createDefaultTimeSlot()],
+        effectiveDate: "",
+        endDate: undefined,
+        note: undefined,
       });
     }
-  }, [form, price]);
+  }, [
+    open,
+    id,
+    price,
+    roomTypeRows,
+    form,
+    createDefaultTimeSlot,
+    buildFormValuesFromPrice,
+  ]);
 
   const {
     control,
@@ -266,7 +299,21 @@ function UpsertPricingModal(props: Props) {
   );
 
   const handleClose = () => {
-    form.reset(defaultValues);
+    if (roomTypeRows.length === 0) {
+      form.reset(emptyFormValues);
+      return;
+    }
+    if (id && price && Object.keys(price).length > 0 && price._id) {
+      form.reset(buildFormValuesFromPrice(price));
+    } else {
+      form.reset({
+        dayType: "" as DayType,
+        timeSlots: [createDefaultTimeSlot()],
+        effectiveDate: "",
+        endDate: undefined,
+        note: undefined,
+      });
+    }
   };
 
   return (
@@ -281,11 +328,10 @@ function UpsertPricingModal(props: Props) {
         )}
       </DialogTrigger>
 
-      <DialogPortal>
-        <DialogContent
-          className="sm:max-w-[425px]"
-          onInteractOutside={handleClose}
-        >
+      <DialogContent
+        className="sm:max-w-[425px]"
+        onInteractOutside={handleClose}
+      >
           <Spin spinning={isPending}>
             <DialogHeader>
               <DialogTitle>{title}</DialogTitle>
@@ -296,6 +342,20 @@ function UpsertPricingModal(props: Props) {
 
             <ScrollArea className="h-[calc(100vh-8rem)]">
               <div className="grid gap-4 p-1">
+                {open && roomTypeRows.length === 0 && isRoomTypesLoading ? (
+                  <div className="flex min-h-[200px] items-center justify-center py-8">
+                    <Typography className="text-muted-foreground">
+                      Đang tải loại phòng…
+                    </Typography>
+                  </div>
+                ) : open && roomTypeRows.length === 0 ? (
+                  <div className="flex min-h-[200px] items-center justify-center py-8">
+                    <Typography className="text-muted-foreground">
+                      Chưa có loại phòng. Vui lòng thêm loại phòng trước khi cấu
+                      hình giá.
+                    </Typography>
+                  </div>
+                ) : roomTypeRows.length > 0 ? (
                 <Form {...form}>
                   <form className="space-y-4" onSubmit={onSubmit}>
                     <FormField
@@ -520,18 +580,18 @@ function UpsertPricingModal(props: Props) {
                                   <FormItem className="flex flex-col">
                                     <FormLabel>Prices</FormLabel>
                                     <div className="grid gap-3">
-                                      {roomTypes.map((roomType, priceIndex) => {
+                                      {roomTypeRows.map((rt, priceIndex) => {
                                         const priceObj = field.value?.find(
-                                          (p) => p.roomType === roomType,
+                                          (p) => p.roomType === rt.type,
                                         );
 
                                         return (
                                           <div
-                                            key={roomType}
+                                            key={rt._id ?? rt.type}
                                             className="grid grid-cols-2 gap-4 items-center px-3 py-2 rounded-md border"
                                           >
                                             <div className="text-sm font-medium">
-                                              {roomType}
+                                              {rt.name}
                                             </div>
                                             <FormControl>
                                               <Input
@@ -547,7 +607,7 @@ function UpsertPricingModal(props: Props) {
                                                   const existingPriceIndex =
                                                     newPrices.findIndex(
                                                       (p) =>
-                                                        p.roomType === roomType,
+                                                        p.roomType === rt.type,
                                                     );
                                                   const price = e.target.value;
 
@@ -562,7 +622,7 @@ function UpsertPricingModal(props: Props) {
                                                     };
                                                   } else {
                                                     newPrices.push({
-                                                      roomType,
+                                                      roomType: rt.type,
                                                       price,
                                                     });
                                                   }
@@ -695,11 +755,11 @@ function UpsertPricingModal(props: Props) {
                     </DialogFooter>
                   </form>
                 </Form>
+                ) : null}
               </div>
             </ScrollArea>
           </Spin>
-        </DialogContent>
-      </DialogPortal>
+      </DialogContent>
     </Dialog>
   );
 }
