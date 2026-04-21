@@ -667,7 +667,12 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         orderDetailData.items.snacks.length > 0));
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+    >
       <DialogContent className="sm:max-w-[725px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Process Booked Event</DialogTitle>
