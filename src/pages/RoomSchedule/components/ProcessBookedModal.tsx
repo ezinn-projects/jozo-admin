@@ -22,7 +22,10 @@ import roomApis from "@/apis/room.apis";
 import useAuth from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
+import dayjs, {
+  parseUTCToLocal,
+  toIsoStringWithZeroSubsecond,
+} from "@/lib/dayjs";
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
@@ -69,6 +72,19 @@ interface MenuItem {
   variants?: string;
 }
 
+/** Ghép YYYY-MM-DD + HH:mm(ss) theo giờ tường VN rồi trả về ISO UTC (chuẩn BE). */
+const wallTimeVietnamToUtcIso = (dateStr: string, timeStr: string) => {
+  const t =
+    timeStr.length === 5
+      ? `${timeStr}:00`
+      : timeStr.length === 8
+        ? timeStr
+        : timeStr;
+  const d = dayjs.tz(`${dateStr}T${t}`, "Asia/Ho_Chi_Minh");
+  if (!d.isValid()) return null;
+  return toIsoStringWithZeroSubsecond(d.utc());
+};
+
 interface ProcessBookedModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -83,9 +99,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   refetchSchedules,
 }) => {
   const { user } = useAuth();
-  const eventStart = dayjs(schedule.startTime);
+  const eventStart = parseUTCToLocal(schedule.startTime);
   const eventEnd = schedule.endTime
-    ? dayjs(schedule.endTime)
+    ? parseUTCToLocal(schedule.endTime)
     : eventStart.add(120, "minute");
 
   // Gift info (API trả về gift object, khác với giftEnabled)
@@ -394,9 +410,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   React.useEffect(() => {
     if (schedule) {
       setCurrentSchedule(schedule);
-      const start = dayjs(schedule.startTime);
+      const start = parseUTCToLocal(schedule.startTime);
       const defaultEnd = schedule.endTime
-        ? dayjs(schedule.endTime)
+        ? parseUTCToLocal(schedule.endTime)
         : start.add(120, "minute");
 
       setAdjustedStartDate(start.format("YYYY-MM-DD"));
@@ -448,7 +464,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       // Cancel any outgoing refetches để tránh overwrite optimistic update
       const queryKey = [
         "roomSchedules",
-        dayjs(schedule.startTime).toISOString(),
+        parseUTCToLocal(schedule.startTime).toISOString(),
       ];
 
       await queryClient.cancelQueries({ queryKey });
@@ -480,7 +496,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       // Invalidate để sync với server (nhưng không refetch ngay)
       const queryKey = [
         "roomSchedules",
-        dayjs(schedule.startTime).toISOString(),
+        parseUTCToLocal(schedule.startTime).toISOString(),
       ];
       queryClient.invalidateQueries({ queryKey });
     },
@@ -565,10 +581,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       if (adjustedStartTime) {
         // Sử dụng thời gian đã điều chỉnh
         const datePart =
-          adjustedStartDate || dayjs(schedule.startTime).format("YYYY-MM-DD");
-        const newStartTime = dayjs(`${datePart}T${adjustedStartTime}`);
-        if (newStartTime.isValid()) {
-          updateData.startTime = newStartTime.toISOString();
+          adjustedStartDate ||
+          parseUTCToLocal(schedule.startTime).format("YYYY-MM-DD");
+        const newStartIso = wallTimeVietnamToUtcIso(
+          datePart,
+          adjustedStartTime,
+        );
+        if (newStartIso) {
+          updateData.startTime = newStartIso;
           // Thông báo cho người dùng biết đã sử dụng thời gian đã điều chỉnh
           toast({
             title: "Thời gian đã được điều chỉnh",
@@ -576,7 +596,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           });
         } else {
           // Nếu thời gian không hợp lệ, sử dụng thời gian hiện tại
-          updateData.startTime = dayjs().toISOString();
+          updateData.startTime = toIsoStringWithZeroSubsecond(dayjs());
           toast({
             title: "Thời gian không hợp lệ",
             description: "Sử dụng thời gian hiện tại",
@@ -584,12 +604,12 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         }
       } else {
         // Nếu chưa điều chỉnh thời gian, sử dụng thời gian hiện tại
-        updateData.startTime = dayjs().toISOString();
+        updateData.startTime = toIsoStringWithZeroSubsecond(dayjs());
       }
     }
     // Nếu chuyển sang "Cancelled", cập nhật endTime thành thời gian hiện tại.
     else if (newStatus === RoomStatus.Cancelled) {
-      updateData.endTime = dayjs().toISOString();
+      updateData.endTime = toIsoStringWithZeroSubsecond(dayjs());
     }
 
     // Gọi API update với dữ liệu mới (bao gồm status và thời gian)
@@ -599,14 +619,19 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // Hàm cập nhật thời gian mới dựa vào input
   const handleUpdateTime = () => {
     // Lấy phần ngày, cho phép chỉnh riêng start date và end date
-    const fallbackDate = dayjs(schedule.startTime).format("YYYY-MM-DD");
+    const fallbackDate = parseUTCToLocal(schedule.startTime).format(
+      "YYYY-MM-DD",
+    );
     const startDatePart = adjustedStartDate || fallbackDate;
     const endDatePart = adjustedEndDate || startDatePart;
 
-    const newStartTime = dayjs(`${startDatePart}T${adjustedStartTime}`);
-    let newEndTime = dayjs(`${endDatePart}T${adjustedEndTime}`);
+    const newStartIso = wallTimeVietnamToUtcIso(
+      startDatePart,
+      adjustedStartTime,
+    );
+    let newEndIso = wallTimeVietnamToUtcIso(endDatePart, adjustedEndTime);
 
-    if (!newStartTime.isValid() || !newEndTime.isValid()) {
+    if (!newStartIso || !newEndIso) {
       toast({
         title: "Invalid time",
         description: "Please enter valid times.",
@@ -614,15 +639,19 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       return;
     }
 
+    const startUtc = dayjs.utc(newStartIso);
+    let endUtc = dayjs.utc(newEndIso);
+
     // Nếu end time nhỏ hơn start time (qua 00:00) thì tự động sang ngày hôm sau
-    if (newEndTime.isBefore(newStartTime)) {
-      newEndTime = newEndTime.add(1, "day");
-      setAdjustedEndDate(newEndTime.format("YYYY-MM-DD"));
+    if (endUtc.isBefore(startUtc)) {
+      endUtc = endUtc.add(1, "day");
+      setAdjustedEndDate(endUtc.tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD"));
+      newEndIso = toIsoStringWithZeroSubsecond(endUtc);
     }
 
     const updateData: Partial<IRoomSchedule> = {
-      startTime: newStartTime.toISOString(),
-      endTime: newEndTime.toISOString(),
+      startTime: newStartIso,
+      endTime: newEndIso,
     };
 
     mutate(updateData);

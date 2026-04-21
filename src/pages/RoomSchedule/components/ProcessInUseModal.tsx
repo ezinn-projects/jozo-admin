@@ -3,10 +3,7 @@ import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
-import roomsScheduleApis, {
-  IChangeRoomRequest,
-  ICreateRoomScheduleRequest,
-} from "@/apis/roomSchedule.api";
+import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import ClaimGiftModal from "./ClaimGiftModal";
 import MemberInfoModal from "./MemberInfoModal";
@@ -23,7 +20,7 @@ import { PaymentMethod, RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
-import dayjs from "dayjs";
+import dayjs, { toIsoStringWithZeroSubsecond } from "@/lib/dayjs";
 import React, { useEffect, useState } from "react";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
@@ -51,8 +48,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
-import { Clock, Gift, Minus, Plus, Printer, User } from "lucide-react";
-import { Switch } from "@/components/ui/switch";
+import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 import roomApis from "@/apis/room.apis";
 import { Textarea } from "@/components/ui/textarea";
 
@@ -137,9 +133,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [noteValue, setNoteValue] = useState<string>("");
   const [customerPhoneValue, setCustomerPhoneValue] = useState<string>("");
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
-  const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
-    schedule.giftEnabled || false,
-  );
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const { data: menuItems } = useGetMenuItems();
@@ -158,14 +151,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
       // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
-      setIsGiftEnabled(schedule.giftEnabled || false);
       setCustomerPhoneValue(schedule.customerPhone || "");
     }
   }, [
     isOpen,
     schedule.startTime,
     schedule.applyFreeHourPromo,
-    schedule.giftEnabled,
     schedule.customerPhone,
   ]);
 
@@ -262,7 +253,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       },
     });
 
-  // Mutation để bật/tắt quyền nhận quà
+  // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
+  /*
   const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
     useMutation({
       mutationFn: (giftEnabled: boolean) =>
@@ -293,7 +285,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       },
     });
 
-  // Mutation để cập nhật customerPhone
   const { mutate: updateCustomerPhone, isPending: isUpdatingCustomerPhone } =
     useMutation({
       mutationFn: (customerPhone: string) =>
@@ -315,6 +306,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
       },
     });
+  */
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
     mutationFn: (payload: IChangeRoomRequest) =>
@@ -660,22 +652,22 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       applyFreeHourPromo,
     ],
     queryFn: () => {
-      // Convert custom times to ISO strings
+      // ISO UTC, giây và ms luôn :00 / .000
       const actualEndTime = customEndTime
-        ? dayjs()
-            .set("hour", parseInt(customEndTime.split(":")[0]))
-            .set("minute", parseInt(customEndTime.split(":")[1]))
-            .set("second", 0)
-            .toISOString()
-        : dayjs().toISOString();
+        ? toIsoStringWithZeroSubsecond(
+            dayjs()
+              .set("hour", parseInt(customEndTime.split(":")[0]))
+              .set("minute", parseInt(customEndTime.split(":")[1])),
+          )
+        : toIsoStringWithZeroSubsecond(dayjs());
 
       const actualStartTime = customStartTime
-        ? dayjs(schedule.startTime)
-            .set("hour", parseInt(customStartTime.split(":")[0]))
-            .set("minute", parseInt(customStartTime.split(":")[1]))
-            .set("second", 0)
-            .toISOString()
-        : schedule.startTime;
+        ? toIsoStringWithZeroSubsecond(
+            dayjs(schedule.startTime)
+              .set("hour", parseInt(customStartTime.split(":")[0]))
+              .set("minute", parseInt(customStartTime.split(":")[1])),
+          )
+        : toIsoStringWithZeroSubsecond(dayjs(schedule.startTime));
 
       return billAPis.getBillByScheduleId(
         schedule._id,
@@ -812,20 +804,20 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
   const handleCompleteSession = () => {
     const actualEndTime = customEndTime
-      ? dayjs()
-          .set("hour", parseInt(customEndTime.split(":")[0]))
-          .set("minute", parseInt(customEndTime.split(":")[1]))
-          .set("second", 0)
-          .toISOString()
-      : dayjs().toISOString();
+      ? toIsoStringWithZeroSubsecond(
+          dayjs()
+            .set("hour", parseInt(customEndTime.split(":")[0]))
+            .set("minute", parseInt(customEndTime.split(":")[1])),
+        )
+      : toIsoStringWithZeroSubsecond(dayjs());
 
     const actualStartTime = customStartTime
-      ? dayjs(schedule.startTime)
-          .set("hour", parseInt(customStartTime.split(":")[0]))
-          .set("minute", parseInt(customStartTime.split(":")[1]))
-          .set("second", 0)
-          .toISOString()
-      : schedule.startTime;
+      ? toIsoStringWithZeroSubsecond(
+          dayjs(schedule.startTime)
+            .set("hour", parseInt(customStartTime.split(":")[0]))
+            .set("minute", parseInt(customStartTime.split(":")[1])),
+        )
+      : toIsoStringWithZeroSubsecond(dayjs(schedule.startTime));
 
     // Tạo bill object để save
     const billToSave = {
@@ -1000,19 +992,21 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       billAPis.printBill(schedule._id, {
         paymentMethod,
         actualEndTime: customEndTime
-          ? dayjs()
-              .set("hour", parseInt(customEndTime.split(":")[0]))
-              .set("minute", parseInt(customEndTime.split(":")[1]))
-              .set("second", 0)
-              .toISOString()
-          : dayjs(endTime).toISOString(),
+          ? toIsoStringWithZeroSubsecond(
+              dayjs()
+                .set("hour", parseInt(customEndTime.split(":")[0]))
+                .set("minute", parseInt(customEndTime.split(":")[1])),
+            )
+          : toIsoStringWithZeroSubsecond(dayjs(endTime)),
         actualStartTime: customStartTime
-          ? dayjs(schedule.startTime)
-              .set("hour", parseInt(customStartTime.split(":")[0]))
-              .set("minute", parseInt(customStartTime.split(":")[1]))
-              .set("second", 0)
-              .toISOString()
-          : dayjs(startTime || schedule.startTime).toISOString(),
+          ? toIsoStringWithZeroSubsecond(
+              dayjs(schedule.startTime)
+                .set("hour", parseInt(customStartTime.split(":")[0]))
+                .set("minute", parseInt(customStartTime.split(":")[1])),
+            )
+          : toIsoStringWithZeroSubsecond(
+              dayjs(startTime || schedule.startTime),
+            ),
         promotionId: selectedPromotion || undefined,
         applyFreeHourPromotion: applyFreeHourPromo,
       }),
@@ -1067,8 +1061,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            {/* Membership & Quà tặng */}
-            <div className="mb-4">
+            {/* Membership & Quà tặng — đoạn UI tạm ẩn
+              <div className="mb-4">
               <div
                 className={`${
                   gift || isGiftEnabled
@@ -1079,7 +1073,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 }`}
               >
                 <div className="space-y-3">
-                  {/* Phone Input */}
                   <div>
                     <Label
                       htmlFor="customer-phone"
@@ -1117,7 +1110,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </span>
                   </div>
 
-                  {/* Gift Status & Switch */}
                   <div className="flex items-center justify-between pt-2 border-t border-gray-200">
                     <div className="flex items-center gap-2">
                       <Gift
@@ -1156,7 +1148,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </div>
                   </div>
 
-                  {/* Action Buttons */}
                   {customerPhoneValue && (
                     <div className="flex gap-2">
                       <Button
@@ -1198,7 +1189,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </div>
                   )}
 
-                  {/* Gift Details */}
                   {gift && (
                     <div className="pt-2 border-t border-pink-200 space-y-1">
                       <div className="text-sm">
@@ -1234,6 +1224,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
               </div>
             </div>
+            */}
 
             {/* Đổi phòng */}
             <div className="mb-4 space-y-2">

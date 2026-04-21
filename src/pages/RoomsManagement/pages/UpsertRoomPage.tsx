@@ -50,7 +50,7 @@ function UpsertRoomPage() {
     defaultValues: {
       roomId: 1,
       roomName: "",
-      roomType: RoomType.Small,
+      roomType: RoomType.Medium,
       maxCapacity: 1,
       description: "",
       status: RoomStatus.Available,

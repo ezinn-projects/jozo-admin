@@ -67,8 +67,6 @@ interface MobileTimelineViewProps {
 
 const getRoomTypeLabel = (type: RoomType) => {
   switch (type) {
-    case RoomType.Small:
-      return "Nhỏ";
     case RoomType.Medium:
       return "Vừa";
     case RoomType.Large:
@@ -76,7 +74,7 @@ const getRoomTypeLabel = (type: RoomType) => {
     case RoomType.Dorm:
       return "Dorm";
     default:
-      return "Nhỏ";
+      return "Vừa";
   }
 };
 

@@ -35,7 +35,7 @@ const EditRoomTypeModal: React.FC<EditRoomTypeModalProps> = ({
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedType, setSelectedType] = React.useState<RoomType>(
-    room?.roomType || RoomType.Small,
+    room?.roomType || RoomType.Medium,
   );
 
   React.useEffect(() => {

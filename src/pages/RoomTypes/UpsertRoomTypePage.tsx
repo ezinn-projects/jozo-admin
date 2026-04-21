@@ -32,7 +32,6 @@ import * as z from "zod";
 import { RoomType } from "@/constants/enum";
 
 const roomTypeOptions = [
-  { value: RoomType.Small, label: "Small" },
   { value: RoomType.Medium, label: "Medium" },
   { value: RoomType.Large, label: "Large" },
   { value: RoomType.Dorm, label: "Dorm" },
@@ -58,7 +57,7 @@ function UpsertRoomTypePage() {
     resolver: zodResolver(formSchema),
     defaultValues: {
       name: "",
-      type: RoomType.Small,
+      type: RoomType.Medium,
       capacity: "1",
       area: "1",
       description: "",
@@ -76,7 +75,7 @@ function UpsertRoomTypePage() {
     if (roomTypeData?.data) {
       form.reset({
         name: roomTypeData?.data.result?.name || "",
-        type: roomTypeData?.data.result?.type || RoomType.Small,
+        type: roomTypeData?.data.result?.type || RoomType.Medium,
         capacity: roomTypeData?.data.result?.capacity?.toString() || "1",
         area: roomTypeData?.data.result?.area?.toString() || "1",
         description: roomTypeData?.data.result?.description || "",

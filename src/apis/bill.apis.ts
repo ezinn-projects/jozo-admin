@@ -1,6 +1,6 @@
 import { IBill } from "@/@types/Bill";
 import http from "@/utils/http";
-import dayjs from "@/lib/dayjs";
+import dayjs, { toIsoStringWithZeroSubsecond } from "@/lib/dayjs";
 
 const billAPis = {
   getBillByScheduleId: async (
@@ -13,7 +13,9 @@ const billAPis = {
     const params = new URLSearchParams();
 
     // Thêm các tham số bắt buộc - sử dụng thời gian hiện tại nếu không có actualEndTime
-    const endTime = actualEndTime || dayjs().toISOString();
+    const endTime = actualEndTime
+      ? toIsoStringWithZeroSubsecond(dayjs(actualEndTime))
+      : toIsoStringWithZeroSubsecond(dayjs());
     params.append("actualEndTime", endTime);
 
     // Thêm các tham số tùy chọn nếu có
@@ -22,7 +24,10 @@ const billAPis = {
     }
 
     if (actualStartTime) {
-      params.append("actualStartTime", actualStartTime);
+      params.append(
+        "actualStartTime",
+        toIsoStringWithZeroSubsecond(dayjs(actualStartTime)),
+      );
     }
 
     if (applyFreeHourPromotion !== undefined) {

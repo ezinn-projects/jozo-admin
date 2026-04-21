@@ -44,7 +44,6 @@ export const addPricingSchema = z
                 z.object({
                   roomType: z.enum(
                     [
-                      RoomType.Small,
                       RoomType.Medium,
                       RoomType.Large,
                       RoomType.Dorm,

@@ -1,7 +1,6 @@
 import { DayType, PaymentMethod, RoomType } from "./enum";
 
 export const ROOM_SIZE_OPTIONS = [
-  { value: RoomType.Small, label: "Small" },
   { value: RoomType.Medium, label: "Medium" },
   { value: RoomType.Large, label: "Large" },
 ];

@@ -1,4 +1,4 @@
-import dayjs from "dayjs";
+import dayjs, { type Dayjs } from "dayjs";
 import utc from "dayjs/plugin/utc";
 import timezone from "dayjs/plugin/timezone";
 import relativeTime from "dayjs/plugin/relativeTime";
@@ -45,5 +45,12 @@ export const formatUTCToLocal = (
 export const timeAgo = (date: string | Date) => {
   return parseUTCToLocal(date).fromNow();
 };
+
+/**
+ * ISO 8601 UTC: luôn có giây và phần thập phân là .000 (không ms ngẫu nhiên),
+ * giây lấy từ đồng hồ được ép về :00 để BE so khớp thời gian người chọn.
+ */
+export const toIsoStringWithZeroSubsecond = (d: Dayjs): string =>
+  d.second(0).millisecond(0).toISOString();
 
 export default dayjs;

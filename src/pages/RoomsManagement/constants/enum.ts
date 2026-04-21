@@ -4,12 +4,10 @@
  * @enum {string}
  * @property {string} LARGE - Large room, suitable for two people, typically with a double bed.
  * @property {string} MEDIUM - Medium room, suitable for two people, typically with a double bed.
- * @property {string} SMALL - Small room, suitable for two people, typically with a double bed.
  */
 export enum RoomType {
   LARGE = "large",
   MEDIUM = "medium",
-  SMALL = "small",
   DORM = "dorm",
 }
 
