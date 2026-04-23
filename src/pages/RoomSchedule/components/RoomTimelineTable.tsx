@@ -239,6 +239,8 @@ const RoomTimelineTable: React.FC = () => {
   );
   const [selectedCoffeeSession, setSelectedCoffeeSession] =
     useState<ICoffeeSession | null>(null);
+  const [openCoffeeOrderEditorOnOpen, setOpenCoffeeOrderEditorOnOpen] =
+    useState(false);
   const queryClient = useQueryClient();
 
   const [scheduleViewTab, setScheduleViewTab] = useState<"rooms" | "coffee">(
@@ -502,6 +504,7 @@ const RoomTimelineTable: React.FC = () => {
     setGiftData(null);
     setCoffeeModalTable(null);
     setSelectedCoffeeSession(null);
+    setOpenCoffeeOrderEditorOnOpen(false);
   };
 
   const handleOrderClick = (roomId: string) => {
@@ -566,6 +569,7 @@ const RoomTimelineTable: React.FC = () => {
     }
 
     setCoffeeModalTable(table);
+    setOpenCoffeeOrderEditorOnOpen(false);
     setModal("coffeeCreate");
   };
 
@@ -577,12 +581,55 @@ const RoomTimelineTable: React.FC = () => {
 
     setCoffeeModalTable(table);
     setSelectedCoffeeSession(session);
+    setOpenCoffeeOrderEditorOnOpen(false);
 
     if (normalizedStatus === "booked") {
       setModal("coffeeBooked");
     } else if (normalizedStatus === "in-use") {
       setModal("coffeeInUse");
     }
+  };
+
+  const handleCoffeeNewOrderClick = (
+    table: ICoffeeTable,
+    tableSessions: ICoffeeSession[],
+  ) => {
+    const tableCode = String(table.code || "").trim();
+    if (!tableCode) return;
+
+    const notification = coffeeNewOrderNotifications[tableCode];
+    if (!notification) return;
+
+    const targetSession =
+      tableSessions.find(
+        (session) => session._id === notification.coffeeSessionId,
+      ) ||
+      (coffeeSessions || []).find(
+        (session) => session._id === notification.coffeeSessionId,
+      );
+
+    if (!targetSession) {
+      toast({
+        title: "Không tìm thấy phiên",
+        description:
+          "Phiên coffee của đơn mới không còn hoạt động. Đã đóng thông báo.",
+      });
+      clearCoffeeNewOrderNotification(tableCode);
+      return;
+    }
+
+    setCoffeeModalTable(table);
+    setSelectedCoffeeSession(targetSession);
+    setOpenCoffeeOrderEditorOnOpen(true);
+    clearCoffeeNewOrderNotification(tableCode);
+
+    const normalizedStatus = normalizeCoffeeSessionStatus(targetSession.status);
+    if (normalizedStatus === "booked") {
+      setModal("coffeeBooked");
+      return;
+    }
+
+    setModal("coffeeInUse");
   };
 
   // Hàm tính toán vị trí và chiều rộng của một event block
@@ -1643,7 +1690,10 @@ const RoomTimelineTable: React.FC = () => {
                                   }`}
                                   onClick={(event) => {
                                     event.stopPropagation();
-                                    clearCoffeeNewOrderNotification(tableCode);
+                                    handleCoffeeNewOrderClick(
+                                      table,
+                                      tableSessions,
+                                    );
                                   }}
                                 >
                                   <ShoppingCart
@@ -1907,6 +1957,7 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           session={selectedCoffeeSession}
           tableName={coffeeModalTable?.name}
+          defaultOpenOrderEditor={openCoffeeOrderEditorOnOpen}
         />
       )}
     </div>

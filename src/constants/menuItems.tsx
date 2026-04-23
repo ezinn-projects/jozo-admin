@@ -16,6 +16,7 @@ import {
   Briefcase,
   KeyRound,
   Gift,
+  Gamepad2,
   Sparkles,
 } from "lucide-react";
 import { Role } from "./enum";
@@ -152,6 +153,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Gifts Management",
         url: PATHS.GIFTS,
         icon: Gift,
+        roles: [Role.Admin],
+      },
+      {
+        title: "Games Management",
+        url: PATHS.GAMES,
+        icon: Gamepad2,
         roles: [Role.Admin],
       },
     ],

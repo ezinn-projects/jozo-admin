@@ -60,6 +60,9 @@ const PATHS = {
   // gifts management
   GIFTS: "/gifts",
 
+  // games management
+  GAMES: "/games",
+
   // membership config
   MEMBERSHIP_CONFIG: "/membership-config",
 

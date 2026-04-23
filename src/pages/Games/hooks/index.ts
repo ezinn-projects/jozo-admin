@@ -1,0 +1,1 @@
+export { useGamesQueryConfig } from "./useGamesQueryConfig";

@@ -14,6 +14,7 @@ import {
   BrowserRouter as Router,
   Routes,
 } from "react-router-dom";
+import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
 const RoomsListPage = lazy(
@@ -46,6 +47,7 @@ const CustomizationGroupTemplatesPage = lazy(
 );
 const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
+const GamesPage = lazy(() => import("@/pages/Games"));
 const MembershipConfigPage = lazy(() => import("@/pages/Membership"));
 const StaffManagementPage = lazy(() => import("@/pages/StaffManagement"));
 const CreateStaffPage = lazy(
@@ -80,8 +82,9 @@ const SongsCollectionPage = lazy(
 function useRoute() {
   return (
     <Router>
-      <Suspense fallback={<div>Loading...</div>}>
-        <Routes>
+      <NuqsAdapter>
+        <Suspense fallback={<div>Loading...</div>}>
+          <Routes>
           <Route path={PATHS.LOGIN} element={<LoginPage />} />
           <Route path={PATHS.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
@@ -172,6 +175,7 @@ function useRoute() {
                 />
                 <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
                 <Route path={PATHS.GIFTS} element={<GiftsPage />} />
+                <Route path={PATHS.GAMES} element={<GamesPage />} />
                 <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
                 <Route
                   path={PATHS.STAFF_EARNINGS_DETAIL}
@@ -211,8 +215,9 @@ function useRoute() {
               </Route>
             </Route>
           </Route>
-        </Routes>
-      </Suspense>
+          </Routes>
+        </Suspense>
+      </NuqsAdapter>
     </Router>
   );
 }

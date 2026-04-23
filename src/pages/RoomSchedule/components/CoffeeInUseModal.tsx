@@ -32,6 +32,7 @@ interface CoffeeInUseModalProps {
   onClose: () => void;
   session: ICoffeeSession | null;
   tableName?: string;
+  defaultOpenOrderEditor?: boolean;
 }
 
 const EMPTY_ORDER: ICoffeeSessionOrder = {
@@ -96,6 +97,7 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   onClose,
   session,
   tableName,
+  defaultOpenOrderEditor = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -155,8 +157,11 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   React.useEffect(() => {
     if (!isOpen) {
       setIsOrderModalOpen(false);
+      return;
     }
-  }, [isOpen]);
+
+    setIsOrderModalOpen(defaultOpenOrderEditor);
+  }, [defaultOpenOrderEditor, isOpen]);
 
   const updateSessionMutation = useMutation({
     mutationFn: (status: CoffeeSessionStatus) =>
