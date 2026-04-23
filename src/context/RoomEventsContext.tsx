@@ -17,6 +17,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   COFFEE_ORDER_BOARD_GAME_AUDIO_URLS,
   COFFEE_SUPPORT_BOARD_GAME_AUDIO_URLS,
+  ONLINE_BOOKING_AUDIO_URL,
   ORDER_BOX_AUDIO_URLS,
   SUPPORT_BOX_AUDIO_URLS,
 } from "@/constants/supportBoxAudio";
@@ -231,6 +232,26 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
         fallbackSpeakText,
       ),
     [playMappedAlertAudio],
+  );
+
+  const playOnlineBookingAudio = useCallback(
+    (fallbackSpeakText: string) => {
+      if (typeof window === "undefined") {
+        speak(fallbackSpeakText);
+        return;
+      }
+      const prev = supportAudioRef.current;
+      if (prev) {
+        prev.pause();
+        prev.currentTime = 0;
+      }
+      const audio = new Audio(ONLINE_BOOKING_AUDIO_URL);
+      supportAudioRef.current = audio;
+      void audio.play().catch(() => {
+        speak(fallbackSpeakText);
+      });
+    },
+    [speak],
   );
 
   const clearSupportNotification = useCallback((roomId: string) => {
@@ -559,7 +580,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
             title: "Booking mới",
             description: `${roomName}: Đã được đặt`,
           });
-          speak(`Phòng ${roomName} vừa được đặt`);
+          playOnlineBookingAudio(`Phòng ${roomName} vừa được đặt`);
           break;
         case "cancelled":
           toast({
@@ -613,6 +634,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     playCoffeeBoardGameSupportAudio,
     playOrderBoxAudio,
     playCoffeeBoardGameOrderAudio,
+    playOnlineBookingAudio,
   ]);
 
   // Clear old notifications periodically

@@ -49,3 +49,7 @@ export const COFFEE_ORDER_BOARD_GAME_AUDIO_URLS: Record<string, string> = {
   "5": "https://res.cloudinary.com/dfl9ynmdl/video/upload/q_auto/f_auto/v1776010317/order-5-bg_krpuo5.mp3",
   "6": "https://res.cloudinary.com/dfl9ynmdl/video/upload/q_auto/f_auto/v1776010318/order-6-bg_h4c2vt.mp3",
 };
+
+/** MP3 phát khi có booking online mới. */
+export const ONLINE_BOOKING_AUDIO_URL =
+  "https://res.cloudinary.com/dfl9ynmdl/video/upload/v1776931862/TTSOL-en-AU-Natasha-20260423-151001_chsblt.mp3";
