@@ -20,7 +20,7 @@ import { PaymentMethod, RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
-import dayjs, { toIsoStringWithZeroSubsecond } from "@/lib/dayjs";
+import dayjs from "@/lib/dayjs";
 import React, { useEffect, useState } from "react";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
@@ -45,12 +45,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
-import { Clock, Gift, Minus, Plus, Printer } from "lucide-react";
+import { CalendarDays, Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 import roomApis from "@/apis/room.apis";
 import { Textarea } from "@/components/ui/textarea";
+import { buildBillDateTimeFromSchedule } from "@/utils/billDateTime";
 
 // Define bill interfaces
 interface BillItem {
@@ -129,6 +136,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [customStartTime, setCustomStartTime] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
+  const [isEndDateManuallyAdjusted, setIsEndDateManuallyAdjusted] =
+    useState<boolean>(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
   const [customerPhoneValue, setCustomerPhoneValue] = useState<string>("");
@@ -149,6 +159,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
+      setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
+      setIsEndDateManuallyAdjusted(false);
       // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
       setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setCustomerPhoneValue(schedule.customerPhone || "");
@@ -166,6 +178,15 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const appliedPromotion = getAppliedPromotion();
+  const billQueryKey = [
+    "bill",
+    schedule._id,
+    selectedPromotion,
+    customEndTime,
+    customStartTime,
+    customEndDate,
+    applyFreeHourPromo,
+  ] as const;
 
   const roomsData = queryClient.getQueryData<
     AxiosResponse<HTTPResponse<IRoom[]>>
@@ -225,14 +246,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         refetchSchedules?.();
         // Refetch bill để cập nhật dữ liệu khuyến mãi giờ miễn phí
         queryClient.invalidateQueries({
-          queryKey: [
-            "bill",
-            schedule._id,
-            selectedPromotion,
-            customEndTime,
-            customStartTime,
-            applyFreeHourPromo,
-          ],
+          queryKey: billQueryKey,
         });
         toast({
           title: "Success",
@@ -407,14 +421,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       onMutate: async ({ itemId, quantity }) => {
         // Cancel any outgoing refetches
         await queryClient.cancelQueries({
-          queryKey: [
-            "bill",
-            schedule._id,
-            selectedPromotion,
-            customEndTime,
-            customStartTime,
-            applyFreeHourPromo,
-          ],
+          queryKey: billQueryKey,
         });
 
         // Cancel fnbOrderDetail queries
@@ -423,14 +430,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
 
         // Snapshot the previous values
-        const previousBillData = queryClient.getQueryData([
-          "bill",
-          schedule._id,
-          selectedPromotion,
-          customEndTime,
-          customStartTime,
-          applyFreeHourPromo,
-        ]);
+        const previousBillData = queryClient.getQueryData(billQueryKey);
 
         const previousOrderData = queryClient.getQueryData([
           "fnbOrderDetail",
@@ -449,14 +449,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
         // Optimistically update bill data
         queryClient.setQueryData(
-          [
-            "bill",
-            schedule._id,
-            selectedPromotion,
-            customEndTime,
-            customStartTime,
-            applyFreeHourPromo,
-          ],
+          billQueryKey,
           (
             old:
               | {
@@ -563,14 +556,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         // If the mutation fails, use the context returned from onMutate to roll back
         if (context?.previousBillData) {
           queryClient.setQueryData(
-            [
-              "bill",
-              schedule._id,
-              selectedPromotion,
-              customEndTime,
-              customStartTime,
-              applyFreeHourPromo,
-            ],
+            billQueryKey,
             context.previousBillData,
           );
         }
@@ -624,14 +610,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       onSuccess: () => {
         // Invalidate and refetch
         queryClient.invalidateQueries({
-          queryKey: [
-            "bill",
-            schedule._id,
-            selectedPromotion,
-            customEndTime,
-            customStartTime,
-            applyFreeHourPromo,
-          ],
+          queryKey: billQueryKey,
         });
         queryClient.invalidateQueries({
           queryKey: ["fnbOrderDetail", schedule._id],
@@ -641,43 +620,26 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       },
     });
 
+  const billDateTimePayload = buildBillDateTimeFromSchedule({
+    scheduleStartTime: schedule.startTime,
+    selectedStartTime: customStartTime,
+    selectedEndTime: customEndTime,
+    selectedEndDate: customEndDate || undefined,
+  });
+
   // Bill data query - gọi với thời gian thực tế ngay từ đầu
   const { data: billData } = useQuery({
-    queryKey: [
-      "bill",
-      schedule._id,
-      selectedPromotion,
-      customEndTime,
-      customStartTime,
-      applyFreeHourPromo,
-    ],
+    queryKey: billQueryKey,
     queryFn: () => {
-      // ISO UTC, giây và ms luôn :00 / .000
-      const actualEndTime = customEndTime
-        ? toIsoStringWithZeroSubsecond(
-            dayjs()
-              .set("hour", parseInt(customEndTime.split(":")[0]))
-              .set("minute", parseInt(customEndTime.split(":")[1])),
-          )
-        : toIsoStringWithZeroSubsecond(dayjs());
-
-      const actualStartTime = customStartTime
-        ? toIsoStringWithZeroSubsecond(
-            dayjs(schedule.startTime)
-              .set("hour", parseInt(customStartTime.split(":")[0]))
-              .set("minute", parseInt(customStartTime.split(":")[1])),
-          )
-        : toIsoStringWithZeroSubsecond(dayjs(schedule.startTime));
-
       return billAPis.getBillByScheduleId(
         schedule._id,
         selectedPromotion || undefined,
-        actualEndTime,
-        actualStartTime,
+        billDateTimePayload.actualEndTime,
+        billDateTimePayload.actualStartTime,
         applyFreeHourPromo,
       );
     },
-    enabled: isOpen && !!customEndTime && !!customStartTime,
+    enabled: isOpen && !!customStartTime && !!customEndTime,
   });
 
   // Set note value when bill data changes
@@ -795,29 +757,14 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     fnbTotal,
     paymentMethod = PaymentMethod.Cash,
     note,
-    endTime,
-    startTime,
     gift,
     freeHourPromotion,
     giftDiscountAmount = 0,
   } = billResult;
 
   const handleCompleteSession = () => {
-    const actualEndTime = customEndTime
-      ? toIsoStringWithZeroSubsecond(
-          dayjs()
-            .set("hour", parseInt(customEndTime.split(":")[0]))
-            .set("minute", parseInt(customEndTime.split(":")[1])),
-        )
-      : toIsoStringWithZeroSubsecond(dayjs());
-
-    const actualStartTime = customStartTime
-      ? toIsoStringWithZeroSubsecond(
-          dayjs(schedule.startTime)
-            .set("hour", parseInt(customStartTime.split(":")[0]))
-            .set("minute", parseInt(customStartTime.split(":")[1])),
-        )
-      : toIsoStringWithZeroSubsecond(dayjs(schedule.startTime));
+    const actualEndTime = billDateTimePayload.actualEndTime;
+    const actualStartTime = billDateTimePayload.actualStartTime;
 
     // Tạo bill object để save
     const billToSave = {
@@ -860,37 +807,27 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const handlePaymentMethodChange = (value: string) => {
-    queryClient.setQueryData(
-      [
-        "bill",
-        schedule._id,
-        selectedPromotion,
-        customEndTime,
-        customStartTime,
-        applyFreeHourPromo,
-      ],
-      (oldData: unknown) => {
-        console.log("oldData", oldData);
-        if (!oldData) return oldData;
-        const typedOldData = oldData as {
-          data?: {
-            result?: {
-              paymentMethod?: string;
-            };
+    queryClient.setQueryData(billQueryKey, (oldData: unknown) => {
+      console.log("oldData", oldData);
+      if (!oldData) return oldData;
+      const typedOldData = oldData as {
+        data?: {
+          result?: {
+            paymentMethod?: string;
           };
         };
-        return {
-          ...typedOldData,
-          data: {
-            ...typedOldData.data,
-            result: {
-              ...typedOldData.data?.result,
-              paymentMethod: value,
-            },
+      };
+      return {
+        ...typedOldData,
+        data: {
+          ...typedOldData.data,
+          result: {
+            ...typedOldData.data?.result,
+            paymentMethod: value,
           },
-        };
-      },
-    );
+        },
+      };
+    });
   };
 
   const handlePromotionChange = (value: string) => {
@@ -898,12 +835,34 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     // Query sẽ tự động refetch khi selectedPromotion thay đổi
   };
 
+  const syncSuggestedEndDate = (nextStartTime: string, nextEndTime: string) => {
+    if (isEndDateManuallyAdjusted) return;
+
+    const suggested = buildBillDateTimeFromSchedule({
+      scheduleStartTime: schedule.startTime,
+      selectedStartTime: nextStartTime,
+      selectedEndTime: nextEndTime,
+    });
+    setCustomEndDate(suggested.suggestedEndDate);
+  };
+
   const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomEndTime(e.target.value);
+    const nextEndTime = e.target.value;
+    setCustomEndTime(nextEndTime);
+    syncSuggestedEndDate(customStartTime, nextEndTime);
   };
 
   const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setCustomStartTime(e.target.value);
+    const nextStartTime = e.target.value;
+    setCustomStartTime(nextStartTime);
+    syncSuggestedEndDate(nextStartTime, customEndTime);
+  };
+
+  const handleEndDateChange = (date?: Date) => {
+    if (!date) return;
+
+    setCustomEndDate(dayjs(date).format("YYYY-MM-DD"));
+    setIsEndDateManuallyAdjusted(true);
   };
 
   // Functions để xử lý edit note
@@ -918,14 +877,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     updateNote(noteValue, {
       onSuccess: () => {
         queryClient.setQueryData(
-          [
-            "bill",
-            schedule._id,
-            selectedPromotion,
-            customEndTime,
-            customStartTime,
-            applyFreeHourPromo,
-          ],
+          billQueryKey,
           (oldData: AxiosResponse<HTTPResponse<BillResponse>>) => {
             console.log("oldData", oldData.data.result);
             if (!oldData) return oldData;
@@ -991,22 +943,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     mutationFn: () =>
       billAPis.printBill(schedule._id, {
         paymentMethod,
-        actualEndTime: customEndTime
-          ? toIsoStringWithZeroSubsecond(
-              dayjs()
-                .set("hour", parseInt(customEndTime.split(":")[0]))
-                .set("minute", parseInt(customEndTime.split(":")[1])),
-            )
-          : toIsoStringWithZeroSubsecond(dayjs(endTime)),
-        actualStartTime: customStartTime
-          ? toIsoStringWithZeroSubsecond(
-              dayjs(schedule.startTime)
-                .set("hour", parseInt(customStartTime.split(":")[0]))
-                .set("minute", parseInt(customStartTime.split(":")[1])),
-            )
-          : toIsoStringWithZeroSubsecond(
-              dayjs(startTime || schedule.startTime),
-            ),
+        actualEndTime: billDateTimePayload.actualEndTime,
+        actualStartTime: billDateTimePayload.actualStartTime,
         promotionId: selectedPromotion || undefined,
         applyFreeHourPromotion: applyFreeHourPromo,
       }),
@@ -1344,6 +1282,42 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       onChange={handleEndTimeChange}
                       className="w-full sm:w-36 h-9 sm:h-8 text-sm"
                     />
+                  </div>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 my-2">
+                    <Label
+                      htmlFor="end-date"
+                      className="text-xs sm:text-sm whitespace-nowrap"
+                    >
+                      Ngày kết thúc:
+                    </Label>
+                    <Popover modal={true}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          id="end-date"
+                          type="button"
+                          variant="outline"
+                          className="w-full sm:w-44 h-9 sm:h-8 justify-between font-normal text-left"
+                        >
+                          {customEndDate
+                            ? dayjs(customEndDate).format("DD/MM/YYYY")
+                            : "Chọn ngày"}
+                          <CalendarDays className="h-4 w-4 opacity-60" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0" align="start">
+                        <Calendar
+                          mode="single"
+                          selected={
+                            customEndDate
+                              ? dayjs(customEndDate).toDate()
+                              : undefined
+                          }
+                          onSelect={handleEndDateChange}
+                          initialFocus
+                        />
+                      </PopoverContent>
+                    </Popover>
                   </div>
 
                   <p className="text-xs sm:text-sm">
@@ -2051,13 +2025,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         onGiftClaimed={() => {
           // Refresh bill query
           queryClient.invalidateQueries({
-            queryKey: [
-              "bill",
-              schedule._id,
-              selectedPromotion,
-              customEndTime,
-              customStartTime,
-            ],
+            queryKey: billQueryKey,
           });
           // Refresh schedules
           refetchSchedules?.();

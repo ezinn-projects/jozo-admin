@@ -78,7 +78,7 @@ const GamesPage = () => {
   const activeTab = queryConfig.tab === "games" ? "games" : "types";
 
   const getTypeName = (game: Game) => {
-    if (game.type?.name) return game.type.name;
+    if (game.gameTypeLabel?.name) return game.gameTypeLabel.name;
     const matchedType = gameTypes.find((item) => item._id === game.typeId);
     return matchedType?.name || "Không xác định";
   };
@@ -336,6 +336,8 @@ const GamesPage = () => {
                   <TableRow>
                     <TableHead>Tên game</TableHead>
                     <TableHead>Loại game</TableHead>
+                    <TableHead>Người chơi</TableHead>
+                    <TableHead>Thời lượng</TableHead>
                     <TableHead>Mô tả ngắn</TableHead>
                     <TableHead>Số ảnh</TableHead>
                     <TableHead>Trạng thái</TableHead>
@@ -345,13 +347,13 @@ const GamesPage = () => {
                 <TableBody>
                   {isLoadingGames ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         Đang tải dữ liệu...
                       </TableCell>
                     </TableRow>
                   ) : games.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={6} className="text-center text-muted-foreground">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground">
                         Chưa có game nào
                       </TableCell>
                     </TableRow>
@@ -363,6 +365,10 @@ const GamesPage = () => {
                           <div className="text-xs text-muted-foreground">{item.slug}</div>
                         </TableCell>
                         <TableCell>{getTypeName(item)}</TableCell>
+                        <TableCell>
+                          {item.minPlayers} - {item.maxPlayers}
+                        </TableCell>
+                        <TableCell>{item.playTimeMinutes} phút</TableCell>
                         <TableCell className="max-w-[360px] truncate">
                           {item.shortDescription || "-"}
                         </TableCell>

@@ -17,11 +17,18 @@ export interface Game {
   slug: string;
   shortDescription?: string;
   guideContent: string;
+  minPlayers: number;
+  maxPlayers: number;
+  playTimeMinutes: number;
   images: string[];
   isActive: boolean;
   createdAt: string;
   updatedAt?: string;
-  type?: GameType;
+  gameTypeLabel: {
+    slug: string;
+    name: string;
+    description?: string;
+  } | null;
 }
 
 export interface ListGamesQuery {
@@ -57,6 +64,9 @@ export interface CreateGameFormDataPayload {
   slug?: string;
   shortDescription?: string;
   guideContent: string;
+  minPlayers: number;
+  maxPlayers: number;
+  playTimeMinutes: number;
   isActive?: boolean;
   images?: File[];
 }
@@ -67,6 +77,9 @@ export interface UpdateGameFormDataPayload {
   slug?: string;
   shortDescription?: string;
   guideContent?: string;
+  minPlayers?: number;
+  maxPlayers?: number;
+  playTimeMinutes?: number;
   isActive?: boolean;
   images?: File[];
 }

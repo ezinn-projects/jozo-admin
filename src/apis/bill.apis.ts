@@ -12,11 +12,12 @@ const billAPis = {
   ) => {
     const params = new URLSearchParams();
 
-    // Thêm các tham số bắt buộc - sử dụng thời gian hiện tại nếu không có actualEndTime
-    const endTime = actualEndTime
-      ? toIsoStringWithZeroSubsecond(dayjs(actualEndTime))
-      : toIsoStringWithZeroSubsecond(dayjs());
-    params.append("actualEndTime", endTime);
+    if (actualEndTime) {
+      params.append(
+        "actualEndTime",
+        toIsoStringWithZeroSubsecond(dayjs(actualEndTime)),
+      );
+    }
 
     // Thêm các tham số tùy chọn nếu có
     if (promotionId) {

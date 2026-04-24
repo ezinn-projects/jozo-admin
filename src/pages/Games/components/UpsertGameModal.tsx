@@ -46,6 +46,9 @@ const defaultValues: GameFormValues = {
   slug: "",
   shortDescription: "",
   guideContent: "",
+  minPlayers: 1,
+  maxPlayers: 1,
+  playTimeMinutes: 30,
   isActive: true,
 };
 
@@ -76,6 +79,9 @@ const UpsertGameModal = ({
         slug: selectedItem.slug || "",
         shortDescription: selectedItem.shortDescription || "",
         guideContent: selectedItem.guideContent || "",
+        minPlayers: selectedItem.minPlayers ?? 1,
+        maxPlayers: selectedItem.maxPlayers ?? 1,
+        playTimeMinutes: selectedItem.playTimeMinutes ?? 30,
         isActive: selectedItem.isActive ?? true,
       });
       setImageFiles([]);
@@ -101,6 +107,9 @@ const UpsertGameModal = ({
       formData.append("shortDescription", values.shortDescription);
     }
     formData.append("guideContent", values.guideContent);
+    formData.append("minPlayers", String(values.minPlayers));
+    formData.append("maxPlayers", String(values.maxPlayers));
+    formData.append("playTimeMinutes", String(values.playTimeMinutes));
     formData.append("isActive", String(values.isActive));
 
     if (imageFiles.length > 0) {
@@ -194,6 +203,50 @@ const UpsertGameModal = ({
                     <FormControl>
                       <Switch checked={field.value} onCheckedChange={field.onChange} />
                     </FormControl>
+                  </FormItem>
+                )}
+              />
+            </div>
+
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <FormField
+                control={form.control}
+                name="minPlayers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Số người chơi tối thiểu</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} step={1} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="maxPlayers"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Số người chơi tối đa</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} step={1} {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="playTimeMinutes"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Thời lượng chơi (phút)</FormLabel>
+                    <FormControl>
+                      <Input type="number" min={1} step={1} {...field} />
+                    </FormControl>
+                    <FormMessage />
                   </FormItem>
                 )}
               />
