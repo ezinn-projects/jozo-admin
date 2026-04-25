@@ -17,7 +17,7 @@ import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import dayjs from "dayjs";
 import { format } from "date-fns";
-import { useIsStaff } from "@/hooks/usePermission";
+import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
 
 interface StaffScheduleDetailModalProps {
   isOpen: boolean;
@@ -26,12 +26,48 @@ interface StaffScheduleDetailModalProps {
   refetchSchedules?: () => void;
 }
 
+const normalizeTimeValue = (time?: string) => (time ? time.slice(0, 5) : "");
+
+const getDefaultShiftTimeRange = (shift?: string) => {
+  if (shift === "shift1" || shift === "morning") {
+    return { startTime: "09:00", endTime: "14:00" };
+  }
+
+  if (shift === "shift2" || shift === "afternoon" || shift === "evening") {
+    return { startTime: "14:00", endTime: "19:00" };
+  }
+
+  if (shift === "shift3" || shift === "all") {
+    return { startTime: "19:00", endTime: "01:00" };
+  }
+
+  return { startTime: "", endTime: "" };
+};
+
+const getScheduleTimeRange = (schedule: IEmployeeSchedule) => {
+  const shiftRange = getDefaultShiftTimeRange(
+    schedule.shift || schedule.shiftType,
+  );
+
+  return {
+    startTime:
+      normalizeTimeValue(schedule.customStartTime) ||
+      normalizeTimeValue(schedule.shiftInfo?.startTime) ||
+      shiftRange.startTime,
+    endTime:
+      normalizeTimeValue(schedule.customEndTime) ||
+      normalizeTimeValue(schedule.shiftInfo?.endTime) ||
+      shiftRange.endTime,
+  };
+};
+
 const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   isOpen,
   onClose,
   schedule,
   refetchSchedules,
 }) => {
+  const isAdmin = useIsAdmin();
   const isStaff = useIsStaff();
   const [rejectedReason, setRejectedReason] = useState("");
 
@@ -40,27 +76,45 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const [adjustedEndTime, setAdjustedEndTime] = useState("");
   const [adjustTimeError, setAdjustTimeError] = useState("");
   const [adjustedNote, setAdjustedNote] = useState("");
+  const [specialHourlyRate, setSpecialHourlyRate] = useState("");
+  const [specialHourlyRateError, setSpecialHourlyRateError] = useState("");
 
   // Initialize form values when schedule changes
   useEffect(() => {
     if (schedule) {
+      const scheduleTimeRange = getScheduleTimeRange(schedule);
+
       setRejectedReason("");
-      // Initialize adjusted times and note with current values
-      setAdjustedStartTime(schedule.customStartTime || "");
-      setAdjustedEndTime(schedule.customEndTime || "");
+      // Fill default shift times when the schedule has no custom times yet.
+      setAdjustedStartTime(scheduleTimeRange.startTime);
+      setAdjustedEndTime(scheduleTimeRange.endTime);
       setAdjustedNote(schedule.note || "");
+      setSpecialHourlyRate(
+        schedule.salarySnapshot?.hourlyRate
+          ? schedule.salarySnapshot.hourlyRate.toLocaleString("vi-VN")
+          : "",
+      );
       setAdjustTimeError("");
+      setSpecialHourlyRateError("");
     }
   }, [schedule]);
 
   const { mutate: updateSchedule, isPending } = useMutation({
     mutationFn: (data: {
       date?: string;
-      shiftType?: "shift1" | "shift2" | "shift3" | "morning" | "afternoon" | "evening" | "all";
+      shiftType?:
+        | "shift1"
+        | "shift2"
+        | "shift3"
+        | "morning"
+        | "afternoon"
+        | "evening"
+        | "all";
       customStartTime?: string;
       customEndTime?: string;
       note?: string;
       status?: EmployeeScheduleStatus;
+      specialHourlyRate?: number;
     }) => staffScheduleApis.updateSchedule(schedule!._id, data),
     onSuccess: () => {
       toast({
@@ -159,7 +213,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   // Calculate working minutes from adjusted times
   const calculateWorkingMinutes = (
     startTime: string,
-    endTime: string
+    endTime: string,
   ): number | null => {
     if (!startTime || !endTime) return null;
 
@@ -168,16 +222,18 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
     const startTotal = startHours * 60 + startMinutes;
     const endTotal = endHours * 60 + endMinutes;
+    const normalizedEndTotal =
+      endTotal < startTotal ? endTotal + 24 * 60 : endTotal;
 
-    if (startTotal >= endTotal) return null;
+    if (startTotal >= normalizedEndTotal) return null;
 
-    return endTotal - startTotal;
+    return normalizedEndTotal - startTotal;
   };
 
   // Validate adjusted time
   const validateAdjustedTime = (
     startTime: string,
-    endTime: string
+    endTime: string,
   ): boolean => {
     if (!startTime || !endTime) {
       setAdjustTimeError("");
@@ -189,8 +245,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
     const startTotal = startHours * 60 + startMinutes;
     const endTotal = endHours * 60 + endMinutes;
+    const normalizedEndTotal =
+      endTotal < startTotal ? endTotal + 24 * 60 : endTotal;
 
-    if (startTotal >= endTotal) {
+    if (startTotal >= normalizedEndTotal) {
       setAdjustTimeError("Thời gian bắt đầu phải nhỏ hơn thời gian kết thúc");
       return false;
     }
@@ -200,7 +258,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   };
 
   const handleAdjustedStartTimeChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const value = e.target.value;
     setAdjustedStartTime(value);
@@ -210,12 +268,35 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   };
 
   const handleAdjustedEndTimeChange = (
-    e: React.ChangeEvent<HTMLInputElement>
+    e: React.ChangeEvent<HTMLInputElement>,
   ) => {
     const value = e.target.value;
     setAdjustedEndTime(value);
     if (adjustedStartTime) {
       validateAdjustedTime(adjustedStartTime, value);
+    }
+  };
+
+  const validateSpecialHourlyRate = (value: string): boolean => {
+    const rate = Number(value.replace(/\D/g, ""));
+
+    if (!value || Number.isNaN(rate) || rate <= 0) {
+      setSpecialHourlyRateError("Mức lương phải lớn hơn 0");
+      return false;
+    }
+
+    setSpecialHourlyRateError("");
+    return true;
+  };
+
+  const handleSpecialHourlyRateChange = (
+    e: React.ChangeEvent<HTMLInputElement>,
+  ) => {
+    const value = e.target.value;
+    setSpecialHourlyRate(value);
+
+    if (value || specialHourlyRateError) {
+      validateSpecialHourlyRate(value);
     }
   };
 
@@ -229,10 +310,15 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       }
     }
 
+    if (specialHourlyRate && !validateSpecialHourlyRate(specialHourlyRate)) {
+      return;
+    }
+
     const updateData: {
       customStartTime?: string;
       customEndTime?: string;
       note?: string;
+      specialHourlyRate?: number;
     } = {};
 
     if (adjustedStartTime) {
@@ -249,6 +335,14 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
     if (adjustedNote !== schedule.note) {
       updateData.note = adjustedNote || undefined;
+    }
+
+    const nextSpecialHourlyRate = Number(specialHourlyRate.replace(/\D/g, ""));
+    if (
+      specialHourlyRate &&
+      nextSpecialHourlyRate !== schedule.salarySnapshot?.hourlyRate
+    ) {
+      updateData.specialHourlyRate = nextSpecialHourlyRate;
     }
 
     updateSchedule(updateData);
@@ -296,6 +390,8 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   };
 
   if (!schedule) return null;
+
+  const scheduleTimeRange = getScheduleTimeRange(schedule);
 
   // Check if schedule date is in the past
   const isPastSchedule = schedule.date
@@ -346,9 +442,17 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       return "Shift 1 (09:00 - 14:00)";
     if (shift === "shift2" || shift === "afternoon" || shift === "evening")
       return "Shift 2 (14:00 - 19:00)";
-    if (shift === "shift3" || shift === "all")
-      return "Shift 3 (19:00 - 01:00)";
+    if (shift === "shift3" || shift === "all") return "Shift 3 (19:00 - 01:00)";
     return shift || "N/A";
+  };
+
+  const formatCurrency = (value: number) =>
+    `${value.toLocaleString("vi-VN")} VNĐ`;
+
+  const getHourlyRate = () => {
+    const rate = Number(specialHourlyRate.replace(/\D/g, ""));
+
+    return rate > 0 ? rate : (schedule.salarySnapshot?.hourlyRate ?? 22000);
   };
 
   return (
@@ -404,6 +508,47 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
             </div>
           </div>
 
+          {schedule.salarySnapshot && (
+            <div className="rounded-md border bg-green-50 p-3">
+              {isAdmin && !isReadOnly && (
+                <div className="mt-1">
+                  <Label className="text-sm font-semibold text-gray-500">
+                    Mức lương snapshot tại thời điểm tạo ca
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number"
+                      currency
+                      min={1}
+                      value={specialHourlyRate}
+                      onChange={handleSpecialHourlyRateChange}
+                      onBlur={(e) => validateSpecialHourlyRate(e.target.value)}
+                      className="max-w-[220px] bg-white font-semibold text-green-700"
+                      placeholder="Nhập mức lương theo giờ"
+                    />
+                    <span className="text-sm font-semibold text-green-700">
+                      VNĐ / giờ
+                    </span>
+                  </div>
+                  {specialHourlyRateError && (
+                    <p className="mt-1 text-sm text-red-500">
+                      {specialHourlyRateError}
+                    </p>
+                  )}
+                </div>
+              )}
+              {schedule.salarySnapshot.snapshotAt && (
+                <p className="mt-1 text-xs text-gray-500">
+                  Snapshot lúc{" "}
+                  {format(
+                    dayjs(schedule.salarySnapshot.snapshotAt).toDate(),
+                    "dd/MM/yyyy HH:mm",
+                  )}
+                </p>
+              )}
+            </div>
+          )}
+
           {/* Custom Time Section - Editable or Read-only */}
           <div className="border-t pt-4">
             <Label className="text-sm font-semibold text-gray-500 mb-2 block">
@@ -420,7 +565,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                       Thời gian bắt đầu (HH:mm)
                     </Label>
                     <p className="mt-1 font-medium">
-                      {schedule.customStartTime || "Chưa thiết lập"}
+                      {scheduleTimeRange.startTime || "Chưa thiết lập"}
                     </p>
                   </div>
                   <div>
@@ -428,23 +573,23 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                       Thời gian kết thúc (HH:mm)
                     </Label>
                     <p className="mt-1 font-medium">
-                      {schedule.customEndTime || "Chưa thiết lập"}
+                      {scheduleTimeRange.endTime || "Chưa thiết lập"}
                     </p>
                   </div>
                 </div>
 
                 {/* Display working minutes and salary for read-only */}
-                {schedule.customStartTime && schedule.customEndTime && (
+                {scheduleTimeRange.startTime && scheduleTimeRange.endTime && (
                   <div className="bg-blue-50 p-3 rounded-md space-y-1">
                     {(() => {
                       const minutes = calculateWorkingMinutes(
-                        schedule.customStartTime!,
-                        schedule.customEndTime!
+                        scheduleTimeRange.startTime,
+                        scheduleTimeRange.endTime,
                       );
                       if (minutes === null) return null;
                       const hours = Math.floor(minutes / 60);
                       const mins = minutes % 60;
-                      const hourlyRate = 22000; // 22k VND per hour
+                      const hourlyRate = getHourlyRate();
                       const salary = (minutes / 60) * hourlyRate;
 
                       return (
@@ -467,7 +612,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                               Ước tính lương:{" "}
                             </span>
                             <span className="font-semibold text-green-600">
-                              {salary.toLocaleString("vi-VN")} VNĐ
+                              {formatCurrency(salary)}
                             </span>
                           </div>
                         </>
@@ -515,12 +660,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                     {(() => {
                       const minutes = calculateWorkingMinutes(
                         adjustedStartTime,
-                        adjustedEndTime
+                        adjustedEndTime,
                       );
                       if (minutes === null) return null;
                       const hours = Math.floor(minutes / 60);
                       const mins = minutes % 60;
-                      const hourlyRate = 22000; // 22k VND per hour
+                      const hourlyRate = getHourlyRate();
                       const salary = (minutes / 60) * hourlyRate;
 
                       return (
@@ -543,7 +688,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                               Ước tính lương:{" "}
                             </span>
                             <span className="font-semibold text-green-600">
-                              {salary.toLocaleString("vi-VN")} VNĐ
+                              {formatCurrency(salary)}
                             </span>
                           </div>
                         </>
@@ -598,7 +743,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                     (
                     {format(
                       dayjs(schedule.createdAt).toDate(),
-                      "dd/MM/yyyy HH:mm"
+                      "dd/MM/yyyy HH:mm",
                     )}
                     )
                   </span>
@@ -614,7 +759,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                     (
                     {format(
                       dayjs(schedule.approvedAt).toDate(),
-                      "dd/MM/yyyy HH:mm"
+                      "dd/MM/yyyy HH:mm",
                     )}
                     )
                   </span>
@@ -627,7 +772,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 <span>
                   {format(
                     dayjs(schedule.startedAt).toDate(),
-                    "dd/MM/yyyy HH:mm"
+                    "dd/MM/yyyy HH:mm",
                   )}
                 </span>
               </div>
@@ -638,7 +783,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 <span>
                   {format(
                     dayjs(schedule.completedAt).toDate(),
-                    "dd/MM/yyyy HH:mm"
+                    "dd/MM/yyyy HH:mm",
                   )}
                 </span>
               </div>
@@ -652,7 +797,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                     (
                     {format(
                       dayjs(schedule.markedAbsentAt).toDate(),
-                      "dd/MM/yyyy HH:mm"
+                      "dd/MM/yyyy HH:mm",
                     )}
                     )
                   </span>
@@ -689,7 +834,11 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
             <Button
               onClick={handleUpdateScheduleInfo}
               disabled={
-                isPending || isDeleting || isUpdatingStatus || !!adjustTimeError
+                isPending ||
+                isDeleting ||
+                isUpdatingStatus ||
+                !!adjustTimeError ||
+                !!specialHourlyRateError
               }
             >
               Cập nhật

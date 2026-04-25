@@ -65,6 +65,7 @@ const EditUserPage = lazy(
 );
 const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
 const StaffSchedulePage = lazy(() => import("@/pages/StaffSchedule"));
+const StaffSalaryConfigPage = lazy(() => import("@/pages/StaffSalaryConfig"));
 const StaffEarningsDetailPage = lazy(
   () => import("@/pages/StaffSchedule/StaffEarningsDetailPage")
 );
@@ -177,6 +178,10 @@ function useRoute() {
                 <Route path={PATHS.GIFTS} element={<GiftsPage />} />
                 <Route path={PATHS.GAMES} element={<GamesPage />} />
                 <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
+                <Route
+                  path={PATHS.STAFF_SALARY_CONFIG}
+                  element={<StaffSalaryConfigPage />}
+                />
                 <Route
                   path={PATHS.STAFF_EARNINGS_DETAIL}
                   element={<StaffEarningsDetailPage />}

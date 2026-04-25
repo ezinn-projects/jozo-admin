@@ -45,7 +45,6 @@ const StaffEarningsDetailPage = () => {
   const navigate = useNavigate();
   const { userId } = useParams<{ userId: string }>();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
-  const hourlyRate = 22000; // 22k VND per hour
 
   // Array mapping for day names in Vietnamese (0 = Sunday, 1 = Monday, ...)
   const dayNames = [
@@ -113,17 +112,19 @@ const StaffEarningsDetailPage = () => {
     enabled: !!userId,
   });
 
-  const schedules = scheduleData?.schedules || [];
+  const schedules = scheduleData?.schedules;
   const staffName = scheduleData?.staffName || "Unknown Staff";
 
   // Calculate detailed earnings data for entire month
   const earningsData = useMemo(() => {
+    const scheduleList = schedules || [];
+
     // Get total days in selected month
     const daysInMonth = selectedMonth.daysInMonth();
 
     // Create a map of schedules by date
-    const schedulesByDate = new Map<string, typeof schedules>();
-    schedules.forEach((schedule) => {
+    const schedulesByDate = new Map<string, typeof scheduleList>();
+    scheduleList.forEach((schedule) => {
       const dateKey = dayjs(schedule.date).format("YYYY-MM-DD");
       if (!schedulesByDate.has(dateKey)) {
         schedulesByDate.set(dateKey, []);
@@ -138,8 +139,9 @@ const StaffEarningsDetailPage = () => {
       endTime: string;
       hours: number;
       salary: number;
+      expectedSalary: number;
       status: EmployeeScheduleStatus | "not-registered";
-      schedule?: (typeof schedules)[0];
+      schedule?: (typeof scheduleList)[0];
     }> = [];
 
     for (let day = 1; day <= daysInMonth; day++) {
@@ -155,6 +157,7 @@ const StaffEarningsDetailPage = () => {
           endTime: "-",
           hours: 0,
           salary: 0,
+          expectedSalary: 0,
           status: "not-registered" as const,
         });
       } else {
@@ -172,6 +175,23 @@ const StaffEarningsDetailPage = () => {
               .split(":")
               .map(Number);
             const [endHour, endMin] = schedule.customEndTime
+              .split(":")
+              .map(Number);
+            const startTotal = startHour * 60 + startMin;
+            let endTotal = endHour * 60 + endMin;
+            if (endTotal <= startTotal) {
+              endTotal += 24 * 60;
+            }
+            const diffMinutes = endTotal - startTotal;
+            hours = diffMinutes / 60;
+          } else if (schedule.shiftInfo) {
+            startTime = schedule.shiftInfo.startTime;
+            endTime = schedule.shiftInfo.endTime;
+
+            const [startHour, startMin] = schedule.shiftInfo.startTime
+              .split(":")
+              .map(Number);
+            const [endHour, endMin] = schedule.shiftInfo.endTime
               .split(":")
               .map(Number);
             const startTotal = startHour * 60 + startMin;
@@ -202,18 +222,27 @@ const StaffEarningsDetailPage = () => {
             }
           }
 
-          // Only count salary for completed shifts
-          const salary =
-            schedule.status === EmployeeScheduleStatus.Completed
-              ? hours * hourlyRate
-              : 0;
+          const roundedHours =
+            Math.round((schedule.salary?.hours ?? hours) * 10) / 10;
+          const hourlyRate =
+            schedule.salary?.hourlyRate ?? schedule.salarySnapshot?.hourlyRate ?? 0;
+          const expectedSalary =
+            schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
+          const salary = schedule.salary
+            ? schedule.salary.isPayable
+              ? schedule.salary.totalAmount
+              : 0
+            : schedule.status === EmployeeScheduleStatus.Completed
+            ? expectedSalary
+            : 0;
 
           data.push({
             date: currentDate,
             startTime,
             endTime,
-            hours: Math.round(hours * 10) / 10,
+            hours: roundedHours,
             salary,
+            expectedSalary,
             status: schedule.status,
             schedule,
           });
@@ -252,7 +281,10 @@ const StaffEarningsDetailPage = () => {
       (sum, item) => sum + item.hours,
       0
     );
-    const expectedSalary = expectedHours * hourlyRate;
+    const expectedSalary = expectedItems.reduce(
+      (sum, item) => sum + item.expectedSalary,
+      0
+    );
 
     return {
       items: data,
@@ -264,7 +296,7 @@ const StaffEarningsDetailPage = () => {
       expectedSalary,
       expectedShifts: expectedItems.length,
     };
-  }, [schedules, hourlyRate, selectedMonth]);
+  }, [schedules, selectedMonth]);
 
   // Generate month options (current month and 11 previous months)
   const monthOptions = useMemo(() => {

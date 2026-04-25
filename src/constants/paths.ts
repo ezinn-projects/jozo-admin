@@ -69,6 +69,7 @@ const PATHS = {
   // staff schedule management
   STAFF_SCHEDULE: "/staff-schedule",
   STAFF_EARNINGS_DETAIL: "/staff-schedule/:userId/earnings",
+  STAFF_SALARY_CONFIG: "/staff-salary-config",
 
   // my schedule - employee view their own schedules
   MY_SCHEDULE: "/my-schedule",

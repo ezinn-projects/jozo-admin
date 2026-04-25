@@ -152,6 +152,14 @@ const StaffSchedulePage = () => {
     return user.name || user.full_name || "No name";
   };
 
+  const getSalarySnapshotTooltip = (schedule: IEmployeeSchedule | null) => {
+    if (!schedule?.salarySnapshot) return "";
+
+    return `\nLương snapshot: ${schedule.salarySnapshot.hourlyRate.toLocaleString(
+      "vi-VN"
+    )} VNĐ/giờ`;
+  };
+
   // Group schedules by userId, date and shift
   const scheduleMap = useMemo(() => {
     const map = new Map<string, IEmployeeSchedule>();
@@ -482,7 +490,7 @@ Trạng thái: ${morningSchedule ? morningStatus || "Không có" : "Chưa đăng
                         morningSchedule?.note
                           ? `\nGhi chú: ${morningSchedule.note}`
                           : ""
-                      }`;
+                      }${getSalarySnapshotTooltip(morningSchedule)}`;
 
                       const afternoonTooltip = `Ngày: ${date.format(
                         "DD/MM/YYYY"
@@ -496,13 +504,13 @@ Trạng thái: ${
                         afternoonSchedule?.note
                           ? `\nGhi chú: ${afternoonSchedule.note}`
                           : ""
-                      }`;
+                      }${getSalarySnapshotTooltip(afternoonSchedule)}`;
 
                       const allTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
 Ca: Shift 3
 Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
                         allSchedule?.note ? `\nGhi chú: ${allSchedule.note}` : ""
-                      }`;
+                      }${getSalarySnapshotTooltip(allSchedule)}`;
 
                       return (
                         <React.Fragment key={date.format("YYYY-MM-DD")}>

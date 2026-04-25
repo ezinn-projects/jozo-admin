@@ -90,6 +90,12 @@ const MENU_ITEMS: MenuItem[] = [
         roles: [Role.Admin],
       },
       {
+        title: "Cấu hình lương nhân viên",
+        url: PATHS.STAFF_SALARY_CONFIG,
+        icon: DollarSign,
+        roles: [Role.Admin],
+      },
+      {
         title: "Room Types",
         url: PATHS.ROOM_TYPES_LISTS,
         icon: BedDouble,

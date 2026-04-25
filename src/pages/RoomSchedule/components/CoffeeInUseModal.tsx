@@ -1,10 +1,16 @@
 import { CoffeeSessionStatus, ICoffeeSession } from "@/@types/CoffeeSession";
 import {
+  FnBMenuCustomizationGroup,
+  IFnBCustomizationGroupTemplate,
+} from "@/@types/FnBCustomization";
+import {
   ICoffeeSessionOrder,
   ICoffeeSessionOrderDetail,
+  ICoffeeSessionOrderSelection,
 } from "@/@types/CoffeeSessionOrder";
 import coffeeSessionApis from "@/apis/coffeeSession.apis";
 import coffeeSessionOrderApis from "@/apis/coffeeSessionOrder.apis";
+import customizationGroupTemplateApis from "@/apis/customizationGroupTemplate.apis";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import CoffeeOrderEditor from "@/pages/RoomSchedule/components/CoffeeOrderEditor";
 import { FnBMenuItem } from "@/hooks/use-menu-items";
@@ -92,6 +98,82 @@ const sanitizeOrder = (order: ICoffeeSessionOrder): ICoffeeSessionOrder => ({
   ),
 });
 
+type SelectionDisplayGroup = {
+  key: string;
+  label: string;
+  options: {
+    key: string;
+    label: string;
+    priceDelta?: number;
+  }[];
+};
+
+const normalizeSelectionKey = (value: string) => value.trim().toLowerCase();
+
+const formatSelectionPrice = (priceDelta?: number) => {
+  if (typeof priceDelta !== "number") return "";
+
+  const prefix = priceDelta > 0 ? "+" : "";
+  return ` (${prefix}${priceDelta.toLocaleString("vi-VN")} VND)`;
+};
+
+const getMenuItemCustomizationGroups = (
+  menuItem: FnBMenuItem | undefined,
+  templates: IFnBCustomizationGroupTemplate[],
+): FnBMenuCustomizationGroup[] => {
+  if (!menuItem) return [];
+
+  const groups = [...(menuItem.customizationGroups || [])];
+
+  (menuItem.customizationTemplateRefs || []).forEach((ref) => {
+    const template = templates.find(
+      (template) => template.templateKey === ref.templateKey,
+    );
+
+    if (template?.group) {
+      groups.push(template.group);
+    }
+  });
+
+  return groups;
+};
+
+const getSelectionDisplayGroups = (
+  customizationGroups: FnBMenuCustomizationGroup[],
+  selections?: ICoffeeSessionOrderSelection[] | null,
+) => {
+  if (!selections?.length) return [];
+
+  const groups = new Map<string, SelectionDisplayGroup>();
+
+  selections.forEach((selection) => {
+    const normalizedGroupKey = normalizeSelectionKey(selection.groupKey);
+    const normalizedOptionKey = normalizeSelectionKey(selection.optionKey);
+    const matchedGroup = customizationGroups.find(
+      (group) => normalizeSelectionKey(group.groupKey) === normalizedGroupKey,
+    );
+    const matchedOption = matchedGroup?.options?.find(
+      (option) => normalizeSelectionKey(option.optionKey) === normalizedOptionKey,
+    );
+    const groupLabel = matchedGroup?.label || selection.groupKey;
+    const optionLabel = matchedOption?.label || selection.optionKey;
+    const currentGroup = groups.get(normalizedGroupKey) || {
+      key: normalizedGroupKey,
+      label: groupLabel,
+      options: [],
+    };
+
+    currentGroup.options.push({
+      key: normalizedOptionKey,
+      label: optionLabel,
+      priceDelta: matchedOption?.priceDelta,
+    });
+    groups.set(normalizedGroupKey, currentGroup);
+  });
+
+  return Array.from(groups.values());
+};
+
 const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   isOpen,
   onClose,
@@ -134,6 +216,14 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     queryKey: ["menuItems"],
     queryFn: fnbMenuApis.getAllMenuItems,
     select: (response) => (response.data.result || []) as FnBMenuItem[],
+    enabled: isOpen,
+  });
+
+  const customizationTemplatesQuery = useQuery({
+    queryKey: ["customizationGroupTemplates"],
+    queryFn: customizationGroupTemplateApis.getTemplates,
+    select: (response) =>
+      (response.data.result || []) as IFnBCustomizationGroupTemplate[],
     enabled: isOpen,
   });
 
@@ -283,12 +373,32 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   );
   const orderHistoryItems = React.useMemo(() => {
     if (orderQuery.data?.lineItems?.length) {
-      return orderQuery.data.lineItems.map((item) => ({
-        key: item.lineId || `${item.itemId}-${item.name}`,
-        name: item.name,
-        quantity: item.quantity,
-        category: item.category,
-      }));
+      return orderQuery.data.lineItems.map((item) => {
+        const menuItems = menuItemsQuery.data || [];
+        const menuItem = menuItems.find(
+          (menuItem) => menuItem._id === item.itemId,
+        );
+        const hasOwnCustomizations =
+          (menuItem?.customizationGroups?.length || 0) > 0 ||
+          (menuItem?.customizationTemplateRefs?.length || 0) > 0;
+        const selectionSourceItem = hasOwnCustomizations
+          ? menuItem
+          : menuItems.find((sourceItem) => sourceItem._id === menuItem?.parentId) ||
+            menuItem;
+        const selectionGroups = getMenuItemCustomizationGroups(
+          selectionSourceItem,
+          customizationTemplatesQuery.data || [],
+        );
+
+        return {
+          key: item.lineId || `${item.itemId}-${item.name}`,
+          name: item.name,
+          quantity: item.quantity,
+          category: item.category,
+          note: item.note,
+          selectionGroups: getSelectionDisplayGroups(selectionGroups, item.selections),
+        };
+      });
     }
 
     const legacyItems = [
@@ -301,8 +411,10 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
       name: item.name,
       quantity: item.quantity,
       category: item.category,
+      note: undefined,
+      selectionGroups: [],
     }));
-  }, [orderQuery.data]);
+  }, [customizationTemplatesQuery.data, menuItemsQuery.data, orderQuery.data]);
 
   return (
     <>
@@ -445,6 +557,30 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                             ? "Đồ uống"
                             : "Đồ ăn"}
                         </p>
+                        {item.selectionGroups.length > 0 && (
+                          <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                            {item.selectionGroups.map((group) => (
+                              <p key={group.key}>
+                                <span className="font-medium text-foreground">
+                                  {group.label}:
+                                </span>{" "}
+                                {group.options
+                                  .map(
+                                    (option) =>
+                                      `${option.label}${formatSelectionPrice(
+                                        option.priceDelta,
+                                      )}`,
+                                  )
+                                  .join(", ")}
+                              </p>
+                            ))}
+                          </div>
+                        )}
+                        {item.note && (
+                          <p className="mt-1 text-xs italic text-muted-foreground">
+                            Ghi chú: {item.note}
+                          </p>
+                        )}
                       </div>
                       <Badge
                         variant="secondary"

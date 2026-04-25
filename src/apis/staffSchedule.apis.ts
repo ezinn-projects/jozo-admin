@@ -24,6 +24,21 @@ export interface IShiftInfo {
   endTime: string;
 }
 
+export interface IEmployeeScheduleSalarySnapshot {
+  hourlyRate: number;
+  snapshotAt?: string;
+  capturedAt?: string;
+  syncedFromSnapshot?: number;
+  source?: "global" | "override" | "manual";
+}
+
+export interface IEmployeeScheduleSalary {
+  hourlyRate: number;
+  hours: number;
+  totalAmount: number;
+  isPayable: boolean;
+}
+
 export interface IEmployeeSchedule {
   _id: string;
   userId: string;
@@ -57,8 +72,34 @@ export interface IEmployeeSchedule {
   completedAt?: string;
   markedAbsentBy?: string;
   markedAbsentAt?: string;
+  salarySnapshot?: IEmployeeScheduleSalarySnapshot;
+  salary?: IEmployeeScheduleSalary;
   createdAt?: string;
   updatedAt?: string;
+}
+
+export interface IEmployeeSalarySnapshot {
+  hourlyRate: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface IEmployeeSalaryConfig {
+  userId: string;
+  userName?: string;
+  userPhone?: string;
+  hourlyRate: number;
+  snapshotHourlyRate: number;
+  isOverride: boolean;
+  updatedAt?: string;
+}
+
+export interface IUpdateEmployeeSalarySnapshotRequest {
+  hourlyRate: number;
+}
+
+export interface IUpdateEmployeeSalaryOverrideRequest {
+  hourlyRate: number;
 }
 
 export interface IEmployeeSchedulesSummary {
@@ -116,6 +157,7 @@ const staffScheduleApis = {
       customEndTime?: string; // Format: HH:mm
       note?: string;
       status?: EmployeeScheduleStatus;
+      specialHourlyRate?: number;
     }
   ) => http.put<HTTPResponse>(`/employee-schedules/${id}`, data),
   updateScheduleStatus: (
@@ -127,6 +169,33 @@ const staffScheduleApis = {
   ) => http.put<HTTPResponse>(`/employee-schedules/${id}/status`, data),
   deleteSchedule: (id: string) =>
     http.delete<HTTPResponse>(`/employee-schedules/${id}`),
+  getSalarySnapshot: () =>
+    http.get<HTTPResponse<IEmployeeSalarySnapshot>>(
+      "/employee-schedules/salary/snapshot"
+    ),
+  updateSalarySnapshot: (data: IUpdateEmployeeSalarySnapshotRequest) =>
+    http.put<HTTPResponse<IEmployeeSalarySnapshot>>(
+      "/employee-schedules/salary/snapshot",
+      data
+    ),
+  syncSalarySnapshot: () =>
+    http.post<HTTPResponse>("/employee-schedules/salary/sync"),
+  getSalaryEmployees: () =>
+    http.get<HTTPResponse<IEmployeeSalaryConfig[]>>(
+      "/employee-schedules/salary/employees"
+    ),
+  updateEmployeeSalaryOverride: (
+    userId: string,
+    data: IUpdateEmployeeSalaryOverrideRequest
+  ) =>
+    http.put<HTTPResponse<IEmployeeSalaryConfig>>(
+      `/employee-schedules/salary/employees/${userId}`,
+      data
+    ),
+  deleteEmployeeSalaryOverride: (userId: string) =>
+    http.delete<HTTPResponse<IEmployeeSalaryConfig>>(
+      `/employee-schedules/salary/employees/${userId}/override`
+    ),
 };
 
 export default staffScheduleApis;
