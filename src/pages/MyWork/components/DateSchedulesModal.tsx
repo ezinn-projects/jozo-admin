@@ -81,8 +81,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
       return "Shift 1 (09:00 - 14:00)";
     if (shift === "shift2" || shift === "afternoon" || shift === "evening")
       return "Shift 2 (14:00 - 19:00)";
-    if (shift === "shift3" || shift === "all")
-      return "Shift 3 (19:00 - 01:00)";
+    if (shift === "shift3" || shift === "all") return "Shift 3 (19:00 - 01:00)";
     return shift || "Custom";
   };
 
@@ -103,7 +102,8 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
-            Lịch làm việc ngày {format(date.toDate(), "dd/MM/yyyy", { locale: vi })}
+            Lịch làm việc ngày{" "}
+            {format(date.toDate(), "dd/MM/yyyy", { locale: vi })}
           </DialogTitle>
         </DialogHeader>
 
@@ -124,11 +124,18 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                 <p className="text-sm text-muted-foreground">
                   Tổng cộng {schedules.length} ca
                   {schedules.length >= 2 && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Đã đủ)</span>
+                    <span className="ml-2 text-xs text-muted-foreground">
+                      (Đã đủ)
+                    </span>
                   )}
                 </p>
                 {schedules.length < 2 && (
-                  <Button onClick={onRegisterNew} variant="outline" size="sm" className="gap-2">
+                  <Button
+                    onClick={onRegisterNew}
+                    variant="outline"
+                    size="sm"
+                    className="gap-2"
+                  >
                     <Plus className="h-4 w-4" />
                     Đăng ký thêm ca
                   </Button>
@@ -142,7 +149,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                     onClick={() => onScheduleClick(schedule)}
                     className={cn(
                       "border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-primary",
-                      getStatusColor(schedule.status)
+                      getStatusColor(schedule.status),
                     )}
                   >
                     <div className="flex items-start justify-between mb-2">
@@ -155,7 +162,10 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                         </Badge>
                         <Badge
                           variant="outline"
-                          className={cn("border", getStatusColor(schedule.status))}
+                          className={cn(
+                            "border",
+                            getStatusColor(schedule.status),
+                          )}
                         >
                           {getStatusLabel(schedule.status)}
                         </Badge>
@@ -165,26 +175,29 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                     {schedule.shiftInfo && (
                       <div className="mt-2 text-sm text-muted-foreground">
                         <div>
-                          {schedule.shiftInfo.name}: {schedule.shiftInfo.startTime} -{" "}
+                          {schedule.shiftInfo.name}:{" "}
+                          {schedule.shiftInfo.startTime} -{" "}
                           {schedule.shiftInfo.endTime}
                         </div>
                       </div>
                     )}
 
-                    {schedule.status === EmployeeScheduleStatus.Rejected && schedule.rejectedReason && (
-                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                        <span className="font-medium">Lý do từ chối: </span>
-                        {schedule.rejectedReason}
-                      </p>
-                    )}
-                    {schedule.status !== EmployeeScheduleStatus.Rejected && schedule.note && (
-                      <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                        {schedule.note}
-                      </p>
-                    )}
+                    {schedule.status === EmployeeScheduleStatus.Rejected &&
+                      schedule.rejectedReason && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                          <span className="font-medium">Lý do từ chối: </span>
+                          {schedule.rejectedReason}
+                        </p>
+                      )}
+                    {schedule.status !== EmployeeScheduleStatus.Rejected &&
+                      schedule.note && (
+                        <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
+                          {schedule.note}
+                        </p>
+                      )}
 
                     <p className="text-xs text-muted-foreground mt-2">
-                      Click để xem chi tiết
+                      Details →
                     </p>
                   </div>
                 ))}
@@ -198,4 +211,3 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
 };
 
 export default DateSchedulesModal;
-

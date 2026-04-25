@@ -35,7 +35,6 @@ import {
   Calendar as CalendarIcon,
   Clock,
   DollarSign,
-  Download,
   User,
 } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -60,7 +59,7 @@ const StaffEarningsDetailPage = () => {
   // Calculate startDate and endDate from selected month
   const startDate = useMemo(
     () => selectedMonth.startOf("month"),
-    [selectedMonth]
+    [selectedMonth],
   );
   const endDate = useMemo(() => selectedMonth.endOf("month"), [selectedMonth]);
 
@@ -207,7 +206,11 @@ const StaffEarningsDetailPage = () => {
               startTime = "09:00";
               endTime = "14:00";
               hours = 5;
-            } else if (shift === "shift2" || shift === "afternoon" || shift === "evening") {
+            } else if (
+              shift === "shift2" ||
+              shift === "afternoon" ||
+              shift === "evening"
+            ) {
               startTime = "14:00";
               endTime = "19:00";
               hours = 5;
@@ -225,7 +228,9 @@ const StaffEarningsDetailPage = () => {
           const roundedHours =
             Math.round((schedule.salary?.hours ?? hours) * 10) / 10;
           const hourlyRate =
-            schedule.salary?.hourlyRate ?? schedule.salarySnapshot?.hourlyRate ?? 0;
+            schedule.salary?.hourlyRate ??
+            schedule.salarySnapshot?.hourlyRate ??
+            0;
           const expectedSalary =
             schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
           const salary = schedule.salary
@@ -233,8 +238,8 @@ const StaffEarningsDetailPage = () => {
               ? schedule.salary.totalAmount
               : 0
             : schedule.status === EmployeeScheduleStatus.Completed
-            ? expectedSalary
-            : 0;
+              ? expectedSalary
+              : 0;
 
           data.push({
             date: currentDate,
@@ -255,18 +260,18 @@ const StaffEarningsDetailPage = () => {
 
     // Calculate totals (only completed shifts)
     const completedItems = data.filter(
-      (item) => item.status === EmployeeScheduleStatus.Completed
+      (item) => item.status === EmployeeScheduleStatus.Completed,
     );
     const totalHours = completedItems.reduce(
       (sum, item) => sum + item.hours,
-      0
+      0,
     );
     const totalSalary = completedItems.reduce(
       (sum, item) => sum + item.salary,
-      0
+      0,
     );
     const totalRegistered = data.filter(
-      (item) => item.status !== "not-registered"
+      (item) => item.status !== "not-registered",
     ).length;
 
     // Calculate expected income (all registered shifts that could potentially earn)
@@ -275,15 +280,15 @@ const StaffEarningsDetailPage = () => {
         item.status !== "not-registered" &&
         item.status !== EmployeeScheduleStatus.Absent &&
         item.status !== EmployeeScheduleStatus.Rejected &&
-        item.status !== EmployeeScheduleStatus.Cancelled
+        item.status !== EmployeeScheduleStatus.Cancelled,
     );
     const expectedHours = expectedItems.reduce(
       (sum, item) => sum + item.hours,
-      0
+      0,
     );
     const expectedSalary = expectedItems.reduce(
       (sum, item) => sum + item.expectedSalary,
-      0
+      0,
     );
 
     return {
@@ -323,14 +328,14 @@ const StaffEarningsDetailPage = () => {
         item.status === "not-registered"
           ? "Chưa đăng ký"
           : item.status === EmployeeScheduleStatus.Absent
-          ? "Vắng mặt"
-          : item.status === EmployeeScheduleStatus.Completed
-          ? "Hoàn thành"
-          : item.status === EmployeeScheduleStatus.Approved
-          ? "Đã duyệt"
-          : item.status === EmployeeScheduleStatus.Pending
-          ? "Chờ duyệt"
-          : item.status;
+            ? "Vắng mặt"
+            : item.status === EmployeeScheduleStatus.Completed
+              ? "Hoàn thành"
+              : item.status === EmployeeScheduleStatus.Approved
+                ? "Đã duyệt"
+                : item.status === EmployeeScheduleStatus.Pending
+                  ? "Chờ duyệt"
+                  : item.status;
 
       return [
         item.date.format("DD/MM/YYYY"),
@@ -340,8 +345,8 @@ const StaffEarningsDetailPage = () => {
         item.status === "not-registered"
           ? "✕"
           : item.status === EmployeeScheduleStatus.Completed
-          ? item.salary.toString()
-          : "-",
+            ? item.salary.toString()
+            : "-",
         status,
       ];
     });
@@ -368,7 +373,7 @@ const StaffEarningsDetailPage = () => {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `${staffName}_earnings_${selectedMonth.format("MM_YYYY")}.csv`
+      `${staffName}_earnings_${selectedMonth.format("MM_YYYY")}.csv`,
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -496,16 +501,6 @@ const StaffEarningsDetailPage = () => {
                 ))}
               </SelectContent>
             </Select>
-
-            <Button
-              variant="outline"
-              onClick={handleExportCSV}
-              disabled={earningsData.items.length === 0}
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Xuất CSV
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -568,8 +563,8 @@ const StaffEarningsDetailPage = () => {
                           isNotRegistered
                             ? "bg-gray-50"
                             : isAbsent
-                            ? "bg-red-50"
-                            : ""
+                              ? "bg-red-50"
+                              : ""
                         }
                       >
                         <TableCell className="font-medium">
@@ -603,15 +598,15 @@ const StaffEarningsDetailPage = () => {
                             isCompleted
                               ? "text-green-600"
                               : isNotRegistered
-                              ? "text-gray-400"
-                              : "text-gray-500"
+                                ? "text-gray-400"
+                                : "text-gray-500"
                           }`}
                         >
                           {isNotRegistered
                             ? "✕"
                             : isCompleted
-                            ? `${item.salary.toLocaleString("vi-VN")}₫`
-                            : "-"}
+                              ? `${item.salary.toLocaleString("vi-VN")}₫`
+                              : "-"}
                         </TableCell>
                         <TableCell>
                           {isNotRegistered ? (

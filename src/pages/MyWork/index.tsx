@@ -206,14 +206,13 @@ const MySchedulePage = () => {
       queryKey: ["schedule-detail", scheduleIdFromUrl],
       queryFn: async () => {
         if (!scheduleIdFromUrl) return null;
-        const response = await staffScheduleApis.getScheduleById(
-          scheduleIdFromUrl
-        );
+        const response =
+          await staffScheduleApis.getScheduleById(scheduleIdFromUrl);
         return response.data.result;
       },
       enabled: !!scheduleIdFromUrl,
       retry: false,
-    }
+    },
   );
 
   // Handle schedule detail loaded from URL
@@ -270,7 +269,7 @@ const MySchedulePage = () => {
         description:
           data.message ||
           `Ca làm việc ngày ${dayjs(data.schedule.date).format(
-            "DD/MM/YYYY"
+            "DD/MM/YYYY",
           )} ${statusLabel}`,
         duration: 5000,
       });
@@ -484,8 +483,7 @@ const MySchedulePage = () => {
       return "Shift 1 (09:00 - 14:00)";
     if (shift === "shift2" || shift === "afternoon" || shift === "evening")
       return "Shift 2 (14:00 - 19:00)";
-    if (shift === "shift3" || shift === "all")
-      return "Shift 3 (19:00 - 01:00)";
+    if (shift === "shift3" || shift === "all") return "Shift 3 (19:00 - 01:00)";
     return shift || "Custom";
   };
 
@@ -504,7 +502,7 @@ const MySchedulePage = () => {
   const salaryInfo = useMemo(() => {
     const hourlyRate = 22000; // 22k VND per hour
     const completedSchedules = monthSchedules.filter(
-      (s) => s.status === EmployeeScheduleStatus.Completed
+      (s) => s.status === EmployeeScheduleStatus.Completed,
     );
 
     // Calculate total hours for completed shifts
@@ -665,7 +663,7 @@ const MySchedulePage = () => {
                 </div>
               </div>
               <p className="text-xs text-green-600 mt-2 font-medium">
-                Click để xem chi tiết →
+                Details →
               </p>
             </CardContent>
           </Card>
@@ -708,10 +706,10 @@ const MySchedulePage = () => {
                       {viewMode === "day"
                         ? currentDate.format("DD/MM/YYYY")
                         : viewMode === "week"
-                        ? `${startDate.format("DD/MM")} - ${endDate.format(
-                            "DD/MM/YYYY"
-                          )}`
-                        : currentDate.format("MM/YYYY")}
+                          ? `${startDate.format("DD/MM")} - ${endDate.format(
+                              "DD/MM/YYYY",
+                            )}`
+                          : currentDate.format("MM/YYYY")}
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent className="w-auto p-0" align="start">
@@ -804,10 +802,10 @@ const MySchedulePage = () => {
             {viewMode === "day"
               ? `Work schedule for ${currentDate.format("DD/MM/YYYY")}`
               : viewMode === "week"
-              ? `Work schedule from ${startDate.format(
-                  "DD/MM"
-                )} to ${endDate.format("DD/MM/YYYY")}`
-              : `Work schedule for ${currentDate.format("MM/YYYY")}`}
+                ? `Work schedule from ${startDate.format(
+                    "DD/MM",
+                  )} to ${endDate.format("DD/MM/YYYY")}`
+                : `Work schedule for ${currentDate.format("MM/YYYY")}`}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -860,7 +858,7 @@ const MySchedulePage = () => {
                     className={cn(
                       "border rounded-lg p-4 transition-colors cursor-pointer hover:shadow-lg",
                       isToday && "border-blue-500 bg-blue-50/50",
-                      isPast && !isToday && "opacity-60"
+                      isPast && !isToday && "opacity-60",
                     )}
                     onClick={() => {
                       setSelectedDateForRegistration(date.toDate());
@@ -872,7 +870,7 @@ const MySchedulePage = () => {
                         <h3
                           className={cn(
                             "text-lg font-semibold",
-                            isToday && "text-blue-600"
+                            isToday && "text-blue-600",
                           )}
                         >
                           {format(date.toDate(), "EEEE, dd/MM/yyyy")}
@@ -907,7 +905,7 @@ const MySchedulePage = () => {
                             }}
                             className={cn(
                               "border rounded-lg p-4 cursor-pointer transition-all hover:shadow-md hover:border-primary",
-                              getStatusColor(schedule.status)
+                              getStatusColor(schedule.status),
                             )}
                           >
                             <div className="flex items-start justify-between mb-2">
@@ -924,31 +922,31 @@ const MySchedulePage = () => {
                                 variant="outline"
                                 className={cn(
                                   "border",
-                                  getStatusColor(schedule.status)
+                                  getStatusColor(schedule.status),
                                 )}
                               >
                                 {schedule.status ===
                                 EmployeeScheduleStatus.Pending
                                   ? "Pending"
                                   : schedule.status ===
-                                    EmployeeScheduleStatus.Approved
-                                  ? "Approved"
-                                  : schedule.status ===
-                                    EmployeeScheduleStatus.InProgress
-                                  ? "In Progress"
-                                  : schedule.status ===
-                                    EmployeeScheduleStatus.Completed
-                                  ? "Completed"
-                                  : schedule.status ===
-                                    EmployeeScheduleStatus.Absent
-                                  ? "Absent"
-                                  : schedule.status ===
-                                    EmployeeScheduleStatus.Rejected
-                                  ? "Rejected"
-                                  : schedule.status ===
-                                    EmployeeScheduleStatus.Cancelled
-                                  ? "Cancelled"
-                                  : schedule.status}
+                                      EmployeeScheduleStatus.Approved
+                                    ? "Approved"
+                                    : schedule.status ===
+                                        EmployeeScheduleStatus.InProgress
+                                      ? "In Progress"
+                                      : schedule.status ===
+                                          EmployeeScheduleStatus.Completed
+                                        ? "Completed"
+                                        : schedule.status ===
+                                            EmployeeScheduleStatus.Absent
+                                          ? "Absent"
+                                          : schedule.status ===
+                                              EmployeeScheduleStatus.Rejected
+                                            ? "Rejected"
+                                            : schedule.status ===
+                                                EmployeeScheduleStatus.Cancelled
+                                              ? "Cancelled"
+                                              : schedule.status}
                               </Badge>
                             </div>
                             {schedule.status ===
@@ -1035,7 +1033,7 @@ const MySchedulePage = () => {
           date={selectedDateForSchedules}
           schedules={
             calendarSchedulesByDate.get(
-              selectedDateForSchedules.format("YYYY-MM-DD")
+              selectedDateForSchedules.format("YYYY-MM-DD"),
             ) || []
           }
           onScheduleClick={handleScheduleClickFromDateModal}

@@ -1,6 +1,5 @@
 import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -27,12 +26,7 @@ import { EmployeeScheduleStatus } from "@/constants/enum";
 import PATHS from "@/constants/paths";
 import { useMySchedules } from "@/hooks/use-my-schedules";
 import dayjs, { Dayjs } from "dayjs";
-import {
-  Calendar as CalendarIcon,
-  Clock,
-  DollarSign,
-  Download,
-} from "lucide-react";
+import { Calendar as CalendarIcon, Clock, DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const MyEarningsDetailPage = () => {
@@ -53,7 +47,7 @@ const MyEarningsDetailPage = () => {
   // Calculate startDate and endDate from selected month
   const startDate = useMemo(
     () => selectedMonth.startOf("month"),
-    [selectedMonth]
+    [selectedMonth],
   );
   const endDate = useMemo(() => selectedMonth.endOf("month"), [selectedMonth]);
 
@@ -137,7 +131,11 @@ const MyEarningsDetailPage = () => {
               startTime = "09:00";
               endTime = "14:00";
               hours = 5;
-            } else if (shift === "shift2" || shift === "afternoon" || shift === "evening") {
+            } else if (
+              shift === "shift2" ||
+              shift === "afternoon" ||
+              shift === "evening"
+            ) {
               startTime = "14:00";
               endTime = "19:00";
               hours = 5;
@@ -176,18 +174,18 @@ const MyEarningsDetailPage = () => {
 
     // Calculate totals (only completed shifts)
     const completedItems = data.filter(
-      (item) => item.status === EmployeeScheduleStatus.Completed
+      (item) => item.status === EmployeeScheduleStatus.Completed,
     );
     const totalHours = completedItems.reduce(
       (sum, item) => sum + item.hours,
-      0
+      0,
     );
     const totalSalary = completedItems.reduce(
       (sum, item) => sum + item.salary,
-      0
+      0,
     );
     const totalRegistered = data.filter(
-      (item) => item.status !== "not-registered"
+      (item) => item.status !== "not-registered",
     ).length;
 
     return {
@@ -224,14 +222,14 @@ const MyEarningsDetailPage = () => {
         item.status === "not-registered"
           ? "Chưa đăng ký"
           : item.status === EmployeeScheduleStatus.Absent
-          ? "Vắng mặt"
-          : item.status === EmployeeScheduleStatus.Completed
-          ? "Hoàn thành"
-          : item.status === EmployeeScheduleStatus.Approved
-          ? "Đã duyệt"
-          : item.status === EmployeeScheduleStatus.Pending
-          ? "Chờ duyệt"
-          : item.status;
+            ? "Vắng mặt"
+            : item.status === EmployeeScheduleStatus.Completed
+              ? "Hoàn thành"
+              : item.status === EmployeeScheduleStatus.Approved
+                ? "Đã duyệt"
+                : item.status === EmployeeScheduleStatus.Pending
+                  ? "Chờ duyệt"
+                  : item.status;
 
       return [
         item.date.format("DD/MM/YYYY"),
@@ -241,8 +239,8 @@ const MyEarningsDetailPage = () => {
         item.status === "not-registered"
           ? "✕"
           : item.status === EmployeeScheduleStatus.Completed
-          ? item.salary.toString()
-          : "-",
+            ? item.salary.toString()
+            : "-",
         status,
       ];
     });
@@ -266,7 +264,7 @@ const MyEarningsDetailPage = () => {
     link.setAttribute("href", url);
     link.setAttribute(
       "download",
-      `earnings_${selectedMonth.format("MM_YYYY")}.csv`
+      `earnings_${selectedMonth.format("MM_YYYY")}.csv`,
     );
     link.style.visibility = "hidden";
     document.body.appendChild(link);
@@ -334,6 +332,15 @@ const MyEarningsDetailPage = () => {
         </Card>
       </div>
 
+      <Card className="border-amber-200 bg-amber-50/70">
+        <CardContent className="pt-6">
+          <p className="text-sm font-medium text-amber-800">
+            Lưu ý: Nếu có sai sót trong tổng thực nhận, vui lòng liên hệ admin
+            ngay để được hỗ trợ kiểm tra.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Filters and Export */}
       <Card>
         <CardHeader>
@@ -362,16 +369,6 @@ const MyEarningsDetailPage = () => {
                 ))}
               </SelectContent>
             </Select>
-
-            <Button
-              variant="outline"
-              onClick={handleExportCSV}
-              disabled={earningsData.items.length === 0}
-              className="gap-2"
-            >
-              <Download className="h-4 w-4" />
-              Xuất CSV
-            </Button>
           </div>
         </CardContent>
       </Card>
@@ -434,8 +431,8 @@ const MyEarningsDetailPage = () => {
                           isNotRegistered
                             ? "bg-gray-50"
                             : isAbsent
-                            ? "bg-red-50"
-                            : ""
+                              ? "bg-red-50"
+                              : ""
                         }
                       >
                         <TableCell className="font-medium">
@@ -469,15 +466,15 @@ const MyEarningsDetailPage = () => {
                             isCompleted
                               ? "text-green-600"
                               : isNotRegistered
-                              ? "text-gray-400"
-                              : "text-gray-500"
+                                ? "text-gray-400"
+                                : "text-gray-500"
                           }`}
                         >
                           {isNotRegistered
                             ? "✕"
                             : isCompleted
-                            ? `${item.salary.toLocaleString("vi-VN")}₫`
-                            : "-"}
+                              ? `${item.salary.toLocaleString("vi-VN")}₫`
+                              : "-"}
                         </TableCell>
                         <TableCell>
                           {isNotRegistered ? (
