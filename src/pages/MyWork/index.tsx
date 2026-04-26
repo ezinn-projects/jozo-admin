@@ -643,7 +643,7 @@ const MySchedulePage = () => {
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-green-600">
-                {salaryInfo.totalSalary.toLocaleString("vi-VN")}₫
+                {summary.totalSalary.toLocaleString("vi-VN")}₫
               </div>
               <p className="text-xs text-muted-foreground mt-1">
                 {salaryInfo.totalCompleted} completed shifts

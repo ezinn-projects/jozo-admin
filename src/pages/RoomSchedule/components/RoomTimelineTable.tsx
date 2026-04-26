@@ -76,6 +76,7 @@ const HOUR_MARKER_SPACING = 120;
 const SCALE = HOUR_MARKER_SPACING / 60;
 const TIMELINE_WIDTH =
   HOUR_MARKER_SPACING * (DAY_END_HOUR - DAY_START_HOUR) + 300;
+const AUTO_SCROLL_MARKER_VIEWPORT_RATIO = 0.65;
 
 interface GroupedSchedules {
   [roomId: string]: IRoomSchedule[];
@@ -344,11 +345,17 @@ const RoomTimelineTable: React.FC = () => {
   // State điều khiển auto-scroll
   const [autoScrollEnabled, setAutoScrollEnabled] = useState(true);
   const inactivityTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const autoScrollTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const isAutoScrollingRef = useRef(false);
 
   const { mutate: resolveRequest } = useResolveRequest();
 
   // Handler để tạm dừng auto-scroll khi người dùng scroll
   const handleScroll = () => {
+    if (isAutoScrollingRef.current) {
+      return;
+    }
+
     setAutoScrollEnabled(false);
     if (inactivityTimerRef.current) {
       clearTimeout(inactivityTimerRef.current);
@@ -363,6 +370,9 @@ const RoomTimelineTable: React.FC = () => {
     return () => {
       if (inactivityTimerRef.current) {
         clearTimeout(inactivityTimerRef.current);
+      }
+      if (autoScrollTimerRef.current) {
+        clearTimeout(autoScrollTimerRef.current);
       }
     };
   }, []);
@@ -381,20 +391,34 @@ const RoomTimelineTable: React.FC = () => {
     markerLeft = leftOffset + clampedMinutes * SCALE;
   }
 
-  // Auto-scroll effect: chỉ cuộn nếu now marker không nằm trong viewport
+  // Auto-scroll effect: canh now marker lệch về bên phải viewport để dễ nhìn phần sắp tới
   useEffect(() => {
     if (timelineContainerRef.current && isToday && autoScrollEnabled) {
       const container = timelineContainerRef.current;
-      const offset = 100; // offset để marker không nằm sát bên trái
       const currentScrollLeft = container.scrollLeft;
       const containerWidth = container.clientWidth;
+      const maxScrollLeft = Math.max(
+        container.scrollWidth - containerWidth,
+        0,
+      );
+      const targetScrollLeft = Math.min(
+        Math.max(
+          markerLeft - containerWidth * AUTO_SCROLL_MARKER_VIEWPORT_RATIO,
+          0,
+        ),
+        maxScrollLeft,
+      );
 
-      // Nếu marker nằm bên trái hoặc bên phải của vùng hiển thị với khoảng cách offset thì mới cuộn
-      if (
-        markerLeft < currentScrollLeft + offset ||
-        markerLeft > currentScrollLeft + containerWidth - offset
-      ) {
-        container.scrollLeft = markerLeft - offset;
+      if (Math.abs(currentScrollLeft - targetScrollLeft) > 1) {
+        isAutoScrollingRef.current = true;
+        container.scrollLeft = targetScrollLeft;
+
+        if (autoScrollTimerRef.current) {
+          clearTimeout(autoScrollTimerRef.current);
+        }
+        autoScrollTimerRef.current = setTimeout(() => {
+          isAutoScrollingRef.current = false;
+        }, 100);
       }
     }
   }, [currentTime, markerLeft, isToday, autoScrollEnabled]);
@@ -1336,8 +1360,13 @@ const RoomTimelineTable: React.FC = () => {
                               }}
                             >
                               {/* Hiển thị thời gian trong schedule block */}
-                              <div className="text-xs text-white font-medium px-1 py-0.5 truncate">
-                                {dayjs(schedule.startTime).format("HH:mm")}
+                              <div className="relative flex h-full items-center justify-center px-1">
+                                <span className="absolute left-1 top-0.5 text-xs text-white font-medium">
+                                  {dayjs(schedule.startTime).format("HH:mm")}
+                                </span>
+                                <span className="max-w-full truncate text-sm font-semibold text-white">
+                                  {room.roomName}
+                                </span>
                               </div>
                             </div>
                           );

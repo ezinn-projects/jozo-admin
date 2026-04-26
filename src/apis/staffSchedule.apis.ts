@@ -108,6 +108,7 @@ export interface IEmployeeSchedulesSummary {
   completed: number;
   inProgress: number;
   upcoming: number;
+  totalSalary: number;
   byStatus: {
     pending: number;
     approved: number;

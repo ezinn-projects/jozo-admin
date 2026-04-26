@@ -81,6 +81,7 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
             completed: 0,
             inProgress: 0,
             upcoming: 0,
+            totalSalary: 0,
             byStatus: {
               pending: 0,
               approved: 0,
@@ -184,6 +185,7 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
           completed: 0,
           inProgress: 0,
           upcoming: 0,
+          totalSalary: 0,
           byStatus: {
             pending: 0,
             approved: 0,
