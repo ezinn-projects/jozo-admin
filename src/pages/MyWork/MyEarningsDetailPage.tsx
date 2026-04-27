@@ -31,7 +31,6 @@ import { useMemo, useState } from "react";
 
 const MyEarningsDetailPage = () => {
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
-  const hourlyRate = 22000; // 22k VND per hour
 
   // Array mapping for day names in Vietnamese (0 = Sunday, 1 = Monday, ...)
   const dayNames = [
@@ -150,17 +149,24 @@ const MyEarningsDetailPage = () => {
             }
           }
 
-          // Only count salary for completed shifts
-          const salary =
-            schedule.status === EmployeeScheduleStatus.Completed
-              ? hours * hourlyRate
+          const roundedHours = Math.round(hours * 10) / 10;
+          const hourlyRate =
+            schedule.salary?.hourlyRate ?? schedule.salarySnapshot?.hourlyRate ?? 0;
+          const calculatedSalary =
+            schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
+          const salary = schedule.salary
+            ? schedule.salary.isPayable
+              ? schedule.salary.totalAmount
+              : 0
+            : schedule.status === EmployeeScheduleStatus.Completed
+              ? calculatedSalary
               : 0;
 
           data.push({
             date: currentDate,
             startTime,
             endTime,
-            hours: Math.round(hours * 10) / 10,
+            hours: roundedHours,
             salary,
             status: schedule.status,
             schedule,
@@ -195,7 +201,7 @@ const MyEarningsDetailPage = () => {
       totalShifts: completedItems.length,
       totalRegistered,
     };
-  }, [schedules, hourlyRate, selectedMonth]);
+  }, [schedules, selectedMonth]);
 
   // Generate month options (current month and 11 previous months)
   const monthOptions = useMemo(() => {
