@@ -30,4 +30,6 @@ export interface IBill {
   createdAt: Date;
   updatedAt: Date;
   invoiceCode: string;
+  completedBy?: string;
+  createdBy?: string;
 }

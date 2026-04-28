@@ -100,9 +100,14 @@ type RevenueData = {
   data: {
     totalRevenue: number;
     billCount: number;
-    bills: IBill[];
+    bills: RevenueBill[];
     dateInfo: DateInfo;
   } | null;
+};
+
+type RevenueBill = IBill & {
+  completedBy?: string;
+  createdBy?: string;
 };
 
 const RevenueStatisticsPage = () => {
@@ -289,12 +294,21 @@ const RevenueStatisticsPage = () => {
       .format("DD/MM/YYYY HH:mm");
   };
 
+  const sortBillsByEndTimeDesc = (bills: RevenueBill[]) => {
+    return [...bills].sort((a, b) => {
+      const endTimeA = dayjs(a.endTime).valueOf();
+      const endTimeB = dayjs(b.endTime).valueOf();
+
+      return endTimeB - endTimeA;
+    });
+  };
+
   const formatPaymentMethod = (method: string) => {
     return paymentMethodMap[method] || method;
   };
 
   // Lọc bills theo paymentMethod
-  const filterBillsByPaymentMethod = (bills: IBill[]) => {
+  const filterBillsByPaymentMethod = (bills: RevenueBill[]) => {
     if (selectedPaymentMethod === "all") return bills;
     // value có thể là nhiều methods phân cách bởi dấu phẩy
     const methods = selectedPaymentMethod.split(",");
@@ -336,8 +350,10 @@ const RevenueStatisticsPage = () => {
   };
 
   // Tính lại tổng doanh thu và số lượng hóa đơn sau khi filter
-  const calculateFilteredStats = (bills: IBill[]) => {
-    const filteredBills = filterBillsByPaymentMethod(bills);
+  const calculateFilteredStats = (bills: RevenueBill[]) => {
+    const filteredBills = sortBillsByEndTimeDesc(
+      filterBillsByPaymentMethod(bills)
+    );
     const totalRevenue = filteredBills.reduce(
       (sum, bill) => sum + bill.totalAmount,
       0
@@ -492,6 +508,8 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
+                              <TableHead>Người hoàn tất</TableHead>
+                              <TableHead>Người tạo</TableHead>
                               {!isStaff && (
                                 <TableHead className="text-right">
                                   Số tiền
@@ -525,6 +543,8 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
+                                <TableCell>{bill.completedBy || "N/A"}</TableCell>
+                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
                                 {!isStaff && (
                                   <TableCell className="text-right">
                                     {formatCurrency(bill.totalAmount)} VNĐ
@@ -631,6 +651,8 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
+                              <TableHead>Người hoàn tất</TableHead>
+                              <TableHead>Người tạo</TableHead>
                               {!isStaff && (
                                 <TableHead className="text-right">
                                   Số tiền
@@ -664,6 +686,8 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
+                                <TableCell>{bill.completedBy || "N/A"}</TableCell>
+                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
                                 {!isStaff && (
                                   <TableCell className="text-right">
                                     {formatCurrency(bill.totalAmount)} VNĐ
@@ -770,6 +794,8 @@ const RevenueStatisticsPage = () => {
                               <TableHead>Thời gian</TableHead>
                               <TableHead>Phòng</TableHead>
                               <TableHead>PT thanh toán</TableHead>
+                              <TableHead>Người hoàn tất</TableHead>
+                              <TableHead>Người tạo</TableHead>
                               {!isStaff && (
                                 <TableHead className="text-right">
                                   Số tiền
@@ -803,6 +829,8 @@ const RevenueStatisticsPage = () => {
                                     bill.paymentMethod || "N/A"
                                   )}
                                 </TableCell>
+                                <TableCell>{bill.completedBy || "N/A"}</TableCell>
+                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
                                 {!isStaff && (
                                   <TableCell className="text-right">
                                     {formatCurrency(bill.totalAmount)} VNĐ
