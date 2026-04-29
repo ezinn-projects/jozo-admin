@@ -5,8 +5,6 @@ import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
-import ClaimGiftModal from "./ClaimGiftModal";
-import MemberInfoModal from "./MemberInfoModal";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -18,13 +16,16 @@ import {
 } from "@/components/ui/dialog";
 import { PaymentMethod, RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
+import dayjs from "@/lib/dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
-import dayjs from "@/lib/dayjs";
 import React, { useEffect, useState } from "react";
+import ClaimGiftModal from "./ClaimGiftModal";
+import MemberInfoModal from "./MemberInfoModal";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
 import { IRoom } from "@/@types/Room";
+import roomApis from "@/apis/room.apis";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,8 +36,14 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
@@ -44,20 +51,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Textarea } from "@/components/ui/textarea";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
-import { CalendarDays, Clock, Gift, Minus, Plus, Printer } from "lucide-react";
-import roomApis from "@/apis/room.apis";
-import { Textarea } from "@/components/ui/textarea";
 import { buildBillDateTimeFromSchedule } from "@/utils/billDateTime";
+import { CalendarDays, Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 
 // Define bill interfaces
 interface BillItem {
@@ -172,6 +171,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     schedule.customerPhone,
   ]);
 
+  console.log("promotionList", promotionList);
+
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
     return promotionList.find((promo) => promo._id === selectedPromotion);
@@ -234,38 +235,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       });
     },
   });
-
-  // Mutation để cập nhật applyFreeHourPromo
-  const { mutate: updateFreeHourPromo, isPending: isUpdatingFreeHourPromo } =
-    useMutation({
-      mutationFn: (applyFreeHourPromo: boolean) =>
-        roomsScheduleApis.updateSchedule(schedule._id, {
-          applyFreeHourPromo,
-        }),
-      onSuccess: (_, applyFreeHourPromo) => {
-        refetchSchedules?.();
-        // Refetch bill để cập nhật dữ liệu khuyến mãi giờ miễn phí
-        queryClient.invalidateQueries({
-          queryKey: billQueryKey,
-        });
-        toast({
-          title: "Success",
-          description: applyFreeHourPromo
-            ? "Đã áp dụng khuyến mãi giờ miễn phí"
-            : "Đã tắt khuyến mãi giờ miễn phí",
-        });
-      },
-      onError: (error) => {
-        console.error("Error updating free hour promo:", error);
-        toast({
-          title: "Error",
-          description: "Không thể cập nhật khuyến mãi giờ miễn phí",
-          variant: "destructive",
-        });
-        // Rollback checkbox state on error
-        setApplyFreeHourPromo(!applyFreeHourPromo);
-      },
-    });
 
   // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
   /*
@@ -555,10 +524,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       onError: (_err, _variables, context) => {
         // If the mutation fails, use the context returned from onMutate to roll back
         if (context?.previousBillData) {
-          queryClient.setQueryData(
-            billQueryKey,
-            context.previousBillData,
-          );
+          queryClient.setQueryData(billQueryKey, context.previousBillData);
         }
         if (context?.previousOrderData) {
           queryClient.setQueryData(
@@ -717,35 +683,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       return mappedItem;
     });
   }, [billData?.data.result, orderDetailData, menuItems]);
-
-  // Tính tổng tiền snack + nước để kiểm tra điều kiện khuyến mãi
-  const totalSnackDrinkAmount = React.useMemo(() => {
-    if (!itemsWithDetails || itemsWithDetails.length === 0) return 0;
-
-    return itemsWithDetails.reduce((total, item) => {
-      const category = item.category?.toLowerCase() || "";
-      // Kiểm tra nếu là snack hoặc drink (hỗ trợ cả số ít và số nhiều)
-      const isSnackOrDrink =
-        category === "snack" ||
-        category === "snacks" ||
-        category === "drink" ||
-        category === "drinks";
-
-      if (isSnackOrDrink) {
-        return total + item.price * item.quantity;
-      }
-      return total;
-    }, 0);
-  }, [itemsWithDetails]);
-
-  // Kiểm tra xem có phải cuối tuần không (thứ 7 = 6, chủ nhật = 0)
-  const isWeekend = React.useMemo(() => {
-    const dayOfWeek = dayjs().day(); // 0 = chủ nhật, 6 = thứ 7
-    return dayOfWeek === 0 || dayOfWeek === 6;
-  }, []);
-
-  // Kiểm tra xem có đủ điều kiện để áp dụng khuyến mãi không (>= 35k và không phải cuối tuần)
-  const canApplyFreeHourPromo = totalSnackDrinkAmount >= 35000 && !isWeekend;
 
   // Sử dụng trực tiếp dữ liệu từ API vì backend đã tính toán promotion
   const billResult = (billData?.data.result || {}) as BillData;
@@ -1589,51 +1526,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   </div>
                 </div>
                 <div className="border-t-2 border-dashed border-purple-400" />
-
-                {/* Free Hour Promotion Checkbox */}
-                <div className="flex flex-col gap-1 mb-2">
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="free-hour-promo"
-                      checked={applyFreeHourPromo}
-                      onCheckedChange={(checked) => {
-                        const newValue = checked === true;
-                        setApplyFreeHourPromo(newValue);
-                        updateFreeHourPromo(newValue);
-                      }}
-                      disabled={isUpdatingFreeHourPromo}
-                    />
-                    <Label
-                      htmlFor="free-hour-promo"
-                      className="text-xs sm:text-sm cursor-pointer"
-                    >
-                      Áp dụng khuyến mãi (chỉ áp dụng bill order snack hoặc nước
-                      có giá trị trên 35k)
-                    </Label>
-                  </div>
-                  {!canApplyFreeHourPromo && (
-                    <p className="text-[10px] sm:text-xs text-red-500 ml-6">
-                      {isWeekend ? (
-                        <>
-                          Không thể áp dụng khuyến mãi vào cuối tuần (thứ 7 và
-                          chủ nhật).
-                        </>
-                      ) : (
-                        <>
-                          Tổng snack + nước hiện tại:{" "}
-                          {totalSnackDrinkAmount.toLocaleString("vi-VN", {
-                            style: "currency",
-                            currency: "VND",
-                          })}
-                          . Cần đạt tối thiểu 35.000đ để áp dụng khuyến mãi.
-                        </>
-                      )}
-                    </p>
-                  )}
-                  <p className="text-[10px] sm:text-xs text-muted-foreground ml-6">
-                    Chỉ áp dụng từ 10h đến 19h, không áp dụng cuối tuần
-                  </p>
-                </div>
 
                 {/* Lucky Draw Promotion Section */}
                 <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 mb-2">
