@@ -37,6 +37,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -153,23 +154,21 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
-  // Set default end time when modal opens
+  // Giờ kết thúc / ngày / SĐT: đồng bộ khi mở modal hoặc khi schedule đổi (không gộp applyFreeHourPromo — tránh ghi đè tick của user)
   useEffect(() => {
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
       setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
       setIsEndDateManuallyAdjusted(false);
-      // Khởi tạo từ schedule, người dùng sẽ tự quyết định check/uncheck
-      setApplyFreeHourPromo(schedule.applyFreeHourPromo || false);
       setCustomerPhoneValue(schedule.customerPhone || "");
     }
-  }, [
-    isOpen,
-    schedule.startTime,
-    schedule.applyFreeHourPromo,
-    schedule.customerPhone,
-  ]);
+  }, [isOpen, schedule.startTime, schedule.customerPhone]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
+  }, [isOpen, schedule.applyFreeHourPromo]);
 
   console.log("promotionList", promotionList);
 
@@ -235,6 +234,26 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       });
     },
   });
+
+  const { mutate: persistApplyFreeHourPromo, isPending: isSavingApplyFreeHour } =
+    useMutation({
+      mutationFn: (value: boolean) =>
+        roomsScheduleApis.updateSchedule(schedule._id, {
+          applyFreeHourPromo: value,
+        }),
+      onSuccess: () => {
+        refetchSchedules?.();
+      },
+      onError: (error) => {
+        console.error("Error updating KM 1 giờ đầu:", error);
+        setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
+        toast({
+          title: "Lỗi",
+          description: "Không thể lưu tùy chọn khuyến mãi 1 giờ đầu",
+          variant: "destructive",
+        });
+      },
+    });
 
   // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
   /*
@@ -1553,6 +1572,25 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   </Select>
                 </div>
 
+                <div className="flex items-center gap-2 mb-2">
+                  <Checkbox
+                    id="apply-free-hour-promo"
+                    checked={applyFreeHourPromo}
+                    disabled={isSavingApplyFreeHour}
+                    onCheckedChange={(checked) => {
+                      const next = checked === true;
+                      setApplyFreeHourPromo(next);
+                      persistApplyFreeHourPromo(next);
+                    }}
+                  />
+                  <Label
+                    htmlFor="apply-free-hour-promo"
+                    className="text-xs sm:text-sm font-normal cursor-pointer leading-tight"
+                  >
+                    Áp dụng khuyến mãi 1 giờ đầu tiên
+                  </Label>
+                </div>
+
                 {/* Gift hiển thị trong bill */}
                 {gift && (
                   <div className="p-2 mb-2 bg-pink-50 border border-pink-200 rounded-md text-pink-700 text-xs sm:text-sm space-y-1">
@@ -1617,7 +1655,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   )}
 
                   {/* Free Hour Promotion */}
-                  {freeHourPromotion && freeHourPromotion.freeAmount > 0 && (
+                  {applyFreeHourPromo &&
+                    freeHourPromotion &&
+                    freeHourPromotion.freeAmount > 0 && (
                     <div className="flex justify-between text-xs sm:text-sm">
                       <span className="text-blue-600 break-words">
                         {(() => {
@@ -1654,7 +1694,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   {/* Tính toán giá gốc */}
                   {(() => {
                     // totalAmount từ API đã là tổng sau khi trừ free hour và promotion
-                    const freeHourDiscount = freeHourPromotion?.freeAmount || 0;
+                    const freeHourDiscount = applyFreeHourPromo
+                      ? freeHourPromotion?.freeAmount || 0
+                      : 0;
 
                     // Tính tổng gốc từ items hoặc từ roomTotal + fnbTotal
                     let originalTotal = (roomTotal || 0) + (fnbTotal || 0);
