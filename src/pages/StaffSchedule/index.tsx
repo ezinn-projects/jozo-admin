@@ -153,11 +153,10 @@ const StaffSchedulePage = () => {
   };
 
   const getSalarySnapshotTooltip = (schedule: IEmployeeSchedule | null) => {
-    if (!schedule?.salarySnapshot) return "";
+    const hourlyRate = schedule?.salarySnapshot?.hourlyRate;
+    if (typeof hourlyRate !== "number" || Number.isNaN(hourlyRate)) return "";
 
-    return `\nLương snapshot: ${schedule.salarySnapshot.hourlyRate.toLocaleString(
-      "vi-VN"
-    )} VNĐ/giờ`;
+    return `\nLương snapshot: ${hourlyRate.toLocaleString("vi-VN")} VNĐ/giờ`;
   };
 
   // Group schedules by userId, date and shift

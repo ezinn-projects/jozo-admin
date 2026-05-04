@@ -153,8 +153,8 @@ const MyEarningsDetailPage = () => {
           const finalHours =
             Math.round((schedule.salary?.hours ?? roundedHours) * 100) / 100;
           const hourlyRate =
-            schedule.salary?.hourlyRate ??
             schedule.salarySnapshot?.hourlyRate ??
+            schedule.salary?.hourlyRate ??
             0;
           const calculatedSalary =
             schedule.salary?.totalAmount ?? finalHours * hourlyRate;
