@@ -15,6 +15,7 @@ import GlobalSnapshotBlock, {
 } from "./components/GlobalSnapshotBlock";
 import { useQueryConfig } from "./hooks/useQueryConfig";
 import { OverrideDialogState, SalaryFormValues } from "./types";
+import { buildHourlyRateMap, buildHourlyShiftMap } from "./utils";
 
 const salaryQueryKeys = {
   snapshot: ["employeeSalarySnapshot"] as const,
@@ -22,14 +23,19 @@ const salaryQueryKeys = {
 };
 
 const defaultSalaryValues: SalaryFormValues = {
-  hourlyRate: 0,
+  hourlyRateMap: buildHourlyRateMap(),
+  hourlyShiftMap: buildHourlyShiftMap(),
 };
 
 const normalizeSalarySnapshot = (
   data?: IEmployeeSalarySnapshot | null
-): SalaryFormValues => ({
-  hourlyRate: data?.hourlyRate ?? 0,
-});
+): SalaryFormValues => {
+  const fallbackRate = data?.hourlyRate ?? 0;
+  return {
+    hourlyRateMap: buildHourlyRateMap(data?.hourlyRateMap, fallbackRate),
+    hourlyShiftMap: buildHourlyShiftMap(data?.hourlyShiftMap),
+  };
+};
 
 const extractEmployeeList = (result: unknown): IEmployeeSalaryConfig[] => {
   if (Array.isArray(result)) {
@@ -147,11 +153,12 @@ function StaffSalaryConfig() {
 
   const handleSaveSnapshot = (values: SalaryFormValues) => {
     updateSnapshotMutation.mutate({
-      hourlyRate: values.hourlyRate,
+      hourlyRateMap: buildHourlyRateMap(values.hourlyRateMap),
+      hourlyShiftMap: buildHourlyShiftMap(values.hourlyShiftMap),
     });
   };
 
-  const handleOverrideSubmit = (values: SalaryFormValues) => {
+  const handleOverrideSubmit = (values: { hourlyRate: number }) => {
     if (!overrideDialog.employee) return;
 
     updateOverrideMutation.mutate({

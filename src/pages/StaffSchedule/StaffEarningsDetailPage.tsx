@@ -226,7 +226,7 @@ const StaffEarningsDetailPage = () => {
           }
 
           const roundedHours =
-            Math.round((schedule.salary?.hours ?? hours) * 10) / 10;
+            Math.round((schedule.salary?.hours ?? hours) * 100) / 100;
           const hourlyRate =
             schedule.salary?.hourlyRate ??
             schedule.salarySnapshot?.hourlyRate ??
@@ -293,11 +293,11 @@ const StaffEarningsDetailPage = () => {
 
     return {
       items: data,
-      totalHours: Math.round(totalHours * 10) / 10,
+      totalHours: Math.round(totalHours * 100) / 100,
       totalSalary,
       totalShifts: completedItems.length,
       totalRegistered,
-      expectedHours: Math.round(expectedHours * 10) / 10,
+      expectedHours: Math.round(expectedHours * 100) / 100,
       expectedSalary,
       expectedShifts: expectedItems.length,
     };

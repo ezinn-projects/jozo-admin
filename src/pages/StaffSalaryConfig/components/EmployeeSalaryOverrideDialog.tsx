@@ -21,7 +21,6 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
-import { SalaryFormValues } from "../types";
 import { formatVndInput, parseVndInput } from "../utils";
 
 const overrideFormSchema = z.object({
@@ -30,12 +29,14 @@ const overrideFormSchema = z.object({
     .min(0, "Lương theo giờ phải lớn hơn hoặc bằng 0"),
 });
 
+type OverrideSalaryFormValues = z.infer<typeof overrideFormSchema>;
+
 interface EmployeeSalaryOverrideDialogProps {
   employee: IEmployeeSalaryConfig | null;
   isOpen: boolean;
   isSaving: boolean;
   onClose: () => void;
-  onSubmit: (values: SalaryFormValues) => void;
+  onSubmit: (values: OverrideSalaryFormValues) => void;
 }
 
 function EmployeeSalaryOverrideDialog({
@@ -45,7 +46,7 @@ function EmployeeSalaryOverrideDialog({
   onClose,
   onSubmit,
 }: EmployeeSalaryOverrideDialogProps) {
-  const form = useForm<SalaryFormValues>({
+  const form = useForm<OverrideSalaryFormValues>({
     resolver: zodResolver(overrideFormSchema),
     defaultValues: {
       hourlyRate: 0,

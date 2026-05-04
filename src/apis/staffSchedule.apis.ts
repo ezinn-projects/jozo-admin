@@ -79,7 +79,9 @@ export interface IEmployeeSchedule {
 }
 
 export interface IEmployeeSalarySnapshot {
-  hourlyRate: number;
+  hourlyRate?: number;
+  hourlyRateMap?: Record<string, number>;
+  hourlyShiftMap?: Record<string, "shift1" | "shift2" | "shift3" | null>;
   createdAt?: string;
   updatedAt?: string;
 }
@@ -95,7 +97,8 @@ export interface IEmployeeSalaryConfig {
 }
 
 export interface IUpdateEmployeeSalarySnapshotRequest {
-  hourlyRate: number;
+  hourlyRateMap: Record<string, number>;
+  hourlyShiftMap: Record<string, "shift1" | "shift2" | "shift3" | null>;
 }
 
 export interface IUpdateEmployeeSalaryOverrideRequest {

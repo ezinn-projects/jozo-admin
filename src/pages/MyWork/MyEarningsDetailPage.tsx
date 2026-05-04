@@ -149,11 +149,15 @@ const MyEarningsDetailPage = () => {
             }
           }
 
-          const roundedHours = Math.round(hours * 10) / 10;
+          const roundedHours = Math.round(hours * 100) / 100;
+          const finalHours =
+            Math.round((schedule.salary?.hours ?? roundedHours) * 100) / 100;
           const hourlyRate =
-            schedule.salary?.hourlyRate ?? schedule.salarySnapshot?.hourlyRate ?? 0;
+            schedule.salary?.hourlyRate ??
+            schedule.salarySnapshot?.hourlyRate ??
+            0;
           const calculatedSalary =
-            schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
+            schedule.salary?.totalAmount ?? finalHours * hourlyRate;
           const salary = schedule.salary
             ? schedule.salary.isPayable
               ? schedule.salary.totalAmount
@@ -166,7 +170,7 @@ const MyEarningsDetailPage = () => {
             date: currentDate,
             startTime,
             endTime,
-            hours: roundedHours,
+            hours: finalHours,
             salary,
             status: schedule.status,
             schedule,
@@ -196,7 +200,7 @@ const MyEarningsDetailPage = () => {
 
     return {
       items: data,
-      totalHours: Math.round(totalHours * 10) / 10,
+      totalHours: Math.round(totalHours * 100) / 100,
       totalSalary,
       totalShifts: completedItems.length,
       totalRegistered,
