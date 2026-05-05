@@ -17,7 +17,7 @@ export interface UseMySchedulesOptions {
   date?: Dayjs;
   startDate?: Dayjs;
   endDate?: Dayjs;
-  /** Mặc định compact — payload nhẹ hơn */
+  /** Defaults to compact — lighter payload */
   salaryView?: SalaryView;
 }
 
@@ -37,7 +37,7 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
       options?.salaryView ?? "compact",
     ],
     queryFn: async () => {
-      // Xây dựng params dựa trên options
+      // Build params from options
       const params: {
         status?: EmployeeScheduleStatus;
         shiftType?: ShiftType;
@@ -104,12 +104,12 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
 
       const result = response.data.result as IEmployeeSchedulesResponse;
 
-      // Transform schedulesByDate thành array và normalize dữ liệu
+      // Flatten schedulesByDate into an array and normalize
       const schedules: IEmployeeSchedule[] = [];
       Object.entries(result.schedulesByDate || {}).forEach(
         ([dateKey, scheduleList]) => {
           scheduleList.forEach((schedule) => {
-            // Normalize date: chuyển ISO string hoặc date string thành YYYY-MM-DD
+            // Normalize date: ISO or date string → YYYY-MM-DD
             let normalizedDate = dateKey;
             if (schedule.date) {
               try {

@@ -27,7 +27,7 @@ export type MenuItem = {
   url?: string;
   icon: React.FC<React.SVGProps<SVGSVGElement>>;
   subItems?: MenuItem[];
-  roles?: Role[]; // Thêm thuộc tính roles để kiểm soát quyền truy cập
+  roles?: Role[]; // Restrict visibility by role
 };
 
 const MENU_ITEMS: MenuItem[] = [
@@ -36,21 +36,21 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.HOME,
     icon: Home,
     subItems: [], // No sub-items for Home
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
   {
     title: "My Schedule",
     url: PATHS.MY_SCHEDULE,
     icon: Briefcase,
     subItems: [], // No sub-items for My Schedule
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
   {
     title: "Rooms management",
     url: PATHS.ROOMS,
     icon: DoorOpenIcon,
     subItems: [], // No sub-items for Rooms management
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
   {
     title: "Coffee Tables",
@@ -69,7 +69,7 @@ const MENU_ITEMS: MenuItem[] = [
   {
     title: "General management",
     icon: Settings2,
-    roles: [Role.Admin], // Chỉ admin mới có thể truy cập
+    roles: [Role.Admin],
     subItems: [
       {
         title: "Users Management",
@@ -90,7 +90,7 @@ const MENU_ITEMS: MenuItem[] = [
         roles: [Role.Admin],
       },
       {
-        title: "Cấu hình lương nhân viên",
+        title: "Staff salary configuration",
         url: PATHS.STAFF_SALARY_CONFIG,
         icon: DollarSign,
         roles: [Role.Admin],
@@ -174,14 +174,14 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.CALENDAR,
     icon: Calendar,
     subItems: [], // No sub-items for Calendar
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
   // {
   //   title: "Settings",
   //   url: PATHS.SETTINGS,
   //   icon: Settings,
   //   subItems: [], // No sub-items for Settings
-  //   roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+  //   roles: [Role.Admin, Role.Staff],
   // },
   // total revenue
   {
@@ -189,7 +189,7 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.TOTAL_REVENUE,
     icon: PercentIcon,
     subItems: [], // No sub-items for Total Revenue
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
   // change password
   {
@@ -197,7 +197,7 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.CHANGE_PASSWORD,
     icon: KeyRound,
     subItems: [], // No sub-items for Change Password
-    roles: [Role.Admin, Role.Staff], // Cả admin và staff đều có thể truy cập
+    roles: [Role.Admin, Role.Staff],
   },
 ];
 

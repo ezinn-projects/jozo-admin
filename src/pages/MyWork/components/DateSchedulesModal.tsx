@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dialog";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import { format } from "date-fns";
-import { vi } from "date-fns/locale";
+import { enUS } from "date-fns/locale";
 import { Dayjs } from "dayjs";
 import { CalendarIcon, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -102,8 +102,8 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CalendarIcon className="h-5 w-5" />
-            Lịch làm việc ngày{" "}
-            {format(date.toDate(), "dd/MM/yyyy", { locale: vi })}
+            Schedule for{" "}
+            {format(date.toDate(), "dd/MM/yyyy", { locale: enUS })}
           </DialogTitle>
         </DialogHeader>
 
@@ -111,21 +111,22 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
           {schedules.length === 0 ? (
             <div className="text-center py-8">
               <p className="text-muted-foreground mb-4">
-                Chưa có ca làm việc nào trong ngày này
+                No shifts scheduled for this day
               </p>
               <Button onClick={onRegisterNew} className="gap-2">
                 <Plus className="h-4 w-4" />
-                Đăng ký ca mới
+                Register a shift
               </Button>
             </div>
           ) : (
             <>
               <div className="flex items-center justify-between mb-4">
                 <p className="text-sm text-muted-foreground">
-                  Tổng cộng {schedules.length} ca
+                  {schedules.length} shift{schedules.length !== 1 ? "s" : ""}{" "}
+                  total
                   {schedules.length >= 2 && (
                     <span className="ml-2 text-xs text-muted-foreground">
-                      (Đã đủ)
+                      (maximum reached)
                     </span>
                   )}
                 </p>
@@ -137,7 +138,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                     className="gap-2"
                   >
                     <Plus className="h-4 w-4" />
-                    Đăng ký thêm ca
+                    Register another shift
                   </Button>
                 )}
               </div>
@@ -185,7 +186,7 @@ const DateSchedulesModal: React.FC<DateSchedulesModalProps> = ({
                     {schedule.status === EmployeeScheduleStatus.Rejected &&
                       schedule.rejectedReason && (
                         <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
-                          <span className="font-medium">Lý do từ chối: </span>
+                          <span className="font-medium">Rejection reason: </span>
                           {schedule.rejectedReason}
                         </p>
                       )}

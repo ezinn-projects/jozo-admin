@@ -35,7 +35,7 @@ import {
 
 const salaryFormSchema = z.object({
   hourlyRateMap: z.record(
-    z.coerce.number().min(0, "Lương theo giờ phải lớn hơn hoặc bằng 0"),
+    z.coerce.number().min(0, "Hourly rate must be greater than or equal to 0"),
   ),
   hourlyShiftMap: z.record(z.enum(["shift1", "shift2", "shift3"]).nullable()),
 });
@@ -68,16 +68,16 @@ function GlobalSnapshotBlock({
       <CardHeader>
         <CardTitle>Global Snapshot</CardTitle>
         <CardDescription>
-          Cấu hình lương theo từng khung giờ (00-23h) và ca làm tương ứng.
+          Hourly pay for each clock hour (00–23) and the matching work shift.
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[120px_1fr_180px]">
-              <span className="font-medium">Khung giờ</span>
-              <span className="font-medium">Lương theo giờ (VND)</span>
-              <span className="font-medium">Ca làm</span>
+              <span className="font-medium">Hour</span>
+              <span className="font-medium">Hourly rate (VND)</span>
+              <span className="font-medium">Shift</span>
             </div>
 
             <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
@@ -134,14 +134,14 @@ function GlobalSnapshotBlock({
                           >
                             <FormControl>
                               <SelectTrigger>
-                                <SelectValue placeholder="Chưa gán ca" />
+                                <SelectValue placeholder="No shift" />
                               </SelectTrigger>
                             </FormControl>
                             <SelectContent>
-                              <SelectItem value="none">Không gán</SelectItem>
-                              <SelectItem value="shift1">Ca 1</SelectItem>
-                              <SelectItem value="shift2">Ca 2</SelectItem>
-                              <SelectItem value="shift3">Ca 3</SelectItem>
+                              <SelectItem value="none">None</SelectItem>
+                              <SelectItem value="shift1">Shift 1</SelectItem>
+                              <SelectItem value="shift2">Shift 2</SelectItem>
+                              <SelectItem value="shift3">Shift 3</SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />
@@ -154,13 +154,13 @@ function GlobalSnapshotBlock({
             </div>
 
             <FormDescription>
-              Khi lưu, hệ thống luôn gửi đủ 24 key từ "0" đến "23" cho cả map
-              lương và map ca.
+              On save, the system always sends all 24 keys from &quot;0&quot;
+              through &quot;23&quot; for both rate and shift maps.
             </FormDescription>
 
             <div className="flex flex-wrap items-center gap-2">
               <Button type="submit" disabled={isBusy}>
-                {isSaving ? "Đang lưu..." : "Lưu snapshot"}
+                {isSaving ? "Saving..." : "Save snapshot"}
               </Button>
               <Button
                 type="button"
@@ -168,7 +168,7 @@ function GlobalSnapshotBlock({
                 disabled={isBusy}
                 onClick={onSync}
               >
-                {isSyncing ? "Đang đồng bộ..." : "Đồng bộ tất cả nhân viên"}
+                {isSyncing ? "Syncing..." : "Sync all staff"}
               </Button>
             </div>
           </form>

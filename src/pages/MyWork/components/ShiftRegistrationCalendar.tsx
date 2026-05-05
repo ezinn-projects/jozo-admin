@@ -51,7 +51,7 @@ export function ShiftRegistrationCalendar({
     if (shiftType === "Shift 1") return "S1";
     if (shiftType === "Shift 2") return "S2";
     if (shiftType === "Shift 3") return "S3";
-    return "TC";
+    return "CU";
   };
 
   // Group schedules by date
@@ -146,7 +146,7 @@ export function ShiftRegistrationCalendar({
       } else if (shift === "shift3" || shift === "all") {
         shiftTypes.add("Shift 3");
       } else if (schedule.customStartTime && schedule.customEndTime) {
-        shiftTypes.add("Ca Tùy chỉnh");
+        shiftTypes.add("Custom shift");
       }
     });
 
@@ -180,7 +180,7 @@ export function ShiftRegistrationCalendar({
               onClick={handleToday}
               className="h-9 rounded-full px-3 text-sm sm:h-10 sm:px-4"
             >
-              Hôm nay
+              Today
             </Button>
           </div>
 
@@ -193,7 +193,7 @@ export function ShiftRegistrationCalendar({
       {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-px rounded-xl bg-slate-200/80 overflow-hidden border">
         {/* Weekday Headers */}
-        {["CN", "T2", "T3", "T4", "T5", "T6", "T7"].map((day) => (
+        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
           <div
             key={day}
             className="bg-slate-50 py-2 text-center text-[11px] font-semibold text-slate-600 sm:py-3 sm:text-sm"
@@ -245,7 +245,8 @@ export function ShiftRegistrationCalendar({
 
                   {daySchedules.length > 0 && !isPast && (
                     <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-600 sm:text-xs">
-                      {daySchedules.length} ca
+                      {daySchedules.length} shift
+                      {daySchedules.length !== 1 ? "s" : ""}
                     </div>
                   )}
                 </div>
@@ -298,7 +299,7 @@ export function ShiftRegistrationCalendar({
 
                       {shiftTypes.length > 2 && (
                         <div className="text-center text-[11px] font-medium text-slate-500">
-                          +{shiftTypes.length - 2} ca khac
+                          +{shiftTypes.length - 2} more
                         </div>
                       )}
                     </div>

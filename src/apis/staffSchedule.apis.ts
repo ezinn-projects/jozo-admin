@@ -24,16 +24,16 @@ export interface IShiftInfo {
   endTime: string;
 }
 
-/** Query param: không gửi hoặc khác compact → BE coi là full */
+/** Query param: omit or non-compact → backend treats as full */
 export type SalaryView = "compact" | "full";
 
-/** Nguồn lương theo schedule (BE mới) */
+/** Salary source tied to schedule (new backend) */
 export type ScheduleSalarySource =
   | "global"
   | "probation"
   | "legacy_manual";
 
-/** Giá trị cũ có thể còn trong rollout */
+/** Legacy values may still appear during rollout */
 export type LegacySalarySource =
   | "special"
   | "override"
@@ -56,7 +56,7 @@ export interface ISalaryResolution {
   probationHolidayBoostSegments?: unknown[];
 }
 
-/** Compact: chủ yếu source + capturedAt. Full: thêm map giờ và chi tiết. */
+/** Compact: mainly source + capturedAt. Full: adds hourly maps and details. */
 export interface IEmployeeScheduleSalarySnapshot {
   source?: "global" | "override" | "manual" | ScheduleSalarySource;
   capturedAt?: string;
@@ -150,7 +150,7 @@ export interface IEmployeeSalaryConfig {
   userPhone?: string;
   hourlyRate: number;
   snapshotHourlyRate: number;
-  /** Override nhân viên đã bỏ — có thể không còn từ BE */
+  /** Per-staff override removed — may no longer come from backend */
   isOverride?: boolean;
   updatedAt?: string;
 }
@@ -172,7 +172,7 @@ export interface IUpdateEmployeeSalarySnapshotRequest {
   hourlyShiftMap: Record<string, "shift1" | "shift2" | "shift3" | null>;
 }
 
-/** @deprecated BE trả 410 — dùng special-days */
+/** @deprecated Backend returns 410 — use special-days */
 export interface IUpdateEmployeeSalaryOverrideRequest {
   hourlyRate: number;
 }
@@ -294,7 +294,7 @@ const staffScheduleApis = {
     http.get<HTTPResponse<IEmployeeSalaryConfig[]>>(
       "/employee-schedules/salary/employees",
     ),
-  /** @deprecated BE 410 — không dùng từ UI */
+  /** @deprecated Backend 410 — not used from UI */
   updateEmployeeSalaryOverride: (
     userId: string,
     data: IUpdateEmployeeSalaryOverrideRequest,
@@ -303,7 +303,7 @@ const staffScheduleApis = {
       `/employee-schedules/salary/employees/${userId}`,
       data,
     ),
-  /** @deprecated BE 410 — không dùng từ UI */
+  /** @deprecated Backend 410 — not used from UI */
   deleteEmployeeSalaryOverride: (userId: string) =>
     http.delete<HTTPResponse<IEmployeeSalaryOverrideResult>>(
       `/employee-schedules/salary/employees/${userId}/override`,

@@ -79,8 +79,8 @@ function StaffSalaryConfig() {
     onSuccess: () => {
       invalidateSalaryQueries();
       toast({
-        title: "Thành công",
-        description: "Đã lưu salary snapshot global.",
+        title: "Success",
+        description: "Global salary snapshot saved.",
       });
     },
   });
@@ -92,10 +92,10 @@ function StaffSalaryConfig() {
       invalidateSalaryQueries();
       queryClient.invalidateQueries({ queryKey: salarySpecialDaysQueryKey });
       toast({
-        title: "Thành công",
+        title: "Success",
         description: result
-          ? `Đã đồng bộ ${result.syncedCount}/${result.totalStaffs} nhân viên.`
-          : "Đã đồng bộ salary snapshot cho tất cả nhân viên.",
+          ? `Synced ${result.syncedCount}/${result.totalStaffs} staff members.`
+          : "Salary snapshot synced for all staff.",
       });
       invalidateScheduleQueries();
     },
@@ -117,8 +117,8 @@ function StaffSalaryConfig() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Cấu hình lương nhân viên"
-        description="Snapshot global, đồng bộ toàn hệ thống, ngày lương đặc biệt và cấu hình thử việc trên từng user."
+        title="Staff salary configuration"
+        description="Global snapshot, full-system sync, special salary days, and probation settings per user."
         icon={CircleDollarSign}
         className="mb-2"
       />

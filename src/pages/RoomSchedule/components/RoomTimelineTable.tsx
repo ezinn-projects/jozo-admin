@@ -992,7 +992,7 @@ const RoomTimelineTable: React.FC = () => {
     <div className="!p-4 w-full space-y-6">
       <PageHeader
         title="Room Schedules Timeline"
-        description="Xem và quản lý lịch đặt phòng theo timeline"
+        description="Track room schedules and manage bookings"
         icon={CalendarIcon}
       />
 

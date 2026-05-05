@@ -56,11 +56,11 @@ const areTimesValid = (startTime?: string, endTime?: string) => {
 const employeeScheduleSchema = z
   .object({
     date: z.date({
-      required_error: "Ngày là bắt buộc",
+      required_error: "Date is required",
     }),
     shifts: z
       .array(z.enum([ShiftType.Morning, ShiftType.Afternoon, ShiftType.All]))
-      .min(1, "Vui lòng chọn ít nhất một ca làm việc"),
+      .min(1, "Please select at least one shift"),
     note: z.string().max(500).optional(),
     customStartTime: z.string().optional(),
     customEndTime: z.string().optional(),
@@ -70,7 +70,7 @@ const employeeScheduleSchema = z
       return areTimesValid(data.customStartTime, data.customEndTime);
     },
     {
-      message: "Khoảng thời gian không hợp lệ",
+      message: "Invalid time range",
       path: ["customEndTime"],
     },
   );
@@ -141,7 +141,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
   useEffect(() => {
     if (customStartTime && customEndTime) {
       if (!areTimesValid(customStartTime, customEndTime)) {
-        setTimeError("Khoảng thời gian không hợp lệ");
+        setTimeError("Invalid time range");
       } else {
         setTimeError("");
       }
@@ -155,15 +155,16 @@ const EmployeeScheduleRegistrationModal: React.FC<
       staffScheduleApis.registerMySchedule(data),
     onSuccess: () => {
       toast({
-        title: "Thành công",
-        description: "Đăng ký lịch thành công, chờ admin phê duyệt",
+        title: "Success",
+        description:
+          "Schedule registered successfully. Awaiting admin approval.",
       });
       reset();
       refetchSchedules?.();
       onClose();
     },
     onError: (error: unknown) => {
-      // Kiểm tra xem có errors object trong response không
+      // Check whether the response includes an errors object
       const axiosError = error as {
         response?: {
           data?: {
@@ -187,7 +188,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
       const errors = responseData?.errors;
 
       if (errors && typeof errors === "object") {
-        // Extract tất cả msg từ errors object
+        // Extract all msg values from the errors object
         const errorMessages: string[] = [];
         const fieldErrors: Record<string, string> = {};
 
@@ -198,16 +199,16 @@ const EmployeeScheduleRegistrationModal: React.FC<
           }
         });
 
-        // Hiển thị tất cả msg trong toast
+        // Show all messages in the toast
         if (errorMessages.length > 0) {
           toast({
-            title: responseData?.message || "Lỗi validation",
+            title: responseData?.message || "Validation error",
             description: errorMessages.join(", "),
             variant: "destructive",
           });
         }
 
-        // Set lỗi vào form fields tương ứng
+        // Map errors to the corresponding form fields
         Object.entries(fieldErrors).forEach(([field, message]) => {
           if (
             field === "shifts" ||
@@ -231,13 +232,13 @@ const EmployeeScheduleRegistrationModal: React.FC<
           }
         });
       } else {
-        // Fallback: hiển thị message thông thường
+        // Fallback: show a generic message
         const errorMessage =
           responseData?.message ||
           axiosError?.message ||
-          "Có lỗi xảy ra khi đăng ký lịch làm";
+          "An error occurred while registering your schedule";
         toast({
-          title: "Lỗi",
+          title: "Error",
           description: errorMessage,
           variant: "destructive",
         });
@@ -248,7 +249,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
   const onSubmit = (values: FormValues) => {
     // Validate time before submit
     if (!areTimesValid(values.customStartTime, values.customEndTime)) {
-      setTimeError("Khoảng thời gian không hợp lệ");
+      setTimeError("Invalid time range");
       return;
     }
 
@@ -278,7 +279,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Đăng ký lịch làm</DialogTitle>
+          <DialogTitle>Register work schedule</DialogTitle>
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -287,7 +288,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
               name="date"
               render={({ field }) => (
                 <FormItem className="flex flex-col">
-                  <FormLabel>Ngày làm việc</FormLabel>
+                  <FormLabel>Work date</FormLabel>
                   <Popover modal={true}>
                     <PopoverTrigger asChild>
                       <FormControl>
@@ -301,7 +302,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
                           {field.value ? (
                             format(field.value, "dd/MM/yyyy")
                           ) : (
-                            <span>Chọn ngày</span>
+                            <span>Pick a date</span>
                           )}
                           {field.value ? (
                             <CircleXIcon
@@ -343,7 +344,7 @@ const EmployeeScheduleRegistrationModal: React.FC<
               name="shifts"
               render={({ field }) => (
                 <FormItem className="space-y-3">
-                  <FormLabel className="text-base">Ca làm việc</FormLabel>
+                  <FormLabel className="text-base">Shift</FormLabel>
                   <div className="flex flex-col space-y-2">
                     {[
                       {
@@ -389,10 +390,10 @@ const EmployeeScheduleRegistrationModal: React.FC<
               name="note"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Ghi chú (tùy chọn)</FormLabel>
+                  <FormLabel>Note (optional)</FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Nhập ghi chú..."
+                      placeholder="Enter a note..."
                       className="resize-none"
                       maxLength={500}
                       {...field}
@@ -410,10 +411,10 @@ const EmployeeScheduleRegistrationModal: React.FC<
                 onClick={handleClose}
                 disabled={isSubmitting}
               >
-                Hủy
+                Cancel
               </Button>
               <Button type="submit" disabled={isSubmitting || !!timeError}>
-                {isSubmitting ? "Đang đăng ký..." : "Đăng ký"}
+                {isSubmitting ? "Registering..." : "Register"}
               </Button>
             </DialogFooter>
           </form>

@@ -63,18 +63,18 @@ const combineDateAndTimeToIso = (
   return out.toISOString();
 };
 
-// Schema cho form cập nhật user
+// Schema for user update form
 const updateUserSchema = z
   .object({
-    name: z.string().min(1, "Tên là bắt buộc"),
-    username: z.string().min(3, "Username phải có ít nhất 3 ký tự"),
-    email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
+    name: z.string().min(1, "Name is required"),
+    username: z.string().min(3, "Username must be at least 3 characters"),
+    email: z.string().email("Invalid email").optional().or(z.literal("")),
     date_of_birth: z.coerce.date({
-      required_error: "Ngày sinh là bắt buộc",
-      invalid_type_error: "Ngày sinh không hợp lệ",
+      required_error: "Date of birth is required",
+      invalid_type_error: "Invalid date of birth",
     }),
-    role: z.nativeEnum(Role, { required_error: "Vai trò là bắt buộc" }),
-    phone_number: z.string().min(10, "Số điện thoại phải có ít nhất 10 số"),
+    role: z.nativeEnum(Role, { required_error: "Role is required" }),
+    phone_number: z.string().min(10, "Phone number must be at least 10 digits"),
     probationStartDate: z.date().optional(),
     probationStartTime: z.string().optional(),
     probationEndDate: z.date().optional(),
@@ -89,7 +89,7 @@ const updateUserSchema = z
     if (!Number.isFinite(n) || n < 0 || n > 20) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Hệ số ngày lễ (thử việc) phải từ 0 đến 20",
+        message: "Holiday multiplier (probation) must be between 0 and 20",
         path: ["probationHolidayMultiplierStr"],
       });
     }
@@ -206,7 +206,7 @@ const EditUserForm = () => {
   if (isLoadingUser) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-lg">Đang tải...</div>
+        <div className="text-lg">Loading...</div>
       </div>
     );
   }
@@ -214,8 +214,8 @@ const EditUserForm = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Chỉnh sửa Admin/Staff"
-        description="Cập nhật thông tin quản trị viên hoặc nhân viên"
+        title="Edit admin / staff"
+        description="Update administrator or staff profile"
         icon={UserCog}
         showBackButton
         backUrl={PATHS.STAFF_MANAGEMENT}
@@ -224,11 +224,11 @@ const EditUserForm = () => {
         <CardContent className="pt-6">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <div className="space-y-2">
-              <Label htmlFor="name">Tên *</Label>
+              <Label htmlFor="name">Name *</Label>
               <Input
                 id="name"
                 {...form.register("name")}
-                placeholder="Nhập tên đầy đủ"
+                placeholder="Full name"
               />
               {form.formState.errors.name && (
                 <p className="text-sm text-red-500">
@@ -242,7 +242,7 @@ const EditUserForm = () => {
               <Input
                 id="username"
                 {...form.register("username")}
-                placeholder="Nhập username (dùng để đăng nhập)"
+                placeholder="Username (used to sign in)"
               />
               {form.formState.errors.username && (
                 <p className="text-sm text-red-500">
@@ -257,7 +257,7 @@ const EditUserForm = () => {
                 id="email"
                 type="email"
                 {...form.register("email")}
-                placeholder="Nhập email (tùy chọn)"
+                placeholder="Email (optional)"
               />
               {form.formState.errors.email && (
                 <p className="text-sm text-red-500">
@@ -267,11 +267,11 @@ const EditUserForm = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone_number">Số điện thoại *</Label>
+              <Label htmlFor="phone_number">Phone number *</Label>
               <Input
                 id="phone_number"
                 {...form.register("phone_number")}
-                placeholder="Nhập số điện thoại"
+                placeholder="Phone number"
               />
               {form.formState.errors.phone_number && (
                 <p className="text-sm text-red-500">
@@ -285,7 +285,7 @@ const EditUserForm = () => {
               name="date_of_birth"
               render={({ field }) => (
                 <div className="space-y-2">
-                  <Label>Ngày sinh *</Label>
+                  <Label>Date of birth *</Label>
                   <Popover>
                     <PopoverTrigger asChild>
                       <Button
@@ -299,7 +299,7 @@ const EditUserForm = () => {
                         <CalendarIcon className="mr-2 h-4 w-4" />
                         {field.value
                           ? format(field.value, "dd/MM/yyyy")
-                          : "Chọn ngày"}
+                          : "Pick a date"}
                       </Button>
                     </PopoverTrigger>
                     <PopoverContent className="w-auto p-0" align="start">
@@ -325,13 +325,13 @@ const EditUserForm = () => {
             />
 
             <div className="space-y-2">
-              <Label htmlFor="role">Vai trò *</Label>
+              <Label htmlFor="role">Role *</Label>
               <Select
                 value={form.watch("role")}
                 onValueChange={(value) => form.setValue("role", value as Role)}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Chọn vai trò" />
+                  <SelectValue placeholder="Select role" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value={Role.Staff}>Staff</SelectItem>
@@ -348,16 +348,16 @@ const EditUserForm = () => {
             <div className="border-t pt-6 space-y-4">
               <div>
                 <div className="text-base font-semibold">
-                  Thử việc &amp; lương
+                  Probation &amp; pay
                 </div>
                 <p className="text-sm text-muted-foreground">
-                  Chọn ngày trên lịch và giờ riêng. Để trống và lưu để xóa cấu
-                  hình.
+                  Pick dates on the calendar and custom times. Leave empty and
+                  save to clear settings.
                 </p>
               </div>
               <div className="grid gap-4 sm:grid-cols-2">
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Bắt đầu thử việc</Label>
+                  <Label>Probation start</Label>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Controller
                       control={form.control}
@@ -376,7 +376,7 @@ const EditUserForm = () => {
                               <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                               {field.value
                                 ? format(field.value, "dd/MM/yyyy")
-                                : "Chọn ngày"}
+                                : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -408,13 +408,13 @@ const EditUserForm = () => {
                         form.setValue("probationStartTime", "");
                       }}
                     >
-                      Xóa
+                      Clear
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-2 sm:col-span-2">
-                  <Label>Kết thúc thử việc</Label>
+                  <Label>Probation end</Label>
                   <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                     <Controller
                       control={form.control}
@@ -433,7 +433,7 @@ const EditUserForm = () => {
                               <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
                               {field.value
                                 ? format(field.value, "dd/MM/yyyy")
-                                : "Chọn ngày"}
+                                : "Pick a date"}
                             </Button>
                           </PopoverTrigger>
                           <PopoverContent className="w-auto p-0" align="start">
@@ -465,31 +465,31 @@ const EditUserForm = () => {
                         form.setValue("probationEndTime", "");
                       }}
                     >
-                      Xóa
+                      Clear
                     </Button>
                   </div>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="probationHourlyRateStr">
-                    Lương giờ (thử việc)
+                    Hourly rate (probation)
                   </Label>
                   <Input
                     id="probationHourlyRateStr"
                     inputMode="numeric"
                     {...form.register("probationHourlyRateStr")}
-                    placeholder="Để trống để xóa"
+                    placeholder="Leave empty to clear"
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="probationHolidayMultiplierStr">
-                    Hệ số ngày lễ (0–20)
+                    Holiday multiplier (0–20)
                   </Label>
                   <Input
                     id="probationHolidayMultiplierStr"
                     inputMode="decimal"
                     {...form.register("probationHolidayMultiplierStr")}
-                    placeholder="Để trống để xóa"
+                    placeholder="Leave empty to clear"
                   />
                   {form.formState.errors.probationHolidayMultiplierStr && (
                     <p className="text-sm text-red-500">
@@ -509,7 +509,7 @@ const EditUserForm = () => {
                 disabled={isUpdatingUser}
                 className="flex-1"
               >
-                {isUpdatingUser ? "Đang xử lý..." : "Cập nhật"}
+                {isUpdatingUser ? "Saving..." : "Update"}
               </Button>
               <Button
                 type="button"
@@ -517,7 +517,7 @@ const EditUserForm = () => {
                 onClick={() => navigate(PATHS.STAFF_MANAGEMENT)}
                 className="flex-1"
               >
-                Hủy
+                Cancel
               </Button>
             </div>
           </form>

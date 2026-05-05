@@ -2,7 +2,7 @@ import http from "@/utils/http";
 // import { HTTPResponse } from "@/@types";
 const HOLIDAY_API_URL = "/holidays";
 
-/** Body tạo/sửa ngày lễ — salaryMultiplier: 0.1–20 hoặc null (không nhân) */
+/** Create/update holiday body — salaryMultiplier: 0.1–20 or null (no multiplier) */
 export interface Holiday {
   _id?: string;
   date: string;

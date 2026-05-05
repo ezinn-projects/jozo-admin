@@ -22,7 +22,7 @@ export interface CalendarEvent {
   date: string;
   name: string;
   description?: string;
-  /** 0.1–20: nhân lương ngày lễ cho NV chính thức; null/undefined: không gán hệ số trên ngày lễ */
+  /** 0.1–20: multiply holiday pay for permanent staff; null/undefined: no multiplier on this holiday */
   salaryMultiplier?: number | null;
 }
 
@@ -44,10 +44,13 @@ function parseSalaryMultiplierInput(raw: string): {
   }
   const n = Number(trimmed.replace(",", "."));
   if (!Number.isFinite(n)) {
-    return { value: null, error: "Hệ số không hợp lệ" };
+    return { value: null, error: "Invalid multiplier" };
   }
   if (n < 0.1 || n > 20) {
-    return { value: null, error: "Hệ số phải từ 0,1 đến 20 (hoặc để trống)" };
+    return {
+      value: null,
+      error: "Multiplier must be between 0.1 and 20 (or leave empty)",
+    };
   }
   return { value: n };
 }
@@ -206,7 +209,7 @@ export function CustomCalendar({
           variant="outline"
           size="icon"
           onClick={handleOpenAddFromHeader}
-          aria-label="Thêm ngày lễ"
+          aria-label="Add holiday"
         >
           <Plus className="h-4 w-4" />
         </Button>
@@ -254,7 +257,7 @@ export function CustomCalendar({
                     {event.salaryMultiplier != null &&
                       event.salaryMultiplier > 0 && (
                         <p className="text-xs font-medium text-red-700 mt-0.5">
-                          Hệ số lương: ×{event.salaryMultiplier}
+                          Pay multiplier: ×{event.salaryMultiplier}
                         </p>
                       )}
                     {event.description && (
@@ -281,11 +284,11 @@ export function CustomCalendar({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Thêm ngày lễ</DialogTitle>
+            <DialogTitle>Add holiday</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label htmlFor="holiday-date">Ngày</Label>
+              <Label htmlFor="holiday-date">Date</Label>
               <Input
                 id="holiday-date"
                 type="date"
@@ -296,19 +299,19 @@ export function CustomCalendar({
               />
             </div>
             <div>
-              <Label htmlFor="holiday-name">Tên ngày lễ *</Label>
+              <Label htmlFor="holiday-name">Holiday name *</Label>
               <Input
                 id="holiday-name"
                 value={newEvent.name || ""}
                 onChange={(e) =>
                   setNewEvent({ ...newEvent, name: e.target.value })
                 }
-                placeholder="Ví dụ: Tết Nguyên Đán"
+                placeholder="e.g. Lunar New Year"
               />
             </div>
             <div>
               <Label htmlFor="holiday-salary-mult">
-                Hệ số lương ngày lễ (áp dụng NV chính thức)
+                Holiday pay multiplier (permanent staff)
               </Label>
               <Input
                 id="holiday-salary-mult"
@@ -318,11 +321,11 @@ export function CustomCalendar({
                   setSalaryMultiplierInput(e.target.value);
                   setMultiplierError("");
                 }}
-                placeholder={`Gợi ý: ${DEFAULT_SALARY_MULTIPLIER_SUGGESTION}`}
+                placeholder={`Suggested: ${DEFAULT_SALARY_MULTIPLIER_SUGGESTION}`}
               />
               <p className="text-xs text-muted-foreground mt-1">
-                Khoảng 0,1–20. Để trống = không gán hệ số trên ngày lễ này (xử
-                lý theo cấu hình khác, ví dụ thử việc).
+                Range 0.1–20. Leave empty for no multiplier on this holiday
+                (other rules such as probation may still apply).
               </p>
               {multiplierError && (
                 <p className="text-sm text-destructive mt-1">
@@ -331,14 +334,14 @@ export function CustomCalendar({
               )}
             </div>
             <div>
-              <Label htmlFor="holiday-desc">Mô tả (tuỳ chọn)</Label>
+              <Label htmlFor="holiday-desc">Description (optional)</Label>
               <Textarea
                 id="holiday-desc"
                 value={newEvent.description || ""}
                 onChange={(e) =>
                   setNewEvent({ ...newEvent, description: e.target.value })
                 }
-                placeholder="Ghi chú thêm"
+                placeholder="Additional notes"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -346,9 +349,9 @@ export function CustomCalendar({
                 variant="outline"
                 onClick={() => setIsAddEventOpen(false)}
               >
-                Huỷ
+                Cancel
               </Button>
-              <Button onClick={handleAddEvent}>Lưu ngày lễ</Button>
+              <Button onClick={handleAddEvent}>Save holiday</Button>
             </div>
           </div>
         </DialogContent>
@@ -360,15 +363,16 @@ export function CustomCalendar({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xoá ngày lễ</AlertDialogTitle>
+            <AlertDialogTitle>Delete holiday</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc muốn xoá ngày lễ này? Thao tác không hoàn tác.
+              Are you sure you want to delete this holiday? This cannot be
+              undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Huỷ</AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>
-              Xoá
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

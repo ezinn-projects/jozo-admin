@@ -71,7 +71,7 @@ function CalendarPage() {
     <div className="!py-6 space-y-6">
       <PageHeader
         title="Holiday Calendar"
-        description="Quản lý lịch nghỉ lễ và ngày đặc biệt"
+        description="Manage public holidays and special dates"
         icon={CalendarIcon}
       />
       <Spin spinning={isLoading}>

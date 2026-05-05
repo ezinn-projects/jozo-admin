@@ -11,19 +11,19 @@ const http = axios.create({
   },
 });
 
-// Thêm một bộ đón chặn request
+// Request interceptor
 http.interceptors.request.use(
   function (config) {
-    // Lấy token mới nhất từ localStorage mỗi khi gửi request
+    // Read latest token from localStorage on each request
     const token = localStorage.getItem("access_token");
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
     
-    // Nếu data là FormData, để axios tự động set Content-Type với boundary
-    // Nếu không phải FormData và chưa có Content-Type, set mặc định là application/json
+    // FormData: let axios set Content-Type with boundary
+    // Otherwise default to application/json if missing
     if (config.data instanceof FormData) {
-      // Xóa Content-Type để axios tự động set với boundary
+      // Drop Content-Type so axios sets multipart boundary
       delete config.headers["Content-Type"];
     } else if (!config.headers["Content-Type"]) {
       config.headers["Content-Type"] = "application/json";
@@ -32,28 +32,26 @@ http.interceptors.request.use(
     return config;
   },
   function (error) {
-    // Làm gì đó với lỗi request
+    // Handle request error
     return Promise.reject(error);
-  }
+  },
 );
 
-// Thêm một bộ đón chặn response
+// Response interceptor
 http.interceptors.response.use(
   function (response) {
-    // Bất kì mã trạng thái nào nằm trong tầm 2xx đều khiến hàm này được trigger
-    // Làm gì đó với dữ liệu response
+    // Any 2xx status runs this handler
     return response;
   },
   function (error) {
-    // Bất kì mã trạng thái nào lọt ra ngoài tầm 2xx đều khiến hàm này được trigger\
-    // Làm gì đó với lỗi response
+    // Any non-2xx status runs this handler
     toast({
       title: "Error",
       description: error.response?.data?.message || "An unknown error occurred",
       variant: "destructive",
     });
     return Promise.reject(error);
-  }
+  },
 );
 
 export default http;

@@ -50,7 +50,7 @@ import {
 } from "@/components/ui/table";
 
 const specialDayFormSchema = z.object({
-  businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Định dạng YYYY-MM-DD"),
+  businessDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
   hourlyAmountMap: z.record(z.coerce.number().min(0)),
 });
 
@@ -119,8 +119,8 @@ function SpecialSalaryDaysSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: salarySpecialDaysQueryKey });
       toast({
-        title: "Thành công",
-        description: "Đã lưu cấu hình ngày lương đặc biệt.",
+        title: "Success",
+        description: "Special salary day saved.",
       });
       form.reset({
         businessDate: "",
@@ -130,8 +130,8 @@ function SpecialSalaryDaysSection({
     onError: (error: unknown) => {
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message || "Không lưu được.";
-      toast({ title: "Lỗi", description: msg, variant: "destructive" });
+          ?.data?.message || "Could not save.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
@@ -140,15 +140,15 @@ function SpecialSalaryDaysSection({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: salarySpecialDaysQueryKey });
       toast({
-        title: "Thành công",
-        description: "Đã xóa ngày lương đặc biệt.",
+        title: "Success",
+        description: "Special salary day removed.",
       });
     },
     onError: (error: unknown) => {
       const msg =
         (error as { response?: { data?: { message?: string } } })?.response
-          ?.data?.message || "Không xóa được.";
-      toast({ title: "Lỗi", description: msg, variant: "destructive" });
+          ?.data?.message || "Could not delete.";
+      toast({ title: "Error", description: msg, variant: "destructive" });
     },
   });
 
@@ -156,9 +156,9 @@ function SpecialSalaryDaysSection({
     const hourlyAmountMap = filterHourMap(values.hourlyAmountMap);
     if (Object.keys(hourlyAmountMap).length === 0) {
       toast({
-        title: "Thiếu dữ liệu",
+        title: "Missing data",
         description:
-          "Nhập ít nhất một khung giờ có mức lương ≥ 0 (đủ điều kiện > 0).",
+          "Enter at least one hour with an amount greater than 0.",
         variant: "destructive",
       });
       return;
@@ -203,15 +203,15 @@ function SpecialSalaryDaysSection({
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <CalendarRange className="h-5 w-5" />
-            Ngày lương đặc biệt
+            Special salary days
           </CardTitle>
           <CardDescription>
-            Ghi đè toàn bộ map giờ cho từng ngày kinh doanh (YYYY-MM-DD). Dùng
-            thay cho override theo nhân viên.
+            Overrides the hourly amount map per business date (YYYY-MM-DD).
+            Use this instead of per-staff overrides.
           </CardDescription>
           <div className="flex flex-wrap items-end gap-3 pt-2">
             <div className="space-y-1">
-              <Label className="text-xs">Từ ngày</Label>
+              <Label className="text-xs">From</Label>
               <Input
                 type="date"
                 value={from || ""}
@@ -220,7 +220,7 @@ function SpecialSalaryDaysSection({
               />
             </div>
             <div className="space-y-1">
-              <Label className="text-xs">Đến ngày</Label>
+              <Label className="text-xs">To</Label>
               <Input
                 type="date"
                 value={to || ""}
@@ -235,16 +235,16 @@ function SpecialSalaryDaysSection({
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ngày</TableHead>
-                  <TableHead>Cập nhật</TableHead>
-                  <TableHead className="text-right">Thao tác</TableHead>
+                  <TableHead>Date</TableHead>
+                  <TableHead>Updated</TableHead>
+                  <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading ? (
                   <TableRow>
                     <TableCell colSpan={3} className="py-8 text-center">
-                      Đang tải...
+                      Loading...
                     </TableCell>
                   </TableRow>
                 ) : !data?.length ? (
@@ -253,7 +253,7 @@ function SpecialSalaryDaysSection({
                       colSpan={3}
                       className="py-8 text-center text-muted-foreground"
                     >
-                      Chưa có ngày đặc biệt trong khoảng lọc.
+                      No special days in this date range.
                     </TableCell>
                   </TableRow>
                 ) : (
@@ -265,7 +265,7 @@ function SpecialSalaryDaysSection({
                       <TableCell className="text-sm text-muted-foreground">
                         {row.updatedByName || row.updatedBy || "—"}
                         {row.updatedAt
-                          ? ` · ${new Date(row.updatedAt).toLocaleString("vi-VN")}`
+                          ? ` · ${new Date(row.updatedAt).toLocaleString("en-US")}`
                           : ""}
                       </TableCell>
                       <TableCell className="text-right space-x-2">
@@ -275,7 +275,7 @@ function SpecialSalaryDaysSection({
                           variant="outline"
                           onClick={() => loadDayIntoForm(row)}
                         >
-                          Sửa trên form
+                          Edit in form
                         </Button>
                         <Button
                           type="button"
@@ -306,7 +306,7 @@ function SpecialSalaryDaysSection({
                   name="businessDate"
                   render={({ field }) => (
                     <FormItem>
-                      <Label>Ngày lễ</Label>
+                      <Label>Business date</Label>
                       <FormControl>
                         <Input type="date" {...field} />
                       </FormControl>
@@ -317,8 +317,8 @@ function SpecialSalaryDaysSection({
               </div>
 
               <div className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[120px_1fr]">
-                <span className="font-medium">Khung giờ</span>
-                <span className="font-medium">Số tiền / giờ (VND)</span>
+                <span className="font-medium">Hour</span>
+                <span className="font-medium">Amount / hour (VND)</span>
               </div>
 
               <div className="max-h-[360px] space-y-2 overflow-y-auto pr-1">
@@ -364,7 +364,7 @@ function SpecialSalaryDaysSection({
               </div>
 
               <Button type="submit" disabled={upsertMutation.isPending}>
-                {upsertMutation.isPending ? "Đang lưu..." : "Lưu ngày đặc biệt"}
+                {upsertMutation.isPending ? "Saving..." : "Save special day"}
               </Button>
             </form>
           </Form>
@@ -380,18 +380,18 @@ function SpecialSalaryDaysSection({
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Xóa ngày lương đặc biệt</AlertDialogTitle>
+            <AlertDialogTitle>Delete special salary day</AlertDialogTitle>
             <AlertDialogDescription>
-              Bạn có chắc muốn xóa toàn bộ cấu hình map giờ cho ngày{" "}
+              Are you sure you want to delete the hourly rate map for{" "}
               <span className="font-semibold text-foreground">
                 {rowPendingDelete?.businessDate}
               </span>
-              ? Thao tác không hoàn tác.
+              ? This cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={deleteMutation.isPending}>
-              Hủy
+              Cancel
             </AlertDialogCancel>
             <Button
               type="button"
@@ -399,7 +399,7 @@ function SpecialSalaryDaysSection({
               disabled={deleteMutation.isPending}
               onClick={handleDeleteConfirm}
             >
-              {deleteMutation.isPending ? "Đang xóa..." : "Xóa"}
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -229,8 +229,8 @@ const MySchedulePage = () => {
   useEffect(() => {
     if (scheduleDetailError && scheduleIdFromUrl) {
       toast({
-        title: "Lỗi",
-        description: "Không tìm thấy thông tin ca làm việc",
+        title: "Error",
+        description: "Could not find this work shift",
         variant: "destructive",
       });
       // Clear invalid scheduleId from URL
@@ -252,25 +252,25 @@ const MySchedulePage = () => {
       status: string;
       message: string;
     }) => {
-      console.log("Status ca đã thay đổi:", data);
+      console.log("Shift status changed:", data);
 
       // Show toast notification
       const statusLabels: Record<string, string> = {
-        [EmployeeScheduleStatus.Approved]: "đã được phê duyệt",
-        [EmployeeScheduleStatus.Rejected]: "đã bị từ chối",
-        [EmployeeScheduleStatus.InProgress]: "đã bắt đầu",
-        [EmployeeScheduleStatus.Completed]: "đã hoàn thành",
-        [EmployeeScheduleStatus.Cancelled]: "đã bị hủy",
-        [EmployeeScheduleStatus.Absent]: "bị đánh dấu vắng mặt",
+        [EmployeeScheduleStatus.Approved]: "has been approved",
+        [EmployeeScheduleStatus.Rejected]: "has been rejected",
+        [EmployeeScheduleStatus.InProgress]: "has started",
+        [EmployeeScheduleStatus.Completed]: "has been completed",
+        [EmployeeScheduleStatus.Cancelled]: "has been cancelled",
+        [EmployeeScheduleStatus.Absent]: "was marked absent",
       };
 
-      const statusLabel = statusLabels[data.status] || "đã được cập nhật";
+      const statusLabel = statusLabels[data.status] || "has been updated";
 
       toast({
-        title: "Cập nhật trạng thái ca làm việc",
+        title: "Shift status updated",
         description:
           data.message ||
-          `Ca làm việc ngày ${dayjs(data.schedule.date).format(
+          `Work shift on ${dayjs(data.schedule.date).format(
             "DD/MM/YYYY",
           )} ${statusLabel}`,
         duration: 5000,
@@ -292,14 +292,14 @@ const MySchedulePage = () => {
       }>;
       message: string;
     }) => {
-      console.log("Bạn đã được phân ca:", data);
+      console.log("You were assigned shifts:", data);
 
       // Show toast notification
       toast({
-        title: "Bạn đã được phân ca",
+        title: "New shift assignments",
         description:
           data.message ||
-          `Bạn đã được phân công ${data.schedules.length} ca làm việc mới`,
+          `You have been assigned ${data.schedules.length} new work shift${data.schedules.length === 1 ? "" : "s"}`,
         duration: 5000,
       });
 
@@ -956,7 +956,7 @@ const MySchedulePage = () => {
                               schedule.rejectedReason && (
                                 <p className="text-sm text-muted-foreground mt-2 line-clamp-2">
                                   <span className="font-medium">
-                                    Lý do từ chối:{" "}
+                                    Rejection reason:{" "}
                                   </span>
                                   {schedule.rejectedReason}
                                 </p>
@@ -995,6 +995,7 @@ const MySchedulePage = () => {
         onClose={handleCloseDetailModal}
         schedule={selectedSchedule}
         refetchSchedules={refetch}
+        allowEmployeeSelfDelete
       />
 
       {/* Calendar Modal for Shift Registration */}
