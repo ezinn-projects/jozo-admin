@@ -168,28 +168,6 @@ const CoffeeBookedModal: React.FC<CoffeeBookedModalProps> = ({
             </div>
           )}
 
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="booked-customer-name">Tên khách</Label>
-              <Input
-                id="booked-customer-name"
-                value={customerName}
-                onChange={(event) => setCustomerName(event.target.value)}
-                placeholder="Nhập tên khách"
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="booked-customer-phone">Số điện thoại</Label>
-              <Input
-                id="booked-customer-phone"
-                value={customerPhone}
-                onChange={(event) => setCustomerPhone(event.target.value)}
-                placeholder="Nhập số điện thoại"
-              />
-            </div>
-          </div>
-
           <div className="space-y-2">
             <Label htmlFor="booked-people-count">Số người</Label>
             <Input

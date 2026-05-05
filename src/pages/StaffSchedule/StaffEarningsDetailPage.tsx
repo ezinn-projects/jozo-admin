@@ -73,6 +73,7 @@ const StaffEarningsDetailPage = () => {
       userId,
       startDate.format("YYYY-MM-DD"),
       endDate.format("YYYY-MM-DD"),
+      "compact",
     ],
     queryFn: async () => {
       if (!userId) {
@@ -84,6 +85,7 @@ const StaffEarningsDetailPage = () => {
         startDate: startDate.format("YYYY-MM-DD"),
         endDate: endDate.format("YYYY-MM-DD"),
         filterType: "month",
+        salaryView: "compact",
       });
 
       const result = response.data.result as IEmployeeSchedulesResponse;
@@ -227,10 +229,7 @@ const StaffEarningsDetailPage = () => {
 
           const roundedHours =
             Math.round((schedule.salary?.hours ?? hours) * 100) / 100;
-          const hourlyRate =
-            schedule.salarySnapshot?.hourlyRate ??
-            schedule.salary?.hourlyRate ??
-            0;
+          const hourlyRate = schedule.salary?.hourlyRate ?? 0;
           const expectedSalary =
             schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
           const salary = schedule.salary

@@ -203,11 +203,13 @@ const MySchedulePage = () => {
   // Fetch schedule detail from URL (deeplink support)
   const { data: scheduleDetailResponse, error: scheduleDetailError } = useQuery(
     {
-      queryKey: ["schedule-detail", scheduleIdFromUrl],
+      queryKey: ["schedule-detail", scheduleIdFromUrl, "full"],
       queryFn: async () => {
         if (!scheduleIdFromUrl) return null;
-        const response =
-          await staffScheduleApis.getScheduleById(scheduleIdFromUrl);
+        const response = await staffScheduleApis.getScheduleById(
+          scheduleIdFromUrl,
+          { salaryView: "full" },
+        );
         return response.data.result;
       },
       enabled: !!scheduleIdFromUrl,

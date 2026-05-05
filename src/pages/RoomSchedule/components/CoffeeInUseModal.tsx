@@ -1,20 +1,17 @@
 import { CoffeeSessionStatus, ICoffeeSession } from "@/@types/CoffeeSession";
 import {
-  FnBMenuCustomizationGroup,
-  IFnBCustomizationGroupTemplate,
-} from "@/@types/FnBCustomization";
-import {
   ICoffeeSessionOrder,
   ICoffeeSessionOrderDetail,
   ICoffeeSessionOrderSelection,
 } from "@/@types/CoffeeSessionOrder";
+import {
+  FnBMenuCustomizationGroup,
+  IFnBCustomizationGroupTemplate,
+} from "@/@types/FnBCustomization";
 import coffeeSessionApis from "@/apis/coffeeSession.apis";
 import coffeeSessionOrderApis from "@/apis/coffeeSessionOrder.apis";
 import customizationGroupTemplateApis from "@/apis/customizationGroupTemplate.apis";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
-import CoffeeOrderEditor from "@/pages/RoomSchedule/components/CoffeeOrderEditor";
-import { FnBMenuItem } from "@/hooks/use-menu-items";
-import useAuth from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -28,7 +25,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { FnBMenuItem } from "@/hooks/use-menu-items";
 import { useToast } from "@/hooks/use-toast";
+import useAuth from "@/hooks/useAuth";
+import CoffeeOrderEditor from "@/pages/RoomSchedule/components/CoffeeOrderEditor";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import React from "react";
@@ -153,7 +153,8 @@ const getSelectionDisplayGroups = (
       (group) => normalizeSelectionKey(group.groupKey) === normalizedGroupKey,
     );
     const matchedOption = matchedGroup?.options?.find(
-      (option) => normalizeSelectionKey(option.optionKey) === normalizedOptionKey,
+      (option) =>
+        normalizeSelectionKey(option.optionKey) === normalizedOptionKey,
     );
     const groupLabel = matchedGroup?.label || selection.groupKey;
     const optionLabel = matchedOption?.label || selection.optionKey;
@@ -383,8 +384,9 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
           (menuItem?.customizationTemplateRefs?.length || 0) > 0;
         const selectionSourceItem = hasOwnCustomizations
           ? menuItem
-          : menuItems.find((sourceItem) => sourceItem._id === menuItem?.parentId) ||
-            menuItem;
+          : menuItems.find(
+              (sourceItem) => sourceItem._id === menuItem?.parentId,
+            ) || menuItem;
         const selectionGroups = getMenuItemCustomizationGroups(
           selectionSourceItem,
           customizationTemplatesQuery.data || [],
@@ -396,7 +398,10 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
           quantity: item.quantity,
           category: item.category,
           note: item.note,
-          selectionGroups: getSelectionDisplayGroups(selectionGroups, item.selections),
+          selectionGroups: getSelectionDisplayGroups(
+            selectionGroups,
+            item.selections,
+          ),
         };
       });
     }
@@ -479,28 +484,6 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                     Đã dùng: {usageDurationMinutes} phút
                   </p>
                 )}
-              </div>
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="in-use-customer-name">Tên khách</Label>
-                <Input
-                  id="in-use-customer-name"
-                  value={customerName}
-                  onChange={(event) => setCustomerName(event.target.value)}
-                  placeholder="Nhập tên khách"
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="in-use-customer-phone">Số điện thoại</Label>
-                <Input
-                  id="in-use-customer-phone"
-                  value={customerPhone}
-                  onChange={(event) => setCustomerPhone(event.target.value)}
-                  placeholder="Nhập số điện thoại"
-                />
               </div>
             </div>
 

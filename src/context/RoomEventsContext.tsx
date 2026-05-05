@@ -361,6 +361,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     }) => {
       if (data.type !== "new_order") return;
 
+      console.log("data", data.orderData);
+
       const roomId = data.roomId;
 
       setOrderNotifications((prev) => ({

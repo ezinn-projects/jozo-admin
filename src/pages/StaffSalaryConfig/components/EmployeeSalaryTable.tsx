@@ -1,6 +1,4 @@
 import { IEmployeeSalaryConfig } from "@/apis/staffSchedule.apis";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,10 +21,7 @@ interface EmployeeSalaryTableProps {
   employees: IEmployeeSalaryConfig[];
   keyword: string;
   isLoading: boolean;
-  isResetting: boolean;
   onKeywordChange: (keyword: string) => void;
-  onOverride: (employee: IEmployeeSalaryConfig) => void;
-  onResetOverride: (employee: IEmployeeSalaryConfig) => void;
 }
 
 const formatCurrency = (value?: number) =>
@@ -36,10 +31,7 @@ function EmployeeSalaryTable({
   employees,
   keyword,
   isLoading,
-  isResetting,
   onKeywordChange,
-  onOverride,
-  onResetOverride,
 }: EmployeeSalaryTableProps) {
   return (
     <Card>
@@ -47,7 +39,8 @@ function EmployeeSalaryTable({
         <div>
           <CardTitle>Danh sách nhân viên</CardTitle>
           <CardDescription>
-            Quản lý lương snapshot và override theo từng nhân viên.
+            Thông tin snapshot đồng bộ — chỉnh lương qua snapshot global, ngày đặc
+            biệt hoặc cấu hình thử việc trên user.
           </CardDescription>
         </div>
         <div className="relative w-full md:w-[320px]">
@@ -66,23 +59,21 @@ function EmployeeSalaryTable({
             <TableRow>
               <TableHead>Nhân viên</TableHead>
               <TableHead>Số điện thoại</TableHead>
-              <TableHead>Hourly Rate</TableHead>
-              <TableHead>Snapshot Hourly Rate</TableHead>
-              <TableHead>Trạng thái</TableHead>
-              <TableHead className="text-right">Action</TableHead>
+              <TableHead>Hourly rate</TableHead>
+              <TableHead>Snapshot hourly rate</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={6} className="py-8 text-center">
+                <TableCell colSpan={4} className="py-8 text-center">
                   Đang tải danh sách nhân viên...
                 </TableCell>
               </TableRow>
             ) : employees.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={6}
+                  colSpan={4}
                   className="py-8 text-center text-muted-foreground"
                 >
                   Không có nhân viên phù hợp
@@ -98,34 +89,6 @@ function EmployeeSalaryTable({
                   <TableCell>{formatCurrency(employee.hourlyRate)}</TableCell>
                   <TableCell>
                     {formatCurrency(employee.snapshotHourlyRate)}
-                  </TableCell>
-                  <TableCell>
-                    {employee.isOverride ? (
-                      <Badge>Override</Badge>
-                    ) : (
-                      <Badge variant="secondary">Theo snapshot</Badge>
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => onOverride(employee)}
-                      >
-                        Override
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        disabled={!employee.isOverride || isResetting}
-                        onClick={() => onResetOverride(employee)}
-                      >
-                        Bỏ override
-                      </Button>
-                    </div>
                   </TableCell>
                 </TableRow>
               ))

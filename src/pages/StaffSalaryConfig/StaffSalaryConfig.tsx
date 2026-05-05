@@ -1,20 +1,23 @@
 import {
   IEmployeeSalaryConfig,
   IEmployeeSalarySnapshot,
+  ISalarySyncResult,
 } from "@/apis/staffSchedule.apis";
 import staffScheduleApis from "@/apis/staffSchedule.apis";
 import { PageHeader } from "@/components/shared";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign } from "lucide-react";
-import { useEffect, useState } from "react";
-import EmployeeSalaryOverrideDialog from "./components/EmployeeSalaryOverrideDialog";
+import { useEffect } from "react";
 import EmployeeSalaryTable from "./components/EmployeeSalaryTable";
 import GlobalSnapshotBlock, {
   useSalaryForm,
 } from "./components/GlobalSnapshotBlock";
+import SpecialSalaryDaysSection, {
+  salarySpecialDaysQueryKey,
+} from "./components/SpecialSalaryDaysSection";
 import { useQueryConfig } from "./hooks/useQueryConfig";
-import { OverrideDialogState, SalaryFormValues } from "./types";
+import { SalaryFormValues } from "./types";
 import { buildHourlyRateMap, buildHourlyShiftMap } from "./utils";
 
 const salaryQueryKeys = {
@@ -22,13 +25,22 @@ const salaryQueryKeys = {
   employees: ["employeeSalaryEmployees"] as const,
 };
 
+const scheduleQueryRoots = [
+  "staffSchedules",
+  "staffSchedulesWithSummary",
+  "mySchedules",
+  "staff-schedules",
+  "schedule-detail",
+  "schedule-detail-modal",
+] as const;
+
 const defaultSalaryValues: SalaryFormValues = {
   hourlyRateMap: buildHourlyRateMap(),
   hourlyShiftMap: buildHourlyShiftMap(),
 };
 
 const normalizeSalarySnapshot = (
-  data?: IEmployeeSalarySnapshot | null
+  data?: IEmployeeSalarySnapshot | null,
 ): SalaryFormValues => {
   const fallbackRate = data?.hourlyRate ?? 0;
   return {
@@ -59,10 +71,6 @@ function StaffSalaryConfig() {
   const { toast } = useToast();
   const { queryConfig, setQueryConfig } = useQueryConfig();
   const form = useSalaryForm(defaultSalaryValues);
-  const [overrideDialog, setOverrideDialog] = useState<OverrideDialogState>({
-    isOpen: false,
-    employee: null,
-  });
 
   const {
     data: snapshotResponse,
@@ -97,6 +105,12 @@ function StaffSalaryConfig() {
     queryClient.invalidateQueries({ queryKey: salaryQueryKeys.employees });
   };
 
+  const invalidateScheduleQueries = () => {
+    scheduleQueryRoots.forEach((queryRoot) => {
+      queryClient.invalidateQueries({ queryKey: [queryRoot] });
+    });
+  };
+
   const updateSnapshotMutation = useMutation({
     mutationFn: staffScheduleApis.updateSalarySnapshot,
     onSuccess: () => {
@@ -110,44 +124,17 @@ function StaffSalaryConfig() {
 
   const syncSalaryMutation = useMutation({
     mutationFn: staffScheduleApis.syncSalarySnapshot,
-    onSuccess: () => {
+    onSuccess: (response) => {
+      const result = response.data?.result as ISalarySyncResult | undefined;
       invalidateSalaryQueries();
+      queryClient.invalidateQueries({ queryKey: salarySpecialDaysQueryKey });
       toast({
         title: "Thành công",
-        description: "Đã đồng bộ salary snapshot cho tất cả nhân viên.",
+        description: result
+          ? `Đã đồng bộ ${result.syncedCount}/${result.totalStaffs} nhân viên.`
+          : "Đã đồng bộ salary snapshot cho tất cả nhân viên.",
       });
-    },
-  });
-
-  const updateOverrideMutation = useMutation({
-    mutationFn: ({
-      userId,
-      hourlyRate,
-    }: {
-      userId: string;
-      hourlyRate: number;
-    }) =>
-      staffScheduleApis.updateEmployeeSalaryOverride(userId, {
-        hourlyRate,
-      }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: salaryQueryKeys.employees });
-      setOverrideDialog({ isOpen: false, employee: null });
-      toast({
-        title: "Thành công",
-        description: "Đã lưu override lương nhân viên.",
-      });
-    },
-  });
-
-  const deleteOverrideMutation = useMutation({
-    mutationFn: staffScheduleApis.deleteEmployeeSalaryOverride,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: salaryQueryKeys.employees });
-      toast({
-        title: "Thành công",
-        description: "Đã bỏ override và quay về snapshot global.",
-      });
+      invalidateScheduleQueries();
     },
   });
 
@@ -155,15 +142,6 @@ function StaffSalaryConfig() {
     updateSnapshotMutation.mutate({
       hourlyRateMap: buildHourlyRateMap(values.hourlyRateMap),
       hourlyShiftMap: buildHourlyShiftMap(values.hourlyShiftMap),
-    });
-  };
-
-  const handleOverrideSubmit = (values: { hourlyRate: number }) => {
-    if (!overrideDialog.employee) return;
-
-    updateOverrideMutation.mutate({
-      userId: overrideDialog.employee.userId,
-      hourlyRate: values.hourlyRate,
     });
   };
 
@@ -177,7 +155,7 @@ function StaffSalaryConfig() {
     <div className="space-y-6">
       <PageHeader
         title="Cấu hình lương nhân viên"
-        description="Quản lý salary snapshot global và override mức lương theo từng nhân viên."
+        description="Snapshot global, đồng bộ toàn hệ thống, ngày lương đặc biệt và cấu hình thử việc trên từng user."
         icon={CircleDollarSign}
         className="mb-2"
       />
@@ -191,26 +169,18 @@ function StaffSalaryConfig() {
         onSync={() => syncSalaryMutation.mutate()}
       />
 
+      <SpecialSalaryDaysSection
+        from={queryConfig.from ?? ""}
+        to={queryConfig.to ?? ""}
+        onFromChange={(v) => setQueryConfig({ from: v || null })}
+        onToChange={(v) => setQueryConfig({ to: v || null })}
+      />
+
       <EmployeeSalaryTable
         employees={filteredEmployees}
         keyword={queryConfig.keyword}
         isLoading={isLoadingEmployees}
-        isResetting={deleteOverrideMutation.isPending}
         onKeywordChange={(value) => setQueryConfig({ keyword: value })}
-        onOverride={(employee) =>
-          setOverrideDialog({ isOpen: true, employee })
-        }
-        onResetOverride={(employee) =>
-          deleteOverrideMutation.mutate(employee.userId)
-        }
-      />
-
-      <EmployeeSalaryOverrideDialog
-        employee={overrideDialog.employee}
-        isOpen={overrideDialog.isOpen}
-        isSaving={updateOverrideMutation.isPending}
-        onClose={() => setOverrideDialog({ isOpen: false, employee: null })}
-        onSubmit={handleOverrideSubmit}
       />
     </div>
   );

@@ -11,13 +11,22 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "@/hooks/use-toast";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import staffScheduleApis from "@/apis/staffSchedule.apis";
 import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import dayjs from "dayjs";
 import { format } from "date-fns";
 import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
+import { Badge } from "@/components/ui/badge";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 
 interface StaffScheduleDetailModalProps {
   isOpen: boolean;
@@ -61,62 +70,112 @@ const getScheduleTimeRange = (schedule: IEmployeeSchedule) => {
   };
 };
 
+const getSnapshotCapturedAt = (schedule: IEmployeeSchedule) =>
+  schedule.salarySnapshot?.capturedAt || schedule.salarySnapshot?.snapshotAt;
+
+const getCurrentHourlyRate = (schedule: IEmployeeSchedule): number | null => {
+  if (typeof schedule.salary?.hourlyRate === "number") {
+    return schedule.salary.hourlyRate;
+  }
+
+  if (typeof schedule.salarySnapshot?.hourlyRate === "number") {
+    return schedule.salarySnapshot.hourlyRate;
+  }
+
+  return null;
+};
+
+const getSalarySourceLabel = (
+  salarySource?: IEmployeeSchedule["salarySource"],
+) => {
+  switch (salarySource) {
+    case "global":
+      return "Snapshot global";
+    case "probation":
+      return "Thử việc";
+    case "legacy_manual":
+      return "Thủ công (legacy)";
+    case "special":
+      return "Đặc biệt theo ca";
+    case "override":
+      return "Override nhân viên";
+    case "snapshot":
+      return "Snapshot ca";
+    case "fallback":
+      return "Mặc định hệ thống";
+    default:
+      return "Không xác định";
+  }
+};
+
+const modeLabel = (mode?: string) => {
+  switch (mode) {
+    case "global":
+      return "Global";
+    case "probation":
+      return "Thử việc";
+    case "legacy_manual":
+      return "Legacy / thủ công";
+    default:
+      return mode || "—";
+  }
+};
+
 const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   isOpen,
   onClose,
   schedule,
   refetchSchedules,
 }) => {
+  const queryClient = useQueryClient();
   const isAdmin = useIsAdmin();
   const isStaff = useIsStaff();
   const [rejectedReason, setRejectedReason] = useState("");
 
-  // State for adjusting working hours and note
   const [adjustedStartTime, setAdjustedStartTime] = useState("");
   const [adjustedEndTime, setAdjustedEndTime] = useState("");
   const [adjustTimeError, setAdjustTimeError] = useState("");
   const [adjustedNote, setAdjustedNote] = useState("");
-  const [specialHourlyRate, setSpecialHourlyRate] = useState("");
-  const [specialHourlyRateError, setSpecialHourlyRateError] = useState("");
 
-  // Initialize form values when schedule changes
+  const { data: scheduleFull, isFetching: isLoadingDetail } = useQuery({
+    queryKey: ["schedule-detail-modal", schedule?._id, "full"],
+    queryFn: async () => {
+      const response = await staffScheduleApis.getScheduleById(schedule!._id, {
+        salaryView: "full",
+      });
+      return response.data.result as IEmployeeSchedule;
+    },
+    enabled: isOpen && !!schedule?._id,
+  });
+
+  const displaySchedule = scheduleFull ?? schedule!;
+
   useEffect(() => {
-    if (schedule) {
-      const scheduleTimeRange = getScheduleTimeRange(schedule);
+    if (!schedule) return;
+    const base = scheduleFull ?? schedule;
+    const scheduleTimeRange = getScheduleTimeRange(base);
 
-      setRejectedReason("");
-      // Fill default shift times when the schedule has no custom times yet.
-      setAdjustedStartTime(scheduleTimeRange.startTime);
-      setAdjustedEndTime(scheduleTimeRange.endTime);
-      setAdjustedNote(schedule.note || "");
-      setSpecialHourlyRate(
-        schedule.salarySnapshot?.hourlyRate
-          ? schedule.salarySnapshot.hourlyRate.toLocaleString("vi-VN")
-          : "",
-      );
-      setAdjustTimeError("");
-      setSpecialHourlyRateError("");
-    }
-  }, [schedule]);
+    setRejectedReason("");
+    setAdjustedStartTime(scheduleTimeRange.startTime);
+    setAdjustedEndTime(scheduleTimeRange.endTime);
+    setAdjustedNote(base.note || "");
+    setAdjustTimeError("");
+  }, [schedule, scheduleFull]);
 
   const { mutate: updateSchedule, isPending } = useMutation({
     mutationFn: (data: {
-      date?: string;
-      shiftType?:
-        | "shift1"
-        | "shift2"
-        | "shift3"
-        | "morning"
-        | "afternoon"
-        | "evening"
-        | "all";
       customStartTime?: string;
       customEndTime?: string;
       note?: string;
-      status?: EmployeeScheduleStatus;
-      specialHourlyRate?: number;
     }) => staffScheduleApis.updateSchedule(schedule!._id, data),
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["staffSchedules"] });
+      queryClient.invalidateQueries({ queryKey: ["mySchedules"] });
+      queryClient.invalidateQueries({ queryKey: ["staff-schedules"] });
+      queryClient.invalidateQueries({ queryKey: ["schedule-detail"] });
+      queryClient.invalidateQueries({
+        queryKey: ["schedule-detail-modal", schedule!._id],
+      });
       toast({
         title: "Success",
         description: "Schedule updated successfully",
@@ -210,7 +269,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     },
   });
 
-  // Calculate working minutes from adjusted times
   const calculateWorkingMinutes = (
     startTime: string,
     endTime: string,
@@ -230,14 +288,13 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     return normalizedEndTotal - startTotal;
   };
 
-  // Validate adjusted time
   const validateAdjustedTime = (
     startTime: string,
     endTime: string,
   ): boolean => {
     if (!startTime || !endTime) {
       setAdjustTimeError("");
-      return true; // Allow empty times
+      return true;
     }
 
     const [startHours, startMinutes] = startTime.split(":").map(Number);
@@ -277,48 +334,19 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
     }
   };
 
-  const validateSpecialHourlyRate = (value: string): boolean => {
-    const rate = Number(value.replace(/\D/g, ""));
-
-    if (!value || Number.isNaN(rate) || rate <= 0) {
-      setSpecialHourlyRateError("Mức lương phải lớn hơn 0");
-      return false;
-    }
-
-    setSpecialHourlyRateError("");
-    return true;
-  };
-
-  const handleSpecialHourlyRateChange = (
-    e: React.ChangeEvent<HTMLInputElement>,
-  ) => {
-    const value = e.target.value;
-    setSpecialHourlyRate(value);
-
-    if (value || specialHourlyRateError) {
-      validateSpecialHourlyRate(value);
-    }
-  };
-
   const handleUpdateScheduleInfo = () => {
     if (!schedule) return;
 
-    // Validate time if both are provided
     if (adjustedStartTime && adjustedEndTime) {
       if (!validateAdjustedTime(adjustedStartTime, adjustedEndTime)) {
         return;
       }
     }
 
-    if (specialHourlyRate && !validateSpecialHourlyRate(specialHourlyRate)) {
-      return;
-    }
-
     const updateData: {
       customStartTime?: string;
       customEndTime?: string;
       note?: string;
-      specialHourlyRate?: number;
     } = {};
 
     if (adjustedStartTime) {
@@ -333,16 +361,8 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       updateData.customEndTime = undefined;
     }
 
-    if (adjustedNote !== schedule.note) {
+    if (adjustedNote !== displaySchedule.note) {
       updateData.note = adjustedNote || undefined;
-    }
-
-    const nextSpecialHourlyRate = Number(specialHourlyRate.replace(/\D/g, ""));
-    if (
-      specialHourlyRate &&
-      nextSpecialHourlyRate !== schedule.salarySnapshot?.hourlyRate
-    ) {
-      updateData.specialHourlyRate = nextSpecialHourlyRate;
     }
 
     updateSchedule(updateData);
@@ -391,30 +411,31 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
   if (!schedule) return null;
 
-  const scheduleTimeRange = getScheduleTimeRange(schedule);
+  const scheduleTimeRange = getScheduleTimeRange(displaySchedule);
 
-  // Check if schedule date is in the past
-  const isPastSchedule = schedule.date
-    ? dayjs(schedule.date).isBefore(dayjs(), "day")
+  const isPastSchedule = displaySchedule.date
+    ? dayjs(displaySchedule.date).isBefore(dayjs(), "day")
     : false;
 
   const canCancel =
     !isStaff &&
-    (schedule.status === EmployeeScheduleStatus.Pending ||
-      schedule.status === EmployeeScheduleStatus.Approved);
+    (displaySchedule.status === EmployeeScheduleStatus.Pending ||
+      displaySchedule.status === EmployeeScheduleStatus.Approved);
   const canApprove =
-    schedule.status === EmployeeScheduleStatus.Pending && !isStaff;
+    displaySchedule.status === EmployeeScheduleStatus.Pending && !isStaff;
   const canReject =
-    schedule.status === EmployeeScheduleStatus.Pending && !isStaff;
+    displaySchedule.status === EmployeeScheduleStatus.Pending && !isStaff;
   const canStart =
-    !isStaff && schedule.status === EmployeeScheduleStatus.Approved;
-  const canComplete = schedule.status === EmployeeScheduleStatus.InProgress;
-  const canMarkAbsent = schedule.status === EmployeeScheduleStatus.InProgress;
-  const canDelete = !isStaff && !isPastSchedule; // Admin can delete if schedule is not in the past
+    !isStaff && displaySchedule.status === EmployeeScheduleStatus.Approved;
+  const canComplete =
+    displaySchedule.status === EmployeeScheduleStatus.InProgress;
+  const canMarkAbsent =
+    displaySchedule.status === EmployeeScheduleStatus.InProgress;
+  const canDelete = !isStaff && !isPastSchedule;
   const isReadOnly =
-    schedule.status === EmployeeScheduleStatus.Cancelled ||
-    schedule.status === EmployeeScheduleStatus.Absent ||
-    schedule.status === EmployeeScheduleStatus.Rejected;
+    displaySchedule.status === EmployeeScheduleStatus.Cancelled ||
+    displaySchedule.status === EmployeeScheduleStatus.Absent ||
+    displaySchedule.status === EmployeeScheduleStatus.Rejected;
 
   const getStatusLabel = (status: EmployeeScheduleStatus) => {
     switch (status) {
@@ -449,11 +470,12 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const formatCurrency = (value: number) =>
     `${value.toLocaleString("vi-VN")} VNĐ`;
 
-  const getHourlyRate = () => {
-    const rate = Number(specialHourlyRate.replace(/\D/g, ""));
+  const getHourlyRate = () =>
+    getCurrentHourlyRate(displaySchedule) ?? 22000;
 
-    return rate > 0 ? rate : (schedule.salarySnapshot?.hourlyRate ?? 22000);
-  };
+  const capturedAt = getSnapshotCapturedAt(displaySchedule);
+  const resolution = displaySchedule.salaryResolution;
+  const salary = displaySchedule.salary;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -463,16 +485,15 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {/* Basic Info */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-semibold text-gray-500">
                 Staff Name
               </Label>
               <p className="mt-1">
-                {schedule.userName ||
-                  schedule.user?.name ||
-                  schedule.user?.full_name ||
+                {displaySchedule.userName ||
+                  displaySchedule.user?.name ||
+                  displaySchedule.user?.full_name ||
                   "N/A"}
               </p>
             </div>
@@ -481,20 +502,19 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 Status
               </Label>
               <p className="mt-1 font-medium">
-                {getStatusLabel(schedule.status)}
+                {getStatusLabel(displaySchedule.status)}
               </p>
             </div>
           </div>
 
-          {/* Read-only display */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-semibold text-gray-500">
                 Date
               </Label>
               <p className="mt-1">
-                {schedule.date
-                  ? format(dayjs(schedule.date).toDate(), "dd/MM/yyyy")
+                {displaySchedule.date
+                  ? format(dayjs(displaySchedule.date).toDate(), "dd/MM/yyyy")
                   : "N/A"}
               </p>
             </div>
@@ -503,53 +523,171 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 Shift
               </Label>
               <p className="mt-1">
-                {getShiftLabel(schedule.shift || schedule.shiftType)}
+                {getShiftLabel(displaySchedule.shift || displaySchedule.shiftType)}
               </p>
             </div>
           </div>
 
-          {schedule.salarySnapshot && (
-            <div className="rounded-md border bg-green-50 p-3">
-              {isAdmin && !isReadOnly && (
-                <div className="mt-1">
-                  <Label className="text-sm font-semibold text-gray-500">
-                    Mức lương snapshot tại thời điểm tạo ca
-                  </Label>
-                  <div className="flex items-center gap-2">
-                    <Input
-                      type="number"
-                      currency
-                      min={1}
-                      value={specialHourlyRate}
-                      onChange={handleSpecialHourlyRateChange}
-                      onBlur={(e) => validateSpecialHourlyRate(e.target.value)}
-                      className="max-w-[220px] bg-white font-semibold text-green-700"
-                      placeholder="Nhập mức lương theo giờ"
-                    />
-                    <span className="text-sm font-semibold text-green-700">
-                      VNĐ / giờ
-                    </span>
-                  </div>
-                  {specialHourlyRateError && (
-                    <p className="mt-1 text-sm text-red-500">
-                      {specialHourlyRateError}
-                    </p>
-                  )}
-                </div>
+          <div>
+            <Label className="text-sm font-semibold text-gray-500">
+              Nguồn lương
+            </Label>
+            <div className="mt-1 flex flex-wrap items-center gap-2">
+              <Badge variant="outline">
+                {getSalarySourceLabel(displaySchedule.salarySource)}
+              </Badge>
+              <span className="text-xs text-muted-foreground">
+                {displaySchedule.salarySource || "—"}
+              </span>
+              {isLoadingDetail && (
+                <span className="text-xs text-muted-foreground">
+                  Đang tải chi tiết lương...
+                </span>
               )}
-              {schedule.salarySnapshot.snapshotAt && (
-                <p className="mt-1 text-xs text-gray-500">
-                  Snapshot lúc{" "}
-                  {format(
-                    dayjs(schedule.salarySnapshot.snapshotAt).toDate(),
-                    "dd/MM/yyyy HH:mm",
+            </div>
+          </div>
+
+          {resolution && (
+            <div className="rounded-md border bg-muted/40 p-3 text-sm space-y-2">
+              <div>
+                <span className="font-medium text-gray-600">
+                  Cách tính (resolution):{" "}
+                </span>
+                <span>{modeLabel(resolution.mode)}</span>
+              </div>
+              {resolution.specialBusinessDates?.length ? (
+                <div>
+                  <span className="font-medium text-gray-600">
+                    Ngày lương đặc biệt:{" "}
+                  </span>
+                  <span>{resolution.specialBusinessDates.join(", ")}</span>
+                </div>
+              ) : null}
+              {resolution.mode === "probation" && (
+                <>
+                  {typeof resolution.probationHolidayMultiplier === "number" && (
+                    <div>
+                      <span className="font-medium text-gray-600">
+                        Hệ số ngày lễ (thử việc):{" "}
+                      </span>
+                      <span>{resolution.probationHolidayMultiplier}</span>
+                    </div>
                   )}
-                </p>
+                  {Array.isArray(resolution.probationHolidayBoostSegments) &&
+                    resolution.probationHolidayBoostSegments.length > 0 && (
+                      <div className="text-xs text-muted-foreground">
+                        <span className="font-medium text-gray-600">
+                          Boost segments:{" "}
+                        </span>
+                        <pre className="mt-1 max-h-24 overflow-auto rounded bg-background p-2">
+                          {JSON.stringify(
+                            resolution.probationHolidayBoostSegments,
+                            null,
+                            2,
+                          )}
+                        </pre>
+                      </div>
+                    )}
+                </>
               )}
             </div>
           )}
 
-          {/* Custom Time Section - Editable or Read-only */}
+          {salary && (
+            <div className="rounded-md border p-3 space-y-1">
+              <Label className="text-sm font-semibold text-gray-500">
+                Lương (theo server)
+              </Label>
+              <div className="grid grid-cols-2 gap-2 text-sm">
+                <div>
+                  Giờ:{" "}
+                  <span className="font-medium">{salary.hours}</span>
+                </div>
+                <div>
+                  Đơn giá/giờ:{" "}
+                  <span className="font-medium">
+                    {formatCurrency(salary.hourlyRate)}
+                  </span>
+                </div>
+                <div>
+                  Tổng:{" "}
+                  <span className="font-semibold text-green-700">
+                    {formatCurrency(salary.totalAmount)}
+                  </span>
+                </div>
+                <div>
+                  Trả lương:{" "}
+                  <Badge variant={salary.isPayable ? "default" : "secondary"}>
+                    {salary.isPayable ? "Có" : "Không"}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {salary?.hourlyBreakdown && salary.hourlyBreakdown.length > 0 && (
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold text-gray-500">
+                Chi tiết theo giờ
+              </Label>
+              <div className="rounded-md border max-h-[220px] overflow-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Giờ</TableHead>
+                      <TableHead>Phút</TableHead>
+                      <TableHead>Đơn giá</TableHead>
+                      <TableHead className="text-right">Thành tiền</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {salary.hourlyBreakdown.map((row, idx) => (
+                      <TableRow key={`${row.hour}-${idx}`}>
+                        <TableCell>{row.hour}</TableCell>
+                        <TableCell>{row.minutes}</TableCell>
+                        <TableCell>{formatCurrency(row.rate)}</TableCell>
+                        <TableCell className="text-right">
+                          {formatCurrency(row.amount)}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </div>
+          )}
+
+          {displaySchedule.salarySnapshot && (
+            <div className="rounded-md border bg-green-50 p-3 space-y-2">
+              <Label className="text-sm font-semibold text-gray-500">
+                Snapshot lương tại thời điểm tạo ca
+              </Label>
+              {displaySchedule.salarySnapshot.source != null && (
+                <p className="text-sm">
+                  Nguồn snapshot:{" "}
+                  <span className="font-medium">
+                    {String(displaySchedule.salarySnapshot.source)}
+                  </span>
+                </p>
+              )}
+              {capturedAt && (
+                <p className="text-xs text-gray-600">
+                  Capture lúc{" "}
+                  {format(dayjs(capturedAt).toDate(), "dd/MM/yyyy HH:mm")}
+                </p>
+              )}
+              {isAdmin &&
+                displaySchedule.salarySnapshot.hourlyRateMap &&
+                Object.keys(displaySchedule.salarySnapshot.hourlyRateMap).length >
+                  0 && (
+                  <p className="text-xs text-muted-foreground">
+                    Đã lưu map lương theo giờ — chỉnh qua trang cấu hình lương
+                    global / ngày đặc biệt.
+                  </p>
+                )}
+            </div>
+          )}
+
           <div className="border-t pt-4">
             <Label className="text-sm font-semibold text-gray-500 mb-2 block">
               {isReadOnly || isStaff
@@ -557,7 +695,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 : "Điều chỉnh thời gian làm việc"}
             </Label>
             {isReadOnly || isStaff ? (
-              // Read-only view for Completed status or Staff users
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -578,7 +715,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   </div>
                 </div>
 
-                {/* Display working minutes and salary for read-only */}
                 {scheduleTimeRange.startTime && scheduleTimeRange.endTime && (
                   <div className="bg-blue-50 p-3 rounded-md space-y-1">
                     {(() => {
@@ -590,7 +726,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                       const hours = Math.floor(minutes / 60);
                       const mins = minutes % 60;
                       const hourlyRate = getHourlyRate();
-                      const salary = (minutes / 60) * hourlyRate;
+                      const est = (minutes / 60) * hourlyRate;
 
                       return (
                         <>
@@ -609,10 +745,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                           </div>
                           <div className="text-sm">
                             <span className="text-gray-600">
-                              Ước tính lương:{" "}
+                              Ước tính (đơn giá từ server):{" "}
                             </span>
                             <span className="font-semibold text-green-600">
-                              {formatCurrency(salary)}
+                              {formatCurrency(est)}
                             </span>
                           </div>
                         </>
@@ -622,7 +758,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 )}
               </div>
             ) : (
-              // Editable view for non-staff users and non-completed statuses
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
@@ -654,7 +789,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                   <p className="text-sm text-red-500">{adjustTimeError}</p>
                 )}
 
-                {/* Display working minutes and estimated salary */}
                 {adjustedStartTime && adjustedEndTime && !adjustTimeError && (
                   <div className="bg-blue-50 p-3 rounded-md space-y-1">
                     {(() => {
@@ -666,7 +800,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                       const hours = Math.floor(minutes / 60);
                       const mins = minutes % 60;
                       const hourlyRate = getHourlyRate();
-                      const salary = (minutes / 60) * hourlyRate;
+                      const est = (minutes / 60) * hourlyRate;
 
                       return (
                         <>
@@ -685,10 +819,10 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                           </div>
                           <div className="text-sm">
                             <span className="text-gray-600">
-                              Ước tính lương:{" "}
+                              Ước tính (đơn giá từ server):{" "}
                             </span>
                             <span className="font-semibold text-green-600">
-                              {formatCurrency(salary)}
+                              {formatCurrency(est)}
                             </span>
                           </div>
                         </>
@@ -712,37 +846,35 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
             )}
           </div>
 
-          {/* Note */}
-          {schedule.status === EmployeeScheduleStatus.Rejected &&
-            schedule.rejectedReason && (
+          {displaySchedule.status === EmployeeScheduleStatus.Rejected &&
+            displaySchedule.rejectedReason && (
               <div>
                 <Label className="text-sm font-semibold text-gray-500">
                   Lý do từ chối
                 </Label>
-                <p className="mt-1 text-sm">{schedule.rejectedReason}</p>
+                <p className="mt-1 text-sm">{displaySchedule.rejectedReason}</p>
               </div>
             )}
-          {schedule.status !== EmployeeScheduleStatus.Rejected &&
-            schedule.note && (
+          {displaySchedule.status !== EmployeeScheduleStatus.Rejected &&
+            displaySchedule.note && (
               <div>
                 <Label className="text-sm font-semibold text-gray-500">
                   Note
                 </Label>
-                <p className="mt-1 text-sm">{schedule.note}</p>
+                <p className="mt-1 text-sm">{displaySchedule.note}</p>
               </div>
             )}
 
-          {/* Timeline Info */}
           <div className="border-t pt-4 space-y-2">
-            {schedule.createdByName && (
+            {displaySchedule.createdByName && (
               <div className="text-sm">
                 <span className="text-gray-500">Created by: </span>
-                <span>{schedule.createdByName}</span>
-                {schedule.createdAt && (
+                <span>{displaySchedule.createdByName}</span>
+                {displaySchedule.createdAt && (
                   <span className="text-gray-400 ml-2">
                     (
                     {format(
-                      dayjs(schedule.createdAt).toDate(),
+                      dayjs(displaySchedule.createdAt).toDate(),
                       "dd/MM/yyyy HH:mm",
                     )}
                     )
@@ -750,15 +882,15 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 )}
               </div>
             )}
-            {schedule.approvedByName && (
+            {displaySchedule.approvedByName && (
               <div className="text-sm">
                 <span className="text-gray-500">Approved by: </span>
-                <span>{schedule.approvedByName}</span>
-                {schedule.approvedAt && (
+                <span>{displaySchedule.approvedByName}</span>
+                {displaySchedule.approvedAt && (
                   <span className="text-gray-400 ml-2">
                     (
                     {format(
-                      dayjs(schedule.approvedAt).toDate(),
+                      dayjs(displaySchedule.approvedAt).toDate(),
                       "dd/MM/yyyy HH:mm",
                     )}
                     )
@@ -766,37 +898,37 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 )}
               </div>
             )}
-            {schedule.startedAt && (
+            {displaySchedule.startedAt && (
               <div className="text-sm">
                 <span className="text-gray-500">Started at: </span>
                 <span>
                   {format(
-                    dayjs(schedule.startedAt).toDate(),
+                    dayjs(displaySchedule.startedAt).toDate(),
                     "dd/MM/yyyy HH:mm",
                   )}
                 </span>
               </div>
             )}
-            {schedule.completedAt && (
+            {displaySchedule.completedAt && (
               <div className="text-sm">
                 <span className="text-gray-500">Completed at: </span>
                 <span>
                   {format(
-                    dayjs(schedule.completedAt).toDate(),
+                    dayjs(displaySchedule.completedAt).toDate(),
                     "dd/MM/yyyy HH:mm",
                   )}
                 </span>
               </div>
             )}
-            {schedule.markedAbsentBy && (
+            {displaySchedule.markedAbsentBy && (
               <div className="text-sm">
                 <span className="text-gray-500">Marked absent by: </span>
-                <span>{schedule.markedAbsentBy}</span>
-                {schedule.markedAbsentAt && (
+                <span>{displaySchedule.markedAbsentBy}</span>
+                {displaySchedule.markedAbsentAt && (
                   <span className="text-gray-400 ml-2">
                     (
                     {format(
-                      dayjs(schedule.markedAbsentAt).toDate(),
+                      dayjs(displaySchedule.markedAbsentAt).toDate(),
                       "dd/MM/yyyy HH:mm",
                     )}
                     )
@@ -806,7 +938,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
             )}
           </div>
 
-          {/* Action Note Input */}
           {canReject && !isReadOnly && (
             <div>
               <Label htmlFor="rejectedReason">Rejection Reason</Label>
@@ -838,7 +969,7 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
                 isDeleting ||
                 isUpdatingStatus ||
                 !!adjustTimeError ||
-                !!specialHourlyRateError
+                isLoadingDetail
               }
             >
               Cập nhật

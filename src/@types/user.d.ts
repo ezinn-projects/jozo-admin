@@ -17,6 +17,10 @@ export type User = {
   website?: string;
   cover_photo?: string;
   avatar?: string;
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationHourlyRate?: number | null;
+  probationHolidayMultiplier?: number | null;
 };
 
 export type CreateUserRequest = {
@@ -37,6 +41,10 @@ export type UpdateUserRequest = {
   date_of_birth?: Date;
   role?: Role;
   phone_number?: string;
+  probationStartDate?: string | null;
+  probationEndDate?: string | null;
+  probationHourlyRate?: number | null;
+  probationHolidayMultiplier?: number | null;
 };
 
 export type UsersResponse = {

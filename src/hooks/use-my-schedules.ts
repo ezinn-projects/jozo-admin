@@ -4,6 +4,7 @@ import staffScheduleApis, {
   IEmployeeSchedule,
   IEmployeeSchedulesResponse,
   IEmployeeSchedulesSummary,
+  SalaryView,
 } from "@/apis/staffSchedule.apis";
 import { EmployeeScheduleStatus, ShiftType } from "@/constants/enum";
 
@@ -16,6 +17,8 @@ export interface UseMySchedulesOptions {
   date?: Dayjs;
   startDate?: Dayjs;
   endDate?: Dayjs;
+  /** Mặc định compact — payload nhẹ hơn */
+  salaryView?: SalaryView;
 }
 
 export const useMySchedules = (options?: UseMySchedulesOptions) => {
@@ -31,6 +34,7 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
       options?.date?.format("YYYY-MM-DD"),
       options?.startDate?.format("YYYY-MM-DD"),
       options?.endDate?.format("YYYY-MM-DD"),
+      options?.salaryView ?? "compact",
     ],
     queryFn: async () => {
       // Xây dựng params dựa trên options
@@ -41,7 +45,10 @@ export const useMySchedules = (options?: UseMySchedulesOptions) => {
         date?: string;
         startDate?: string;
         endDate?: string;
+        salaryView?: SalaryView;
       } = {};
+
+      params.salaryView = options?.salaryView ?? "compact";
 
       if (options?.filterType === "day" && options?.date) {
         params.filterType = "day";

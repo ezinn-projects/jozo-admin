@@ -4,6 +4,7 @@ import staffScheduleApis, {
   IEmployeeSchedule,
   IEmployeeSchedulesResponse,
   IEmployeeSchedulesSummary,
+  SalaryView,
 } from "@/apis/staffSchedule.apis";
 
 export type ViewMode = "week" | "month";
@@ -13,6 +14,7 @@ export interface UseStaffSchedulesOptions {
   status?: string;
   filterType?: "day" | "week" | "month";
   date?: Dayjs;
+  salaryView?: SalaryView;
 }
 
 export const useStaffSchedules = (
@@ -31,6 +33,7 @@ export const useStaffSchedules = (
       options?.status,
       options?.filterType,
       options?.date?.format("YYYY-MM-DD"),
+      options?.salaryView ?? "compact",
     ],
     queryFn: async () => {
       // Xây dựng params dựa trên options
@@ -57,6 +60,8 @@ export const useStaffSchedules = (
       if (options?.status) {
         params.status = options.status;
       }
+
+      params.salaryView = options?.salaryView ?? "compact";
 
       const response = await staffScheduleApis.getEmployeeSchedules(params);
       if (!response.data.result) {
@@ -150,6 +155,7 @@ export const useStaffSchedulesWithSummary = (
       options?.status,
       options?.filterType,
       options?.date?.format("YYYY-MM-DD"),
+      options?.salaryView ?? "compact",
     ],
     queryFn: async () => {
       // Xây dựng params dựa trên options
@@ -176,6 +182,8 @@ export const useStaffSchedulesWithSummary = (
       if (options?.status) {
         params.status = options.status;
       }
+
+      params.salaryView = options?.salaryView ?? "compact";
 
       const response = await staffScheduleApis.getEmployeeSchedules(params);
       if (!response.data.result) {

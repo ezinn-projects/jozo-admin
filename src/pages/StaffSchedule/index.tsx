@@ -153,10 +153,37 @@ const StaffSchedulePage = () => {
   };
 
   const getSalarySnapshotTooltip = (schedule: IEmployeeSchedule | null) => {
-    const hourlyRate = schedule?.salarySnapshot?.hourlyRate;
-    if (typeof hourlyRate !== "number" || Number.isNaN(hourlyRate)) return "";
+    const hourly =
+      typeof schedule?.salary?.hourlyRate === "number"
+        ? schedule.salary.hourlyRate
+        : schedule?.salarySnapshot?.hourlyRate;
+    if (typeof hourly !== "number" || Number.isNaN(hourly)) return "";
 
-    return `\nLương snapshot: ${hourlyRate.toLocaleString("vi-VN")} VNĐ/giờ`;
+    return `\nĐơn giá/giờ (server): ${hourly.toLocaleString("vi-VN")} VNĐ`;
+  };
+
+  const getSalarySourceTooltip = (schedule: IEmployeeSchedule | null) => {
+    if (!schedule?.salarySource && !schedule?.salaryResolution) return "";
+
+    const sourceLabelMap: Record<string, string> = {
+      global: "Snapshot global",
+      probation: "Thử việc",
+      legacy_manual: "Legacy / thủ công",
+      special: "Đặc biệt theo ca",
+      override: "Override nhân viên",
+      snapshot: "Snapshot ca",
+      fallback: "Mặc định hệ thống",
+    };
+
+    const mode = schedule.salaryResolution?.mode
+      ? `\nResolution: ${sourceLabelMap[schedule.salaryResolution.mode] || schedule.salaryResolution.mode}`
+      : "";
+    const specials =
+      schedule.salaryResolution?.specialBusinessDates?.length
+        ? `\nNgày đặc biệt: ${schedule.salaryResolution.specialBusinessDates.join(", ")}`
+        : "";
+
+    return `\nNguồn lương: ${sourceLabelMap[schedule.salarySource || ""] || schedule.salarySource || "—"}${mode}${specials}`;
   };
 
   // Group schedules by userId, date and shift
@@ -489,7 +516,7 @@ Trạng thái: ${morningSchedule ? morningStatus || "Không có" : "Chưa đăng
                         morningSchedule?.note
                           ? `\nGhi chú: ${morningSchedule.note}`
                           : ""
-                      }${getSalarySnapshotTooltip(morningSchedule)}`;
+                      }${getSalarySnapshotTooltip(morningSchedule)}${getSalarySourceTooltip(morningSchedule)}`;
 
                       const afternoonTooltip = `Ngày: ${date.format(
                         "DD/MM/YYYY"
@@ -503,13 +530,13 @@ Trạng thái: ${
                         afternoonSchedule?.note
                           ? `\nGhi chú: ${afternoonSchedule.note}`
                           : ""
-                      }${getSalarySnapshotTooltip(afternoonSchedule)}`;
+                      }${getSalarySnapshotTooltip(afternoonSchedule)}${getSalarySourceTooltip(afternoonSchedule)}`;
 
                       const allTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
 Ca: Shift 3
 Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
                         allSchedule?.note ? `\nGhi chú: ${allSchedule.note}` : ""
-                      }${getSalarySnapshotTooltip(allSchedule)}`;
+                      }${getSalarySnapshotTooltip(allSchedule)}${getSalarySourceTooltip(allSchedule)}`;
 
                       return (
                         <React.Fragment key={date.format("YYYY-MM-DD")}>

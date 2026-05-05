@@ -269,13 +269,8 @@ const RoomTimelineTable: React.FC = () => {
   });
 
   const updateCoffeeTableActiveMutation = useMutation({
-    mutationFn: ({
-      id,
-      isActive,
-    }: {
-      id: string;
-      isActive: boolean;
-    }) => coffeeTableApis.updateCoffeeTable(id, { isActive }),
+    mutationFn: ({ id, isActive }: { id: string; isActive: boolean }) =>
+      coffeeTableApis.updateCoffeeTable(id, { isActive }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["coffeeTables"] });
       toast({
@@ -397,10 +392,7 @@ const RoomTimelineTable: React.FC = () => {
       const container = timelineContainerRef.current;
       const currentScrollLeft = container.scrollLeft;
       const containerWidth = container.clientWidth;
-      const maxScrollLeft = Math.max(
-        container.scrollWidth - containerWidth,
-        0,
-      );
+      const maxScrollLeft = Math.max(container.scrollWidth - containerWidth, 0);
       const targetScrollLeft = Math.min(
         Math.max(
           markerLeft - containerWidth * AUTO_SCROLL_MARKER_VIEWPORT_RATIO,
@@ -1771,9 +1763,9 @@ const RoomTimelineTable: React.FC = () => {
                               <TooltipContent>
                                 <p>{coffeeSupportNotification.message}</p>
                                 <p className="text-xs text-gray-500 mt-1">
-                                  {dayjs(coffeeSupportNotification.timestamp).format(
-                                    "HH:mm",
-                                  )}
+                                  {dayjs(
+                                    coffeeSupportNotification.timestamp,
+                                  ).format("HH:mm")}
                                 </p>
                               </TooltipContent>
                             </Tooltip>

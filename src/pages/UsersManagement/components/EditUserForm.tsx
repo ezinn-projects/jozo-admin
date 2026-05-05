@@ -27,19 +27,44 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/utils";
 
+const toDateTimeLocalValue = (iso?: string | null) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
 // Schema cho form cập nhật user
-const updateUserSchema = z.object({
-  name: z.string().min(1, "Tên là bắt buộc"),
-  username: z.string().min(3, "Username phải có ít nhất 3 ký tự"),
-  email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
-  date_of_birth: z.coerce.date({
-    required_error: "Ngày sinh là bắt buộc",
-    invalid_type_error: "Ngày sinh không hợp lệ",
-  }),
-  phone_number: z
-    .string()
-    .regex(/^\d{10,11}$/, "Số điện thoại phải gồm 10-11 chữ số"),
-});
+const updateUserSchema = z
+  .object({
+    name: z.string().min(1, "Tên là bắt buộc"),
+    username: z.string().min(3, "Username phải có ít nhất 3 ký tự"),
+    email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
+    date_of_birth: z.coerce.date({
+      required_error: "Ngày sinh là bắt buộc",
+      invalid_type_error: "Ngày sinh không hợp lệ",
+    }),
+    phone_number: z
+      .string()
+      .regex(/^\d{10,11}$/, "Số điện thoại phải gồm 10-11 chữ số"),
+    probationStartLocal: z.string().optional(),
+    probationEndLocal: z.string().optional(),
+    probationHourlyRateStr: z.string().optional(),
+    probationHolidayMultiplierStr: z.string().optional(),
+  })
+  .superRefine((data, ctx) => {
+    const m = data.probationHolidayMultiplierStr?.trim();
+    if (!m) return;
+    const n = Number(m.replace(/\s/g, "").replace(",", "."));
+    if (!Number.isFinite(n) || n < 0 || n > 20) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Hệ số ngày lễ (thử việc) phải từ 0 đến 20",
+        path: ["probationHolidayMultiplierStr"],
+      });
+    }
+  });
 
 type UpdateUserFormData = z.infer<typeof updateUserSchema>;
 
@@ -117,6 +142,10 @@ const EditUserForm = () => {
       email: "",
       date_of_birth: undefined,
       phone_number: "",
+      probationStartLocal: "",
+      probationEndLocal: "",
+      probationHourlyRateStr: "",
+      probationHolidayMultiplierStr: "",
     },
   });
 
@@ -142,6 +171,18 @@ const EditUserForm = () => {
         email: user.email || "",
         date_of_birth: new Date(user.date_of_birth),
         phone_number: user.phone_number,
+        probationStartLocal: toDateTimeLocalValue(user.probationStartDate),
+        probationEndLocal: toDateTimeLocalValue(user.probationEndDate),
+        probationHourlyRateStr:
+          user.probationHourlyRate != null &&
+          !Number.isNaN(user.probationHourlyRate)
+            ? String(user.probationHourlyRate)
+            : "",
+        probationHolidayMultiplierStr:
+          user.probationHolidayMultiplier != null &&
+          !Number.isNaN(user.probationHolidayMultiplier)
+            ? String(user.probationHolidayMultiplier)
+            : "",
       });
     }
   }, [user, form]);
@@ -156,12 +197,38 @@ const EditUserForm = () => {
   const onSubmit = (data: UpdateUserFormData) => {
     if (!id) return;
 
+    const parseRate = (raw?: string): number | null => {
+      const t = raw?.trim();
+      if (!t) return null;
+      const n = Number(t.replace(/\s/g, "").replace(/\./g, "").replace(/,/g, ""));
+      if (!Number.isFinite(n) || n < 0) return null;
+      return n;
+    };
+
+    const parseMultiplier = (raw?: string): number | null => {
+      const t = raw?.trim();
+      if (!t) return null;
+      const n = Number(t.replace(/\s/g, "").replace(",", "."));
+      if (!Number.isFinite(n) || n < 0 || n > 20) return null;
+      return n;
+    };
+
     const updateData: UpdateUserRequest = {
       name: data.name,
       username: data.username,
       email: data.email || undefined,
       date_of_birth: data.date_of_birth,
       phone_number: data.phone_number,
+      probationStartDate: data.probationStartLocal?.trim()
+        ? new Date(data.probationStartLocal).toISOString()
+        : null,
+      probationEndDate: data.probationEndLocal?.trim()
+        ? new Date(data.probationEndLocal).toISOString()
+        : null,
+      probationHourlyRate: parseRate(data.probationHourlyRateStr),
+      probationHolidayMultiplier: parseMultiplier(
+        data.probationHolidayMultiplierStr,
+      ),
     };
 
     updateUser(
@@ -678,6 +745,70 @@ const EditUserForm = () => {
                 </div>
               )}
             />
+
+            <div className="border-t pt-6 space-y-4">
+              <div>
+                <div className="text-base font-semibold">Thử việc &amp; lương</div>
+                <p className="text-sm text-muted-foreground">
+                  Để trống và lưu để xóa cấu hình. Ngày/giờ lưu dạng ISO trên server.
+                </p>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="probationStartLocal">
+                    Bắt đầu thử việc
+                  </Label>
+                  <Input
+                    id="probationStartLocal"
+                    type="datetime-local"
+                    {...form.register("probationStartLocal")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="probationEndLocal">Kết thúc thử việc</Label>
+                  <Input
+                    id="probationEndLocal"
+                    type="datetime-local"
+                    {...form.register("probationEndLocal")}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="probationHourlyRateStr">
+                    Lương giờ (thử việc)
+                  </Label>
+                  <Input
+                    id="probationHourlyRateStr"
+                    inputMode="numeric"
+                    {...form.register("probationHourlyRateStr")}
+                    placeholder="VNĐ/giờ, để trống để xóa"
+                  />
+                  {form.formState.errors.probationHourlyRateStr && (
+                    <p className="text-sm text-red-500">
+                      {form.formState.errors.probationHourlyRateStr.message}
+                    </p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="probationHolidayMultiplierStr">
+                    Hệ số ngày lễ (0–20)
+                  </Label>
+                  <Input
+                    id="probationHolidayMultiplierStr"
+                    inputMode="decimal"
+                    {...form.register("probationHolidayMultiplierStr")}
+                    placeholder="Để trống để xóa"
+                  />
+                  {form.formState.errors.probationHolidayMultiplierStr && (
+                    <p className="text-sm text-red-500">
+                      {
+                        form.formState.errors.probationHolidayMultiplierStr
+                          .message
+                      }
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
 
             {/* Buttons */}
             <div className="flex gap-4 pt-4">
