@@ -12,7 +12,6 @@ import {
   FormDescription,
   FormField,
   FormItem,
-  FormLabel,
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
@@ -27,11 +26,16 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { UseFormReturn, useForm } from "react-hook-form";
 import { z } from "zod";
 import { SalaryFormValues } from "../types";
-import { HOURS_IN_DAY, formatHourLabel, formatVndInput, parseVndInput } from "../utils";
+import {
+  HOURS_IN_DAY,
+  formatHourLabel,
+  formatVndInput,
+  parseVndInput,
+} from "../utils";
 
 const salaryFormSchema = z.object({
   hourlyRateMap: z.record(
-    z.coerce.number().min(0, "Lương theo giờ phải lớn hơn hoặc bằng 0")
+    z.coerce.number().min(0, "Lương theo giờ phải lớn hơn hoặc bằng 0"),
   ),
   hourlyShiftMap: z.record(z.enum(["shift1", "shift2", "shift3"]).nullable()),
 });
@@ -69,10 +73,7 @@ function GlobalSnapshotBlock({
       </CardHeader>
       <CardContent>
         <Form {...form}>
-          <form
-            onSubmit={form.handleSubmit(onSubmit)}
-            className="space-y-4"
-          >
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <div className="grid gap-2 rounded-md border p-3 text-sm md:grid-cols-[120px_1fr_180px]">
               <span className="font-medium">Khung giờ</span>
               <span className="font-medium">Lương theo giờ (VND)</span>
@@ -105,7 +106,9 @@ function GlobalSnapshotBlock({
                               disabled={isBusy}
                               value={formatVndInput(field.value)}
                               onChange={(event) =>
-                                field.onChange(parseVndInput(event.target.value))
+                                field.onChange(
+                                  parseVndInput(event.target.value),
+                                )
                               }
                               onBlur={field.onBlur}
                               name={field.name}
