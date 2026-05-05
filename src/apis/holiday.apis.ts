@@ -2,11 +2,13 @@ import http from "@/utils/http";
 // import { HTTPResponse } from "@/@types";
 const HOLIDAY_API_URL = "/holidays";
 
-interface Holiday {
+/** Body tạo/sửa ngày lễ — salaryMultiplier: 0.1–20 hoặc null (không nhân) */
+export interface Holiday {
   _id?: string;
   date: string;
   name: string;
   description?: string;
+  salaryMultiplier?: number | null;
 }
 
 const holidayApis = {

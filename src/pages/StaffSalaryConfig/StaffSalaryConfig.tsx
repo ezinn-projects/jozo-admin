@@ -1,15 +1,10 @@
-import {
-  IEmployeeSalaryConfig,
-  IEmployeeSalarySnapshot,
-  ISalarySyncResult,
-} from "@/apis/staffSchedule.apis";
+import { IEmployeeSalarySnapshot, ISalarySyncResult } from "@/apis/staffSchedule.apis";
 import staffScheduleApis from "@/apis/staffSchedule.apis";
 import { PageHeader } from "@/components/shared";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CircleDollarSign } from "lucide-react";
 import { useEffect } from "react";
-import EmployeeSalaryTable from "./components/EmployeeSalaryTable";
 import GlobalSnapshotBlock, {
   useSalaryForm,
 } from "./components/GlobalSnapshotBlock";
@@ -22,7 +17,6 @@ import { buildHourlyRateMap, buildHourlyShiftMap } from "./utils";
 
 const salaryQueryKeys = {
   snapshot: ["employeeSalarySnapshot"] as const,
-  employees: ["employeeSalaryEmployees"] as const,
 };
 
 const scheduleQueryRoots = [
@@ -49,23 +43,6 @@ const normalizeSalarySnapshot = (
   };
 };
 
-const extractEmployeeList = (result: unknown): IEmployeeSalaryConfig[] => {
-  if (Array.isArray(result)) {
-    return result as IEmployeeSalaryConfig[];
-  }
-
-  if (
-    result &&
-    typeof result === "object" &&
-    "items" in result &&
-    Array.isArray((result as { items?: unknown }).items)
-  ) {
-    return (result as { items: IEmployeeSalaryConfig[] }).items;
-  }
-
-  return [];
-};
-
 function StaffSalaryConfig() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -81,20 +58,7 @@ function StaffSalaryConfig() {
     queryFn: staffScheduleApis.getSalarySnapshot,
   });
 
-  const { data: employeesResponse, isLoading: isLoadingEmployees } = useQuery({
-    queryKey: salaryQueryKeys.employees,
-    queryFn: staffScheduleApis.getSalaryEmployees,
-  });
-
   const snapshot = snapshotResponse?.data.result;
-  const employees = extractEmployeeList(employeesResponse?.data.result);
-  const keyword = queryConfig.keyword.trim().toLowerCase();
-  const filteredEmployees = employees.filter((employee) => {
-    const userName = employee.userName?.toLowerCase() || "";
-    const userPhone = employee.userPhone || "";
-
-    return userName.includes(keyword) || userPhone.includes(keyword);
-  });
 
   useEffect(() => {
     form.reset(normalizeSalarySnapshot(snapshot));
@@ -102,7 +66,6 @@ function StaffSalaryConfig() {
 
   const invalidateSalaryQueries = () => {
     queryClient.invalidateQueries({ queryKey: salaryQueryKeys.snapshot });
-    queryClient.invalidateQueries({ queryKey: salaryQueryKeys.employees });
   };
 
   const invalidateScheduleQueries = () => {
@@ -174,13 +137,6 @@ function StaffSalaryConfig() {
         to={queryConfig.to ?? ""}
         onFromChange={(v) => setQueryConfig({ from: v || null })}
         onToChange={(v) => setQueryConfig({ to: v || null })}
-      />
-
-      <EmployeeSalaryTable
-        employees={filteredEmployees}
-        keyword={queryConfig.keyword}
-        isLoading={isLoadingEmployees}
-        onKeywordChange={(value) => setQueryConfig({ keyword: value })}
       />
     </div>
   );

@@ -17,17 +17,39 @@ import {
   AlertDialogTitle,
 } from "./alert-dialog";
 
-interface Event {
+export interface CalendarEvent {
   _id?: string;
   date: string;
   name: string;
   description?: string;
+  /** 0.1–20: nhân lương ngày lễ cho NV chính thức; null/undefined: không gán hệ số trên ngày lễ */
+  salaryMultiplier?: number | null;
 }
 
 interface CustomCalendarProps {
-  events?: Event[];
-  onEventAdd?: (event: Event) => void;
-  onEventDelete?: (event: Event) => void;
+  events?: CalendarEvent[];
+  onEventAdd?: (event: CalendarEvent) => void;
+  onEventDelete?: (event: CalendarEvent) => void;
+}
+
+const DEFAULT_SALARY_MULTIPLIER_SUGGESTION = "1.5";
+
+function parseSalaryMultiplierInput(raw: string): {
+  value: number | null;
+  error?: string;
+} {
+  const trimmed = raw.trim();
+  if (!trimmed) {
+    return { value: null };
+  }
+  const n = Number(trimmed.replace(",", "."));
+  if (!Number.isFinite(n)) {
+    return { value: null, error: "Hệ số không hợp lệ" };
+  }
+  if (n < 0.1 || n > 20) {
+    return { value: null, error: "Hệ số phải từ 0,1 đến 20 (hoặc để trống)" };
+  }
+  return { value: n };
 }
 
 export function CustomCalendar({
@@ -39,10 +61,15 @@ export function CustomCalendar({
   const [selectedDate, setSelectedDate] = useState<dayjs.Dayjs | null>(null);
   const [isAddEventOpen, setIsAddEventOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [eventToDelete, setEventToDelete] = useState<Event | null>(null);
-  const [newEvent, setNewEvent] = useState<Partial<Event>>({});
+  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(
+    null,
+  );
+  const [newEvent, setNewEvent] = useState<Partial<CalendarEvent>>({});
+  const [salaryMultiplierInput, setSalaryMultiplierInput] = useState(
+    DEFAULT_SALARY_MULTIPLIER_SUGGESTION,
+  );
+  const [multiplierError, setMultiplierError] = useState("");
 
-  // Generate calendar grid
   const calendarGrid = useMemo(() => {
     const firstDayOfMonth = currentDate.startOf("month");
     const lastDayOfMonth = currentDate.endOf("month");
@@ -54,12 +81,10 @@ export function CustomCalendar({
     let dayCount = 1;
     let nextMonthDayCount = 1;
 
-    // Generate 6 weeks of calendar
     for (let week = 0; week < 6; week++) {
       const weekDays = [];
       for (let day = 0; day < 7; day++) {
         if (week === 0 && day < firstDayOfWeek) {
-          // Days from previous month
           weekDays.push({
             date: dayjs(currentDate)
               .subtract(1, "month")
@@ -67,14 +92,12 @@ export function CustomCalendar({
             isCurrentMonth: false,
           });
         } else if (dayCount > daysInMonth) {
-          // Days from next month
           weekDays.push({
             date: dayjs(currentDate).add(1, "month").date(nextMonthDayCount),
             isCurrentMonth: false,
           });
           nextMonthDayCount++;
         } else {
-          // Days from current month
           weekDays.push({
             date: dayjs(currentDate).date(dayCount),
             isCurrentMonth: true,
@@ -99,21 +122,50 @@ export function CustomCalendar({
     setCurrentDate(dayjs());
   };
 
-  const handleDateClick = (date: dayjs.Dayjs) => {
+  const openAddDialogForDate = (date: dayjs.Dayjs) => {
     setSelectedDate(date);
     setNewEvent({ date: date.format("YYYY-MM-DD") });
+    setSalaryMultiplierInput(DEFAULT_SALARY_MULTIPLIER_SUGGESTION);
+    setMultiplierError("");
+    setIsAddEventOpen(true);
+  };
+
+  const handleDateClick = (date: dayjs.Dayjs) => {
+    openAddDialogForDate(date);
+  };
+
+  const handleOpenAddFromHeader = () => {
+    const today = dayjs();
+    setSelectedDate(today);
+    setNewEvent({ date: today.format("YYYY-MM-DD") });
+    setSalaryMultiplierInput(DEFAULT_SALARY_MULTIPLIER_SUGGESTION);
+    setMultiplierError("");
     setIsAddEventOpen(true);
   };
 
   const handleAddEvent = () => {
-    if (newEvent.date && newEvent.name) {
-      onEventAdd?.(newEvent as Event);
-      setIsAddEventOpen(false);
-      setNewEvent({});
+    console.log("newEvent", newEvent);
+    if (!newEvent.date || !newEvent.name?.trim()) return;
+
+    const parsed = parseSalaryMultiplierInput(salaryMultiplierInput);
+    if (parsed.error) {
+      setMultiplierError(parsed.error);
+      return;
     }
+    setMultiplierError("");
+
+    onEventAdd?.({
+      date: newEvent.date,
+      name: newEvent.name.trim(),
+      description: newEvent.description?.trim() || undefined,
+      salaryMultiplier: parsed.value,
+    });
+    setIsAddEventOpen(false);
+    setNewEvent({});
+    setSalaryMultiplierInput(DEFAULT_SALARY_MULTIPLIER_SUGGESTION);
   };
 
-  const handleDeleteClick = (event: Event, e: React.MouseEvent) => {
+  const handleDeleteClick = (event: CalendarEvent, e: React.MouseEvent) => {
     e.stopPropagation();
     setEventToDelete(event);
     setIsDeleteDialogOpen(true);
@@ -135,7 +187,6 @@ export function CustomCalendar({
 
   return (
     <div className="w-full">
-      {/* Calendar Header */}
       <div className="flex items-center justify-between mb-4">
         <div className="flex items-center gap-2">
           <Button variant="outline" size="icon" onClick={handlePrevMonth}>
@@ -154,22 +205,20 @@ export function CustomCalendar({
         <Button
           variant="outline"
           size="icon"
-          onClick={() => setIsAddEventOpen(true)}
+          onClick={handleOpenAddFromHeader}
+          aria-label="Thêm ngày lễ"
         >
           <Plus className="h-4 w-4" />
         </Button>
       </div>
 
-      {/* Calendar Grid */}
       <div className="grid grid-cols-7 gap-px bg-gray-200">
-        {/* Weekday Headers */}
         {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
           <div key={day} className="bg-white p-2 text-center font-medium">
             {day}
           </div>
         ))}
 
-        {/* Calendar Days */}
         {calendarGrid.map((week, weekIndex) =>
           week.map((day, dayIndex) => {
             const event = getEventForDate(day.date);
@@ -202,6 +251,12 @@ export function CustomCalendar({
                         <Trash2 className="h-3 w-3" />
                       </Button>
                     </div>
+                    {event.salaryMultiplier != null &&
+                      event.salaryMultiplier > 0 && (
+                        <p className="text-xs font-medium text-red-700 mt-0.5">
+                          Hệ số lương: ×{event.salaryMultiplier}
+                        </p>
+                      )}
                     {event.description && (
                       <p className="text-xs text-gray-500 mt-1 line-clamp-2">
                         {event.description}
@@ -215,31 +270,75 @@ export function CustomCalendar({
         )}
       </div>
 
-      {/* Add Event Dialog */}
-      <Dialog open={isAddEventOpen} onOpenChange={setIsAddEventOpen}>
+      <Dialog
+        open={isAddEventOpen}
+        onOpenChange={(open) => {
+          setIsAddEventOpen(open);
+          if (!open) {
+            setMultiplierError("");
+          }
+        }}
+      >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Add Event</DialogTitle>
+            <DialogTitle>Thêm ngày lễ</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Event Name</Label>
+              <Label htmlFor="holiday-date">Ngày</Label>
               <Input
+                id="holiday-date"
+                type="date"
+                value={newEvent.date || ""}
+                onChange={(e) =>
+                  setNewEvent({ ...newEvent, date: e.target.value })
+                }
+              />
+            </div>
+            <div>
+              <Label htmlFor="holiday-name">Tên ngày lễ *</Label>
+              <Input
+                id="holiday-name"
                 value={newEvent.name || ""}
                 onChange={(e) =>
                   setNewEvent({ ...newEvent, name: e.target.value })
                 }
-                placeholder="Enter event name"
+                placeholder="Ví dụ: Tết Nguyên Đán"
               />
             </div>
             <div>
-              <Label>Description (Optional)</Label>
+              <Label htmlFor="holiday-salary-mult">
+                Hệ số lương ngày lễ (áp dụng NV chính thức)
+              </Label>
+              <Input
+                id="holiday-salary-mult"
+                inputMode="decimal"
+                value={salaryMultiplierInput}
+                onChange={(e) => {
+                  setSalaryMultiplierInput(e.target.value);
+                  setMultiplierError("");
+                }}
+                placeholder={`Gợi ý: ${DEFAULT_SALARY_MULTIPLIER_SUGGESTION}`}
+              />
+              <p className="text-xs text-muted-foreground mt-1">
+                Khoảng 0,1–20. Để trống = không gán hệ số trên ngày lễ này (xử
+                lý theo cấu hình khác, ví dụ thử việc).
+              </p>
+              {multiplierError && (
+                <p className="text-sm text-destructive mt-1">
+                  {multiplierError}
+                </p>
+              )}
+            </div>
+            <div>
+              <Label htmlFor="holiday-desc">Mô tả (tuỳ chọn)</Label>
               <Textarea
+                id="holiday-desc"
                 value={newEvent.description || ""}
                 onChange={(e) =>
                   setNewEvent({ ...newEvent, description: e.target.value })
                 }
-                placeholder="Enter event description"
+                placeholder="Ghi chú thêm"
               />
             </div>
             <div className="flex justify-end gap-2">
@@ -247,31 +346,29 @@ export function CustomCalendar({
                 variant="outline"
                 onClick={() => setIsAddEventOpen(false)}
               >
-                Cancel
+                Huỷ
               </Button>
-              <Button onClick={handleAddEvent}>Add Event</Button>
+              <Button onClick={handleAddEvent}>Lưu ngày lễ</Button>
             </div>
           </div>
         </DialogContent>
       </Dialog>
 
-      {/* Delete Confirmation Dialog */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
       >
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Event</AlertDialogTitle>
+            <AlertDialogTitle>Xoá ngày lễ</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to delete this event? This action cannot be
-              undone.
+              Bạn có chắc muốn xoá ngày lễ này? Thao tác không hoàn tác.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel>Huỷ</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteConfirm}>
-              Delete
+              Xoá
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

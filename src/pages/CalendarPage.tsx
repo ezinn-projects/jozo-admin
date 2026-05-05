@@ -3,16 +3,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { CustomCalendar } from "@/components/ui/custom-calendar";
-import holidayApis from "@/apis/holiday.apis";
+import holidayApis, { Holiday } from "@/apis/holiday.apis";
 import { Spin } from "@/components/ui/spin";
 import { Calendar as CalendarIcon } from "lucide-react";
-
-interface Holiday {
-  _id?: string;
-  date: string;
-  name: string;
-  description?: string;
-}
 
 function CalendarPage() {
   const { toast } = useToast();
