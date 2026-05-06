@@ -1,5 +1,6 @@
 import {
   ICoffeeSessionOrderDetail,
+  IMarkCoffeeSessionOrderBatchServedResult,
   IUpdateCoffeeSessionOrderRequestBody,
 } from "@/@types/CoffeeSessionOrder";
 import http from "@/utils/http";
@@ -21,6 +22,13 @@ const coffeeSessionOrderApis = {
     ),
   deleteCoffeeSessionOrder: (coffeeSessionId: string) =>
     http.delete<HTTPResponse>(`${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}`),
+  markCoffeeSessionOrderBatchServed: (
+    coffeeSessionId: string,
+    batchId: string,
+  ) =>
+    http.patch<HTTPResponse<IMarkCoffeeSessionOrderBatchServedResult>>(
+      `${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}/batches/${batchId}/served`,
+    ),
 };
 
 export default coffeeSessionOrderApis;

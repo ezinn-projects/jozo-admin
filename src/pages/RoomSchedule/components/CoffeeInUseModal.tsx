@@ -2,12 +2,8 @@ import { CoffeeSessionStatus, ICoffeeSession } from "@/@types/CoffeeSession";
 import {
   ICoffeeSessionOrder,
   ICoffeeSessionOrderDetail,
-  ICoffeeSessionOrderSelection,
 } from "@/@types/CoffeeSessionOrder";
-import {
-  FnBMenuCustomizationGroup,
-  IFnBCustomizationGroupTemplate,
-} from "@/@types/FnBCustomization";
+import { IFnBCustomizationGroupTemplate } from "@/@types/FnBCustomization";
 import coffeeSessionApis from "@/apis/coffeeSession.apis";
 import coffeeSessionOrderApis from "@/apis/coffeeSessionOrder.apis";
 import customizationGroupTemplateApis from "@/apis/customizationGroupTemplate.apis";
@@ -28,7 +24,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { FnBMenuItem } from "@/hooks/use-menu-items";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
+import { useRoomEvents } from "@/context/RoomEventsContext";
 import CoffeeOrderEditor from "@/pages/RoomSchedule/components/CoffeeOrderEditor";
+import { mergeAggregatedIntoDetail } from "@/utils/coffeeSessionOrderBatch";
+import {
+  formatSelectionPrice,
+  getLineItemSelectionDisplayGroups,
+} from "@/utils/coffeeOrderLineItemSelections";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import React from "react";
@@ -38,6 +40,8 @@ interface CoffeeInUseModalProps {
   onClose: () => void;
   session: ICoffeeSession | null;
   tableName?: string;
+  /** Mã bàn (code) để đồng bộ ẩn icon đơn mới sau khi phục vụ */
+  tableCode?: string;
   defaultOpenOrderEditor?: boolean;
 }
 
@@ -98,93 +102,18 @@ const sanitizeOrder = (order: ICoffeeSessionOrder): ICoffeeSessionOrder => ({
   ),
 });
 
-type SelectionDisplayGroup = {
-  key: string;
-  label: string;
-  options: {
-    key: string;
-    label: string;
-    priceDelta?: number;
-  }[];
-};
-
-const normalizeSelectionKey = (value: string) => value.trim().toLowerCase();
-
-const formatSelectionPrice = (priceDelta?: number) => {
-  if (typeof priceDelta !== "number") return "";
-
-  const prefix = priceDelta > 0 ? "+" : "";
-  return ` (${prefix}${priceDelta.toLocaleString("vi-VN")} VND)`;
-};
-
-const getMenuItemCustomizationGroups = (
-  menuItem: FnBMenuItem | undefined,
-  templates: IFnBCustomizationGroupTemplate[],
-): FnBMenuCustomizationGroup[] => {
-  if (!menuItem) return [];
-
-  const groups = [...(menuItem.customizationGroups || [])];
-
-  (menuItem.customizationTemplateRefs || []).forEach((ref) => {
-    const template = templates.find(
-      (template) => template.templateKey === ref.templateKey,
-    );
-
-    if (template?.group) {
-      groups.push(template.group);
-    }
-  });
-
-  return groups;
-};
-
-const getSelectionDisplayGroups = (
-  customizationGroups: FnBMenuCustomizationGroup[],
-  selections?: ICoffeeSessionOrderSelection[] | null,
-) => {
-  if (!selections?.length) return [];
-
-  const groups = new Map<string, SelectionDisplayGroup>();
-
-  selections.forEach((selection) => {
-    const normalizedGroupKey = normalizeSelectionKey(selection.groupKey);
-    const normalizedOptionKey = normalizeSelectionKey(selection.optionKey);
-    const matchedGroup = customizationGroups.find(
-      (group) => normalizeSelectionKey(group.groupKey) === normalizedGroupKey,
-    );
-    const matchedOption = matchedGroup?.options?.find(
-      (option) =>
-        normalizeSelectionKey(option.optionKey) === normalizedOptionKey,
-    );
-    const groupLabel = matchedGroup?.label || selection.groupKey;
-    const optionLabel = matchedOption?.label || selection.optionKey;
-    const currentGroup = groups.get(normalizedGroupKey) || {
-      key: normalizedGroupKey,
-      label: groupLabel,
-      options: [],
-    };
-
-    currentGroup.options.push({
-      key: normalizedOptionKey,
-      label: optionLabel,
-      priceDelta: matchedOption?.priceDelta,
-    });
-    groups.set(normalizedGroupKey, currentGroup);
-  });
-
-  return Array.from(groups.values());
-};
-
 const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   isOpen,
   onClose,
   session,
   tableName,
+  tableCode,
   defaultOpenOrderEditor = false,
 }) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { user } = useAuth();
+  const { clearCoffeeNewOrderAfterBatchServed } = useRoomEvents();
   const [customerName, setCustomerName] = React.useState("");
   const [customerPhone, setCustomerPhone] = React.useState("");
   const [peopleCount, setPeopleCount] = React.useState("1");
@@ -336,6 +265,91 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     },
   });
 
+  const markBatchServedMutation = useMutation({
+    mutationFn: (batchId: string) =>
+      coffeeSessionOrderApis.markCoffeeSessionOrderBatchServed(
+        sessionDetail?._id || "",
+        batchId,
+      ),
+    onMutate: async (batchId) => {
+      const sid = sessionDetail?._id;
+      if (!sid) return undefined;
+      await queryClient.cancelQueries({
+        queryKey: ["coffeeSessionOrder", sid],
+      });
+      const prev = queryClient.getQueryData<ICoffeeSessionOrderDetail | null>([
+        "coffeeSessionOrder",
+        sid,
+      ]);
+      queryClient.setQueryData<ICoffeeSessionOrderDetail | null>(
+        ["coffeeSessionOrder", sid],
+        (old) => {
+          if (!old?.batches?.length) return old;
+          return {
+            ...old,
+            batches: old.batches.map((b) =>
+              b.batchId === batchId
+                ? {
+                    ...b,
+                    status: "served" as const,
+                    servedAt: new Date().toISOString(),
+                  }
+                : b,
+            ),
+          };
+        },
+      );
+      return { prev };
+    },
+    onError: (error, _batchId, ctx) => {
+      const sid = sessionDetail?._id;
+      if (sid && ctx?.prev !== undefined) {
+        queryClient.setQueryData(["coffeeSessionOrder", sid], ctx.prev);
+      }
+      toast({
+        title: "Không thể đánh dấu đã phục vụ",
+        description: error.message || "Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    },
+    onSuccess: (response) => {
+      const sid = sessionDetail?._id;
+      const result = response.data.result;
+      if (!sid || !result) return;
+      queryClient.setQueryData<ICoffeeSessionOrderDetail | null>(
+        ["coffeeSessionOrder", sid],
+        (old) => {
+          if (!old) return old;
+          if (result.aggregatedOrder) {
+            return mergeAggregatedIntoDetail(old, result.aggregatedOrder);
+          }
+          if (!old.batches?.length) return old;
+          return {
+            ...old,
+            batches: old.batches.map((b) =>
+              b.batchId === result.batch.batchId ? result.batch : b,
+            ),
+          };
+        },
+      );
+      toast({
+        title: "Đã cập nhật batch",
+        description: "Trạng thái phục vụ đã được lưu.",
+      });
+      if (
+        tableCode &&
+        result.batch?.batchId &&
+        result.batch.status === "served"
+      ) {
+        clearCoffeeNewOrderAfterBatchServed({
+          tableCode,
+          batchId: result.batch.batchId,
+          coffeeSessionId: sid,
+        });
+      }
+    },
+  });
+
   const handleQuantityChange = (item: FnBMenuItem, nextQuantity: number) => {
     const category = item.category.toLowerCase();
     const targetKey =
@@ -373,37 +387,22 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     [draftOrder.drinks, draftOrder.snacks],
   );
   const orderHistoryItems = React.useMemo(() => {
-    if (orderQuery.data?.lineItems?.length) {
-      return orderQuery.data.lineItems.map((item) => {
-        const menuItems = menuItemsQuery.data || [];
-        const menuItem = menuItems.find(
-          (menuItem) => menuItem._id === item.itemId,
-        );
-        const hasOwnCustomizations =
-          (menuItem?.customizationGroups?.length || 0) > 0 ||
-          (menuItem?.customizationTemplateRefs?.length || 0) > 0;
-        const selectionSourceItem = hasOwnCustomizations
-          ? menuItem
-          : menuItems.find(
-              (sourceItem) => sourceItem._id === menuItem?.parentId,
-            ) || menuItem;
-        const selectionGroups = getMenuItemCustomizationGroups(
-          selectionSourceItem,
-          customizationTemplatesQuery.data || [],
-        );
+    const menuItems = menuItemsQuery.data || [];
+    const templates = customizationTemplatesQuery.data || [];
 
-        return {
-          key: item.lineId || `${item.itemId}-${item.name}`,
-          name: item.name,
-          quantity: item.quantity,
-          category: item.category,
-          note: item.note,
-          selectionGroups: getSelectionDisplayGroups(
-            selectionGroups,
-            item.selections,
-          ),
-        };
-      });
+    if (orderQuery.data?.lineItems?.length) {
+      return orderQuery.data.lineItems.map((item) => ({
+        key: item.lineId || `${item.itemId}-${item.name}`,
+        name: item.name,
+        quantity: item.quantity,
+        category: item.category,
+        note: item.note,
+        selectionGroups: getLineItemSelectionDisplayGroups(
+          item,
+          menuItems,
+          templates,
+        ),
+      }));
     }
 
     const legacyItems = [
@@ -420,6 +419,11 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
       selectionGroups: [],
     }));
   }, [customizationTemplatesQuery.data, menuItemsQuery.data, orderQuery.data]);
+
+  const sortedOrderBatches = [...(orderQuery.data?.batches ?? [])].sort(
+    (a, b) => dayjs(b.submittedAt).valueOf() - dayjs(a.submittedAt).valueOf(),
+  );
+  const orderTotals = orderQuery.data?.orderTotals;
 
   return (
     <>
@@ -514,70 +518,211 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                 <div>
                   <h3 className="font-semibold">Order</h3>
                 </div>
-                <Badge variant="secondary">
-                  {totalOrderItems > 0
-                    ? `${totalOrderItems} món đã chọn`
-                    : "Chưa có món"}
-                </Badge>
+                <div className="flex flex-wrap items-center gap-2">
+                  {sortedOrderBatches.some((b) => b.status === "pending") ? (
+                    <Badge variant="destructive">Có đợt chờ phục vụ</Badge>
+                  ) : null}
+                  <Badge variant="secondary">
+                    {totalOrderItems > 0
+                      ? `${totalOrderItems} món (chỉnh sửa)`
+                      : "Chưa chỉnh trên editor"}
+                  </Badge>
+                </div>
               </div>
+              {orderTotals ? (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  F&B: list {orderTotals.fnbListTotal.toLocaleString("vi-VN")} ·
+                  tính phí {orderTotals.fnbChargedTotal.toLocaleString("vi-VN")}{" "}
+                  <span className="opacity-75">
+                    ({orderTotals.pricingMode})
+                  </span>
+                </p>
+              ) : null}
               {orderQuery.isLoading ? (
                 <p className="mt-3 text-sm text-muted-foreground">
                   Đang tải order...
                 </p>
-              ) : orderHistoryItems.length > 0 ? (
-                <div className="mt-3 space-y-2 rounded-md border bg-background p-3">
-                  {orderHistoryItems.map((item) => (
-                    <div
-                      key={item.key}
-                      className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border px-3 py-2"
-                    >
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{item.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {String(item.category || "")
-                            .toLowerCase()
-                            .startsWith("drink")
-                            ? "Đồ uống"
-                            : "Đồ ăn"}
-                        </p>
-                        {item.selectionGroups.length > 0 && (
-                          <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
-                            {item.selectionGroups.map((group) => (
-                              <p key={group.key}>
-                                <span className="font-medium text-foreground">
-                                  {group.label}:
-                                </span>{" "}
-                                {group.options
-                                  .map(
-                                    (option) =>
-                                      `${option.label}${formatSelectionPrice(
-                                        option.priceDelta,
-                                      )}`,
-                                  )
-                                  .join(", ")}
-                              </p>
-                            ))}
-                          </div>
-                        )}
-                        {item.note && (
-                          <p className="mt-1 text-xs italic text-muted-foreground">
-                            Ghi chú: {item.note}
-                          </p>
-                        )}
-                      </div>
-                      <Badge
-                        variant="secondary"
-                        className="min-w-10 justify-center"
-                      >
-                        x{item.quantity}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
               ) : (
-                <p className="mt-3 text-sm text-muted-foreground">
-                  Chưa có order cho phiên này.
-                </p>
+                <>
+                  {sortedOrderBatches.length > 0 ? (
+                    <div className="mt-3 space-y-3">
+                      <p className="text-sm font-medium">Đợt order</p>
+                      {sortedOrderBatches.map((batch) => (
+                        <div
+                          key={batch.batchId}
+                          className="space-y-2 rounded-md border bg-background p-3"
+                        >
+                          <div className="flex flex-wrap items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="break-all font-mono text-xs text-muted-foreground">
+                                {batch.batchId}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                Gửi:{" "}
+                                {dayjs(batch.submittedAt).format(
+                                  "HH:mm DD/MM/YYYY",
+                                )}
+                              </p>
+                              {batch.status === "served" && batch.servedAt ? (
+                                <p className="text-xs text-muted-foreground">
+                                  Phục vụ:{" "}
+                                  {dayjs(batch.servedAt).format(
+                                    "HH:mm DD/MM/YYYY",
+                                  )}
+                                </p>
+                              ) : null}
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                              <Badge
+                                variant={
+                                  batch.status === "pending"
+                                    ? "default"
+                                    : "secondary"
+                                }
+                              >
+                                {batch.status === "pending"
+                                  ? "Chờ phục vụ"
+                                  : "Đã phục vụ"}
+                              </Badge>
+                              {batch.status === "pending" ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  loading={
+                                    markBatchServedMutation.isPending &&
+                                    markBatchServedMutation.variables ===
+                                      batch.batchId
+                                  }
+                                  disabled={
+                                    markBatchServedMutation.isPending ||
+                                    !sessionDetail?._id
+                                  }
+                                  onClick={() =>
+                                    markBatchServedMutation.mutate(
+                                      batch.batchId,
+                                    )
+                                  }
+                                >
+                                  Đã phục vụ
+                                </Button>
+                              ) : null}
+                            </div>
+                          </div>
+                          <div className="space-y-1 border-t pt-2">
+                            {batch.lineItems.map((item) => {
+                              const batchSelectionGroups =
+                                getLineItemSelectionDisplayGroups(
+                                  item,
+                                  menuItemsQuery.data || [],
+                                  customizationTemplatesQuery.data || [],
+                                );
+                              return (
+                                <div
+                                  key={item.lineId}
+                                  className="flex justify-between gap-2 text-sm"
+                                >
+                                  <div className="min-w-0">
+                                    <p className="truncate font-medium">
+                                      {item.name}
+                                    </p>
+                                    {batchSelectionGroups.length > 0 ? (
+                                      <div className="mt-0.5 space-y-0.5 text-xs text-muted-foreground">
+                                        {batchSelectionGroups.map((group) => (
+                                          <p key={group.key}>
+                                            <span className="font-medium text-foreground">
+                                              {group.label}:
+                                            </span>{" "}
+                                            {group.options
+                                              .map(
+                                                (option) =>
+                                                  `${option.label}${formatSelectionPrice(
+                                                    option.priceDelta,
+                                                  )}`,
+                                              )
+                                              .join(", ")}
+                                          </p>
+                                        ))}
+                                      </div>
+                                    ) : null}
+                                    {item.note ? (
+                                      <p className="mt-0.5 text-xs italic text-amber-800">
+                                        Ghi chú: {item.note}
+                                      </p>
+                                    ) : null}
+                                  </div>
+                                  <span className="shrink-0 font-medium">
+                                    ×{item.quantity}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  {sortedOrderBatches.length === 0 &&
+                  orderHistoryItems.length > 0 ? (
+                    <div className="mt-3 space-y-2 rounded-md border bg-background p-3">
+                      <p className="text-sm font-medium">
+                        Tổng hợp món trong phiên
+                      </p>
+                      {orderHistoryItems.map((item) => (
+                        <div
+                          key={item.key}
+                          className="grid grid-cols-[1fr_auto] items-center gap-2 rounded-md border px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">{item.name}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {String(item.category || "")
+                                .toLowerCase()
+                                .startsWith("drink")
+                                ? "Đồ uống"
+                                : "Đồ ăn"}
+                            </p>
+                            {item.selectionGroups.length > 0 && (
+                              <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                                {item.selectionGroups.map((group) => (
+                                  <p key={group.key}>
+                                    <span className="font-medium text-foreground">
+                                      {group.label}:
+                                    </span>{" "}
+                                    {group.options
+                                      .map(
+                                        (option) =>
+                                          `${option.label}${formatSelectionPrice(
+                                            option.priceDelta,
+                                          )}`,
+                                      )
+                                      .join(", ")}
+                                  </p>
+                                ))}
+                              </div>
+                            )}
+                            {item.note && (
+                              <p className="mt-1 text-xs italic text-muted-foreground">
+                                Ghi chú: {item.note}
+                              </p>
+                            )}
+                          </div>
+                          <Badge
+                            variant="secondary"
+                            className="min-w-10 justify-center"
+                          >
+                            x{item.quantity}
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  ) : sortedOrderBatches.length === 0 &&
+                    orderHistoryItems.length === 0 ? (
+                    <p className="mt-3 text-sm text-muted-foreground">
+                      Chưa có order cho phiên này.
+                    </p>
+                  ) : null}
+                </>
               )}
             </div>
           </div>
@@ -586,7 +731,9 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
             <div className="flex flex-wrap gap-2">
               <Button
                 loading={
-                  updateOrderMutation.isPending || deleteOrderMutation.isPending
+                  updateOrderMutation.isPending ||
+                  deleteOrderMutation.isPending ||
+                  markBatchServedMutation.isPending
                 }
                 onClick={() => setIsOrderModalOpen(true)}
                 disabled={updateSessionMutation.isPending}

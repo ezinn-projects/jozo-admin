@@ -5,7 +5,10 @@ import useAuth from "./useAuth";
 import { INotification } from "@/@types/Notification";
 import { Gift } from "@/@types/Gift";
 import { IBookingSocketData } from "@/@types/Booking";
-import { ICoffeeOrderNewSocketPayload } from "@/@types/CoffeeSessionOrder";
+import {
+  ICoffeeOrderSocketPayload,
+  IOrderBatchStatusChangedSocketPayload,
+} from "@/@types/CoffeeSessionOrder";
 
 export const useSocket = () => {
   const { toast } = useToast();
@@ -148,15 +151,39 @@ export const useSocket = () => {
   };
 
   const onOrderNew = (
-    callback: (data: ICoffeeOrderNewSocketPayload) => void,
+    callback: (data: ICoffeeOrderSocketPayload) => void,
   ) => {
     socketRef.current?.on("order:new", callback);
   };
 
   const offOrderNew = (
-    callback: (data: ICoffeeOrderNewSocketPayload) => void,
+    callback: (data: ICoffeeOrderSocketPayload) => void,
   ) => {
     socketRef.current?.off("order:new", callback);
+  };
+
+  const onOrderCreated = (
+    callback: (data: ICoffeeOrderSocketPayload) => void,
+  ) => {
+    socketRef.current?.on("order:created", callback);
+  };
+
+  const offOrderCreated = (
+    callback: (data: ICoffeeOrderSocketPayload) => void,
+  ) => {
+    socketRef.current?.off("order:created", callback);
+  };
+
+  const onOrderBatchStatusChanged = (
+    callback: (data: IOrderBatchStatusChangedSocketPayload) => void,
+  ) => {
+    socketRef.current?.on("order:batch_status_changed", callback);
+  };
+
+  const offOrderBatchStatusChanged = (
+    callback: (data: IOrderBatchStatusChangedSocketPayload) => void,
+  ) => {
+    socketRef.current?.off("order:batch_status_changed", callback);
   };
 
   const onOrderSupportRequested = (callback: (data: unknown) => void) => {
@@ -314,6 +341,10 @@ export const useSocket = () => {
     offNewOrderNotification,
     onOrderNew,
     offOrderNew,
+    onOrderCreated,
+    offOrderCreated,
+    onOrderBatchStatusChanged,
+    offOrderBatchStatusChanged,
     onOrderSupportRequested,
     offOrderSupportRequested,
     onNewBooking,

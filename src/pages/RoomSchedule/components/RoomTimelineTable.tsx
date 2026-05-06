@@ -1,4 +1,9 @@
 import { ICoffeeSession } from "@/@types/CoffeeSession";
+import {
+  ICoffeeSessionOrderLine,
+  ICoffeeSessionOrderLineItem,
+  ICompactCoffeeSessionOrderBatch,
+} from "@/@types/CoffeeSessionOrder";
 import { ICoffeeTable } from "@/@types/CoffeeTable";
 import { IRoom, IRoomSchedule } from "@/@types/Room";
 import { Gift as GiftType } from "@/@types/Gift";
@@ -63,6 +68,7 @@ import {
 import CoffeeBookedModal from "./CoffeeBookedModal";
 import CoffeeCreateSessionModal from "./CoffeeCreateSessionModal";
 import CoffeeInUseModal from "./CoffeeInUseModal";
+import CoffeeNewOrderLineItemsModal from "./CoffeeNewOrderLineItemsModal";
 import EditRoomTypeModal from "./EditRoomTypeModal";
 import ExtendSessionModal from "./ExtendSessionModal";
 import ProcessBookedModal from "./ProcessBookedModal";
@@ -242,6 +248,17 @@ const RoomTimelineTable: React.FC = () => {
     useState<ICoffeeSession | null>(null);
   const [openCoffeeOrderEditorOnOpen, setOpenCoffeeOrderEditorOnOpen] =
     useState(false);
+  const [coffeeNewOrderLineItemsOpen, setCoffeeNewOrderLineItemsOpen] =
+    useState(false);
+  const [coffeeNewOrderLineItemsCtx, setCoffeeNewOrderLineItemsCtx] = useState<{
+    table: ICoffeeTable;
+    session: ICoffeeSession;
+    lines?: ICoffeeSessionOrderLine[];
+    lineItems?: ICoffeeSessionOrderLineItem[];
+    summary: string;
+    highlightBatchId?: string;
+    createdBatch?: ICompactCoffeeSessionOrderBatch;
+  } | null>(null);
   const queryClient = useQueryClient();
 
   const [scheduleViewTab, setScheduleViewTab] = useState<"rooms" | "coffee">(
@@ -521,6 +538,8 @@ const RoomTimelineTable: React.FC = () => {
     setCoffeeModalTable(null);
     setSelectedCoffeeSession(null);
     setOpenCoffeeOrderEditorOnOpen(false);
+    setCoffeeNewOrderLineItemsOpen(false);
+    setCoffeeNewOrderLineItemsCtx(null);
   };
 
   const handleOrderClick = (roomId: string) => {
@@ -606,6 +625,26 @@ const RoomTimelineTable: React.FC = () => {
     }
   };
 
+  const closeCoffeeNewOrderLineItemsModal = () => {
+    setCoffeeNewOrderLineItemsOpen(false);
+    setCoffeeNewOrderLineItemsCtx(null);
+  };
+
+  const handleOpenCoffeeSessionFromNewOrderPreview = () => {
+    if (!coffeeNewOrderLineItemsCtx) return;
+    const { table, session } = coffeeNewOrderLineItemsCtx;
+    setCoffeeModalTable(table);
+    setSelectedCoffeeSession(session);
+    setOpenCoffeeOrderEditorOnOpen(true);
+
+    const normalizedStatus = normalizeCoffeeSessionStatus(session.status);
+    if (normalizedStatus === "booked") {
+      setModal("coffeeBooked");
+      return;
+    }
+    setModal("coffeeInUse");
+  };
+
   const handleCoffeeNewOrderClick = (
     table: ICoffeeTable,
     tableSessions: ICoffeeSession[],
@@ -634,18 +673,16 @@ const RoomTimelineTable: React.FC = () => {
       return;
     }
 
-    setCoffeeModalTable(table);
-    setSelectedCoffeeSession(targetSession);
-    setOpenCoffeeOrderEditorOnOpen(true);
-    clearCoffeeNewOrderNotification(tableCode);
-
-    const normalizedStatus = normalizeCoffeeSessionStatus(targetSession.status);
-    if (normalizedStatus === "booked") {
-      setModal("coffeeBooked");
-      return;
-    }
-
-    setModal("coffeeInUse");
+    setCoffeeNewOrderLineItemsCtx({
+      table,
+      session: targetSession,
+      lines: notification.lines,
+      lineItems: notification.lineItems,
+      summary: notification.message,
+      highlightBatchId: notification.createdBatch?.batchId,
+      createdBatch: notification.createdBatch,
+    });
+    setCoffeeNewOrderLineItemsOpen(true);
   };
 
   // Hàm tính toán vị trí và chiều rộng của một event block
@@ -1703,7 +1740,7 @@ const RoomTimelineTable: React.FC = () => {
                               <TooltipTrigger asChild>
                                 <button
                                   type="button"
-                                  aria-label={`Đơn mới bàn ${tableCode}, đóng thông báo`}
+                                  aria-label={`Đơn mới bàn ${tableCode}, mở xem món chờ phục vụ`}
                                   className={`flex items-center gap-0.5 ${
                                     isCoffeeNewOrderBlinking
                                       ? "animate-bounce"
@@ -1732,6 +1769,12 @@ const RoomTimelineTable: React.FC = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="font-medium">Đơn mới</p>
+                                <p className="text-xs text-muted-foreground">
+                                  Icon ẩn sau khi phục vụ xong đợt này
+                                </p>
+                                <p className="text-xs">
+                                  Bấm để xem / in phiếu
+                                </p>
                                 <p>{coffeeNewOrderNotification.message}</p>
                                 <p className="text-xs text-gray-500 mt-1">
                                   {dayjs(
@@ -1978,9 +2021,28 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           session={selectedCoffeeSession}
           tableName={coffeeModalTable?.name}
+          tableCode={
+            coffeeModalTable?.code != null
+              ? String(coffeeModalTable.code).trim()
+              : undefined
+          }
           defaultOpenOrderEditor={openCoffeeOrderEditorOnOpen}
         />
       )}
+      {coffeeNewOrderLineItemsCtx ? (
+        <CoffeeNewOrderLineItemsModal
+          isOpen={coffeeNewOrderLineItemsOpen}
+          onClose={closeCoffeeNewOrderLineItemsModal}
+          tableName={coffeeNewOrderLineItemsCtx.table.name}
+          coffeeSessionId={coffeeNewOrderLineItemsCtx.session._id || ""}
+          summaryMessage={coffeeNewOrderLineItemsCtx.summary}
+          initialLines={coffeeNewOrderLineItemsCtx.lines}
+          initialLineItems={coffeeNewOrderLineItemsCtx.lineItems}
+          highlightBatchId={coffeeNewOrderLineItemsCtx.highlightBatchId}
+          initialCreatedBatch={coffeeNewOrderLineItemsCtx.createdBatch}
+          onOpenSession={handleOpenCoffeeSessionFromNewOrderPreview}
+        />
+      ) : null}
     </div>
   );
 };

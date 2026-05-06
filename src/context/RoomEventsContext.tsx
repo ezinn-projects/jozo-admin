@@ -21,7 +21,22 @@ import {
   ORDER_BOX_AUDIO_URLS,
   SUPPORT_BOX_AUDIO_URLS,
 } from "@/constants/supportBoxAudio";
-import { ICoffeeOrderNewSocketPayload } from "@/@types/CoffeeSessionOrder";
+import {
+  ICoffeeOrderSocketPayload,
+  ICoffeeSessionOrder,
+  ICoffeeSessionOrderDetail,
+  ICoffeeSessionOrderLine,
+  ICoffeeSessionOrderLineItem,
+  ICoffeeOrderTotals,
+  ICompactCoffeeSessionOrderBatch,
+  IOrderBatchStatusChangedSocketPayload,
+} from "@/@types/CoffeeSessionOrder";
+import {
+  applyBatchStatusChangedToDetail,
+  isOrderCreatedSocketPayload,
+  mergeAggregatedIntoDetail,
+  summarizeLineItemsQuick,
+} from "@/utils/coffeeSessionOrderBatch";
 
 type SupportNotification = {
   roomId: string;
@@ -64,6 +79,42 @@ type CoffeeNewOrderNotification = {
   orderId: string;
   message: string;
   timestamp: number;
+  lines?: ICoffeeSessionOrderLine[];
+  lineItems?: ICoffeeSessionOrderLineItem[];
+  orderTotals?: ICoffeeOrderTotals;
+  createdBatch?: ICompactCoffeeSessionOrderBatch;
+  submittedLineItems?: ICoffeeSessionOrderLineItem[];
+};
+
+const buildCoffeeOrderLinesFromAggregates = (
+  o: ICoffeeSessionOrder,
+): ICoffeeSessionOrderLine[] | undefined => {
+  if (o.lines?.length) return o.lines;
+  const out: ICoffeeSessionOrderLine[] = [];
+  let idx = 0;
+  for (const [itemId, q] of Object.entries(o.drinks || {})) {
+    const quantity = Number(q) || 0;
+    if (quantity > 0) {
+      out.push({
+        lineId: `dr-${idx++}`,
+        itemId,
+        category: "drink",
+        quantity,
+      });
+    }
+  }
+  for (const [itemId, q] of Object.entries(o.snacks || {})) {
+    const quantity = Number(q) || 0;
+    if (quantity > 0) {
+      out.push({
+        lineId: `sn-${idx++}`,
+        itemId,
+        category: "snack",
+        quantity,
+      });
+    }
+  }
+  return out.length ? out : undefined;
 };
 
 type CoffeeNewOrderNotificationsMap = Record<
@@ -87,6 +138,12 @@ interface RoomEventsContextValue {
   clearGiftNotification: (roomId: string) => void;
   clearCoffeeSupportNotification: (tableCode: string) => void;
   clearCoffeeNewOrderNotification: (tableCode: string) => void;
+  /** Gọi sau khi đánh dấu batch đã phục vụ (API/socket) để ẩn icon đơn mới khi khớp. */
+  clearCoffeeNewOrderAfterBatchServed: (args: {
+    tableCode: string;
+    batchId: string;
+    coffeeSessionId: string;
+  }) => void;
 }
 
 const RoomEventsContext = createContext<RoomEventsContextValue | undefined>(
@@ -113,6 +170,10 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offGiftClaimed,
     onOrderNew,
     offOrderNew,
+    onOrderCreated,
+    offOrderCreated,
+    onOrderBatchStatusChanged,
+    offOrderBatchStatusChanged,
     onOrderSupportRequested,
     offOrderSupportRequested,
   } = useSocket();
@@ -314,6 +375,35 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     }));
   }, []);
 
+  const clearCoffeeNewOrderAfterBatchServed = useCallback(
+    (args: { tableCode: string; batchId: string; coffeeSessionId: string }) => {
+      const tc = args.tableCode.trim();
+      if (!tc || !args.batchId) return;
+
+      setCoffeeNewOrderNotifications((prev) => {
+        const notif = prev[tc];
+        if (!notif) return prev;
+
+        const batchMatches = notif.orderId === args.batchId;
+        const legacyMatches =
+          !notif.createdBatch &&
+          notif.coffeeSessionId === args.coffeeSessionId;
+
+        if (batchMatches || legacyMatches) {
+          const next = { ...prev };
+          delete next[tc];
+          return next;
+        }
+        return prev;
+      });
+      setBlinkingCoffeeNewOrderTables((prev) => ({
+        ...prev,
+        [tc]: false,
+      }));
+    },
+    [],
+  );
+
   // Socket subscription & room joining
   useEffect(() => {
     // Admin room để nhận booking/support/order/gift chung
@@ -430,12 +520,106 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       speak(`Quà tặng đã được nhận tại phòng ${roomId}`);
     };
 
-    const handleOrderNew = (payload: ICoffeeOrderNewSocketPayload) => {
-      const tableCodeRaw = payload?.tableCode;
-      const doc = payload?.order;
-      const innerOrder = payload?.order?.order;
+    const flushCoffeeNewOrderUi = (
+      tableCode: string,
+      summary: string,
+      options?: { batchHint?: string },
+    ) => {
+      setBlinkingCoffeeNewOrderTables((prev) => ({
+        ...prev,
+        [tableCode]: true,
+      }));
 
+      setTimeout(() => {
+        setBlinkingCoffeeNewOrderTables((prev) => ({
+          ...prev,
+          [tableCode]: false,
+        }));
+      }, 30000);
+
+      const batchSuffix = options?.batchHint ? ` — ${options.batchHint}` : "";
+      toast({
+        title: "Đơn hàng coffee mới",
+        description: `Bàn ${tableCode}: ${summary}${batchSuffix}`,
+      });
+      playCoffeeBoardGameOrderAudio(
+        tableCode,
+        `Đơn hàng mới từ bàn ${tableCode}, ${summary}`,
+      );
+    };
+
+    const handleCoffeeOrderSocket = (payload: ICoffeeOrderSocketPayload) => {
       queryClient.invalidateQueries({ queryKey: ["coffeeSessions"] });
+      const sid = String(payload.coffeeSessionId ?? "").trim();
+      if (sid) {
+        void queryClient.invalidateQueries({
+          queryKey: ["coffeeSessionOrder", sid],
+        });
+      }
+
+      if (isOrderCreatedSocketPayload(payload)) {
+        if (payload.aggregatedOrder && sid) {
+          queryClient.setQueriesData(
+            { queryKey: ["coffeeSessionOrder", sid] },
+            (old: ICoffeeSessionOrderDetail | null | undefined) => {
+              if (!old) {
+                return old;
+              }
+              return mergeAggregatedIntoDetail(old, payload.aggregatedOrder);
+            },
+          );
+        }
+
+        const tableCodeRaw = payload.tableCode;
+        if (tableCodeRaw == null || String(tableCodeRaw).trim() === "") {
+          return;
+        }
+        const tableCode = String(tableCodeRaw).trim();
+        const ts =
+          typeof payload.createdAt === "number" &&
+          !Number.isNaN(payload.createdAt)
+            ? payload.createdAt
+            : Date.now();
+
+        const submitted = payload.submittedLineItems ?? [];
+        const lineItems: ICoffeeSessionOrderLineItem[] =
+          submitted.length > 0
+            ? submitted
+            : payload.createdBatch.lineItems;
+        const summary = summarizeLineItemsQuick(lineItems);
+        const lines =
+          payload.createdBatch.order?.lines?.length > 0
+            ? payload.createdBatch.order.lines
+            : undefined;
+
+        setCoffeeNewOrderNotifications((prev) => ({
+          ...prev,
+          [tableCode]: {
+            tableCode,
+            tableId: String(payload.tableId ?? ""),
+            coffeeSessionId: String(payload.coffeeSessionId ?? ""),
+            orderId: payload.createdBatch.batchId,
+            message: summary,
+            timestamp: ts,
+            lines,
+            lineItems,
+            orderTotals:
+              payload.createdBatch.orderTotals ??
+              payload.aggregatedOrder?.orderTotals,
+            createdBatch: payload.createdBatch,
+            submittedLineItems: payload.submittedLineItems,
+          },
+        }));
+
+        flushCoffeeNewOrderUi(tableCode, summary, {
+          batchHint: `đợt ${payload.createdBatch.batchId.slice(0, 8)}…`,
+        });
+        return;
+      }
+
+      const doc = payload.order;
+      const innerOrder = payload.order?.order;
+      const tableCodeRaw = payload.tableCode;
 
       if (
         tableCodeRaw == null ||
@@ -460,43 +644,59 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       }
       const summary = parts.length > 0 ? parts.join(", ") : "Đơn hàng mới";
       const ts =
-        typeof payload?.createdAt === "number" &&
-        !Number.isNaN(payload?.createdAt)
-          ? payload?.createdAt
+        typeof payload.createdAt === "number" &&
+        !Number.isNaN(payload.createdAt)
+          ? payload.createdAt
           : Date.now();
+
+      const resolvedLines = buildCoffeeOrderLinesFromAggregates(innerOrder);
 
       setCoffeeNewOrderNotifications((prev) => ({
         ...prev,
         [tableCode]: {
           tableCode,
-          tableId: String(payload?.tableId ?? ""),
-          coffeeSessionId: String(payload?.coffeeSessionId ?? ""),
+          tableId: String(payload.tableId ?? ""),
+          coffeeSessionId: String(payload.coffeeSessionId ?? ""),
           orderId: String(doc._id ?? ""),
           message: summary,
           timestamp: ts,
+          lines: resolvedLines,
+          lineItems: doc.lineItems,
+          orderTotals: doc.orderTotals,
         },
       }));
 
-      setBlinkingCoffeeNewOrderTables((prev) => ({
-        ...prev,
-        [tableCode]: true,
-      }));
+      flushCoffeeNewOrderUi(tableCode, summary);
+    };
 
-      setTimeout(() => {
-        setBlinkingCoffeeNewOrderTables((prev) => ({
-          ...prev,
-          [tableCode]: false,
-        }));
-      }, 30000);
+    const handleOrderBatchStatusChanged = (
+      payload: IOrderBatchStatusChangedSocketPayload,
+    ) => {
+      const sid = String(payload.coffeeSessionId ?? "").trim();
+      if (!sid) {
+        return;
+      }
 
-      toast({
-        title: "Đơn hàng coffee mới",
-        description: `Bàn ${tableCode}: ${summary}`,
-      });
-      playCoffeeBoardGameOrderAudio(
-        tableCode,
-        `Đơn hàng mới từ bàn ${tableCode}, ${summary}`,
+      queryClient.setQueriesData(
+        { queryKey: ["coffeeSessionOrder", sid] },
+        (old: ICoffeeSessionOrderDetail | null | undefined) => {
+          if (!old) {
+            return old;
+          }
+          return applyBatchStatusChangedToDetail(old, payload);
+        },
       );
+
+      if (payload.status === "served") {
+        const tc = String(payload.tableCode ?? "").trim();
+        if (tc) {
+          clearCoffeeNewOrderAfterBatchServed({
+            tableCode: tc,
+            batchId: payload.batchId,
+            coffeeSessionId: sid,
+          });
+        }
+      }
     };
 
     const handleOrderSupportRequested = (payload: unknown) => {
@@ -601,7 +801,9 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     onNewOrderNotification(handleNewOrderNotification);
     onNewBooking(handleNewBooking);
     onGiftClaimed(handleGiftClaimed);
-    onOrderNew(handleOrderNew);
+    onOrderNew(handleCoffeeOrderSocket);
+    onOrderCreated(handleCoffeeOrderSocket);
+    onOrderBatchStatusChanged(handleOrderBatchStatusChanged);
     onOrderSupportRequested(handleOrderSupportRequested);
 
     return () => {
@@ -609,7 +811,9 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       offNewOrderNotification(handleNewOrderNotification);
       offNewBooking(handleNewBooking);
       offGiftClaimed(handleGiftClaimed);
-      offOrderNew(handleOrderNew);
+      offOrderNew(handleCoffeeOrderSocket);
+      offOrderCreated(handleCoffeeOrderSocket);
+      offOrderBatchStatusChanged(handleOrderBatchStatusChanged);
       offOrderSupportRequested(handleOrderSupportRequested);
       leaveRoom("management");
       leaveRoom("admin");
@@ -627,6 +831,10 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offGiftClaimed,
     onOrderNew,
     offOrderNew,
+    onOrderCreated,
+    offOrderCreated,
+    onOrderBatchStatusChanged,
+    offOrderBatchStatusChanged,
     onOrderSupportRequested,
     offOrderSupportRequested,
     queryClient,
@@ -637,6 +845,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     playOrderBoxAudio,
     playCoffeeBoardGameOrderAudio,
     playOnlineBookingAudio,
+    clearCoffeeNewOrderAfterBatchServed,
   ]);
 
   // Clear old notifications periodically
@@ -684,15 +893,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
         return next;
       });
 
-      setCoffeeNewOrderNotifications((prev) => {
-        const next: CoffeeNewOrderNotificationsMap = {};
-        Object.entries(prev).forEach(([code, notif]) => {
-          if (now - notif.timestamp < 10 * 60 * 1000) {
-            next[code] = notif;
-          }
-        });
-        return next;
-      });
+      // Đơn coffee mới: không xóa theo thời gian — chỉ ẩn khi batch đã phục vụ
     }, 60000);
 
     return () => clearInterval(interval);
@@ -715,6 +916,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       clearGiftNotification,
       clearCoffeeSupportNotification,
       clearCoffeeNewOrderNotification,
+      clearCoffeeNewOrderAfterBatchServed,
     }),
     [
       supportNotifications,
@@ -732,6 +934,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       clearGiftNotification,
       clearCoffeeSupportNotification,
       clearCoffeeNewOrderNotification,
+      clearCoffeeNewOrderAfterBatchServed,
     ],
   );
 
