@@ -127,45 +127,21 @@ const billAPis = {
         "Content-Type": "application/pdf",
       },
     }),
-  // Revenue APIs
-  getDailyRevenue: async (date: string) =>
+  /** GET /bill/revenue — FE tự tính startDate/endDate (ISO), gửi lên một endpoint duy nhất */
+  getBillRevenue: async (startDate: string, endDate: string) =>
     http.get<
       HTTPResponse<{
-        date: string;
-        formattedDate: string;
-        totalRevenue: number;
-        billCount: number;
-        bills: IBill[];
-      }>
-    >(`/bill/revenue/daily?date=${date}`),
-
-  getWeeklyRevenue: async (date: string) =>
-    http.get<
-      HTTPResponse<{
-        week: number;
-        year: number;
+        timeRange?: string;
         dateRange: string;
-        startDate: Date;
-        endDate: Date;
+        startDate: string;
+        endDate: string;
         totalRevenue: number;
         billCount: number;
         bills: IBill[];
       }>
-    >(`/bill/revenue/weekly?date=${date}`),
-
-  getMonthlyRevenue: async (date: string) =>
-    http.get<
-      HTTPResponse<{
-        month: string;
-        year: number;
-        dateRange: string;
-        startDate: Date;
-        endDate: Date;
-        totalRevenue: number;
-        billCount: number;
-        bills: IBill[];
-      }>
-    >(`/bill/revenue/monthly?date=${date}`),
+    >(
+      `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+    ),
 };
 
 export default billAPis;

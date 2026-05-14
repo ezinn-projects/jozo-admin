@@ -1,6 +1,14 @@
 import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Table,
@@ -10,11 +18,29 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { useDeleteSong, useNormalizeSongs, useSongsCollection } from "@/hooks/use-room-music";
+import type { PruneUnavailableYoutubeResult } from "@/apis/roomMusic.apis";
+import {
+  useDeleteSong,
+  useNormalizeSongs,
+  usePruneUnavailableYoutube,
+  useSongsCollection,
+} from "@/hooks/use-room-music";
+import { useToast } from "@/hooks/use-toast";
 import { formatDate } from "@/utils/formatters";
-import { Loader2, Music, RefreshCcw, Search, Trash2, Wand2 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  Loader2,
+  Music,
+  RefreshCcw,
+  Search,
+  Trash2,
+  Wand2,
+  Youtube,
+} from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import PaginationContainer from "@/pages/RecruitmentPage/components/PaginationContainer";
+
+/** Chỉ render bảng video_id khi BE trả mảng và độ dài ≤ ngưỡng này */
+const MAX_VIDEO_IDS_TO_RENDER = 200;
 
 const SongsCollectionPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,9 +96,58 @@ const SongsCollectionPage = () => {
     isPending: isDeleting,
   } = useDeleteSong();
 
+  const { mutateAsync: pruneUnavailableYoutube, isPending: isPruningYoutube } =
+    usePruneUnavailableYoutube();
+  const { toast } = useToast();
+
+  const [youtubePruneOpen, setYoutubePruneOpen] = useState(false);
+  const [youtubePruneLoading, setYoutubePruneLoading] = useState(false);
+  const [youtubePrunePayload, setYoutubePrunePayload] = useState<{
+    message: string;
+    result: PruneUnavailableYoutubeResult;
+  } | null>(null);
+
   // Extract songs and pagination from response
   const songs = responseData?.result?.songs || [];
   const pagination = responseData?.result?.pagination;
+
+  const titleByVideoId = useMemo(
+    () => new Map(songs.map((s) => [s.video_id, s.title] as const)),
+    [songs],
+  );
+
+  const handleYoutubePruneLibrary = async () => {
+    const ok = window.confirm(
+      "Chạy dọn toàn bộ bài YouTube không khả dụng trong thư viện? Một lần gọi API duy nhất — có thể rất lâu (nhiều phút). Giữ tab mở; nếu hay bị timeout hãy chạy từ BE/cron hoặc tăng timeout proxy.",
+    );
+    if (!ok) return;
+    setYoutubePrunePayload(null);
+    setYoutubePruneOpen(true);
+    setYoutubePruneLoading(true);
+    try {
+      const { data } = await pruneUnavailableYoutube({
+        omitIds: true,
+      });
+      const result = data?.result;
+      if (!result) {
+        toast({
+          title: "Thiếu dữ liệu",
+          description: "API không trả result.",
+          variant: "destructive",
+        });
+        setYoutubePruneOpen(false);
+        return;
+      }
+      setYoutubePrunePayload({
+        message: data?.message ?? "",
+        result,
+      });
+    } catch {
+      setYoutubePruneOpen(false);
+    } finally {
+      setYoutubePruneLoading(false);
+    }
+  };
   
   // Use pagination info from API
   const total = pagination?.total || 0;
@@ -157,6 +232,19 @@ const SongsCollectionPage = () => {
             </Button>
             <Button
               variant="outline"
+              type="button"
+              onClick={handleYoutubePruneLibrary}
+              disabled={isPruningYoutube}
+            >
+              {isPruningYoutube ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : (
+                <Youtube className="w-4 h-4 mr-2" />
+              )}
+              Dọn thư viện YouTube
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => refetch()}
               disabled={isFetching}
             >
@@ -168,6 +256,134 @@ const SongsCollectionPage = () => {
           </div>
         }
       />
+
+      <Dialog
+        open={youtubePruneOpen}
+        onOpenChange={(open) => {
+          if (!open && youtubePruneLoading) return;
+          setYoutubePruneOpen(open);
+          if (!open) {
+            setYoutubePrunePayload(null);
+            setYoutubePruneLoading(false);
+          }
+        }}
+      >
+        <DialogContent
+          className="max-w-lg max-h-[85vh] flex flex-col gap-0 p-0"
+          onPointerDownOutside={(e) => youtubePruneLoading && e.preventDefault()}
+          onEscapeKeyDown={(e) => youtubePruneLoading && e.preventDefault()}
+        >
+          <DialogHeader className="p-6 pb-2 space-y-1 shrink-0">
+            <DialogTitle>Dọn thư viện YouTube</DialogTitle>
+            <DialogDescription>
+              Một lần gọi{" "}
+              <span className="font-mono text-xs">
+                POST /room-music/songs/prune-unavailable-youtube?omit_ids=1
+              </span>
+              . Phản hồi chỉ gồm số liệu (không tải mảng video_id).
+            </DialogDescription>
+          </DialogHeader>
+          <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1 min-h-0 text-sm">
+            {youtubePruneLoading ? (
+              <div className="flex flex-col items-center gap-4 py-10 text-center text-muted-foreground">
+                <Loader2 className="h-10 w-10 animate-spin text-foreground" />
+                <p>
+                  Đang chạy trên server — có thể rất lâu với thư viện lớn. Không đóng tab;
+                  nếu trình duyệt hay timeout, hãy chạy job từ BE nội bộ hoặc cron.
+                </p>
+              </div>
+            ) : youtubePrunePayload ? (
+              <>
+                {youtubePrunePayload.message ? (
+                  <div className="space-y-1 rounded-md border bg-muted/40 p-3">
+                    <p className="text-xs font-medium uppercase text-muted-foreground">
+                      message
+                    </p>
+                    <p className="whitespace-pre-wrap">{youtubePrunePayload.message}</p>
+                  </div>
+                ) : null}
+                <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border bg-muted/40 p-3">
+                  <span className="text-muted-foreground">checked</span>
+                  <span className="font-medium tabular-nums">
+                    {youtubePrunePayload.result.checked}
+                  </span>
+                  <span className="text-muted-foreground">skipped_unknown</span>
+                  <span className="font-medium tabular-nums">
+                    {youtubePrunePayload.result.skipped_unknown}
+                  </span>
+                  <span className="text-muted-foreground">unavailable_on_youtube</span>
+                  <span className="font-medium tabular-nums">
+                    {youtubePrunePayload.result.unavailable_on_youtube}
+                  </span>
+                  <span className="text-muted-foreground">removed_from_db</span>
+                  <span className="font-medium tabular-nums">
+                    {youtubePrunePayload.result.removed_from_db}
+                  </span>
+                  <span className="text-muted-foreground">dry_run</span>
+                  <span className="font-medium">
+                    {youtubePrunePayload.result.dry_run ? "true" : "false"}
+                  </span>
+                </div>
+                {(() => {
+                  const ids =
+                    youtubePrunePayload.result.video_ids_removed_or_would_remove ??
+                    [];
+                  if (ids.length === 0) {
+                    return (
+                      <p className="text-muted-foreground">
+                        Không có danh sách video_id trong phản hồi (omit_ids=1 hoặc không có
+                        bản ghi tương ứng).
+                      </p>
+                    );
+                  }
+                  if (ids.length > MAX_VIDEO_IDS_TO_RENDER) {
+                    return (
+                      <p className="text-muted-foreground">
+                        Danh sách quá dài ({ids.length} mục) — không hiển thị bảng trên FE.
+                      </p>
+                    );
+                  }
+                  return (
+                    <div className="space-y-2">
+                      <p className="text-xs font-medium text-muted-foreground">
+                        video_ids_removed_or_would_remove
+                      </p>
+                      <div className="max-h-[min(40vh,240px)] overflow-auto rounded-md border">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead className="w-[140px]">video_id</TableHead>
+                              <TableHead>Tiêu đề (trang hiện tại)</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            {ids.map((vid) => (
+                              <TableRow key={vid}>
+                                <TableCell className="font-mono text-xs">{vid}</TableCell>
+                                <TableCell>{titleByVideoId.get(vid) ?? "—"}</TableCell>
+                              </TableRow>
+                            ))}
+                          </TableBody>
+                        </Table>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </>
+            ) : null}
+          </div>
+          <DialogFooter className="p-6 pt-2 border-t bg-background shrink-0 flex-row flex-wrap gap-2 sm:justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setYoutubePruneOpen(false)}
+              disabled={youtubePruneLoading}
+            >
+              Đóng
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <Card>
         <CardContent className="pt-6">
@@ -213,8 +429,11 @@ const SongsCollectionPage = () => {
                         className="w-16 h-16 rounded-md object-cover"
                       />
                     ) : (
-                      <div className="w-16 h-16 bg-gray-100 rounded-md flex items-center justify-center text-gray-400 text-xs">
-                        No image
+                      <div
+                        className="w-16 h-16 rounded-md flex items-center justify-center text-[10px] font-semibold leading-tight text-center px-0.5 bg-red-500 text-white border border-red-600 shadow-sm"
+                        title="Bản ghi không có thumbnail"
+                      >
+                        Thiếu ảnh
                       </div>
                     )}
                   </TableCell>
@@ -278,6 +497,7 @@ const SongsCollectionPage = () => {
               total={total}
               onPageChange={handlePageChange}
               onPageSizeChange={handlePageSizeChange}
+              pageSizeOptions={[10, 20, 50, 100, 1000]}
             />
           )}
         </CardContent>

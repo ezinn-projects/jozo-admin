@@ -16,6 +16,8 @@ interface PaginationContainerProps {
   total: number;
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
+  /** Mặc định: 10, 20, 50, 100 */
+  pageSizeOptions?: number[];
 }
 
 const PaginationContainer: React.FC<PaginationContainerProps> = ({
@@ -25,8 +27,11 @@ const PaginationContainer: React.FC<PaginationContainerProps> = ({
   total,
   onPageChange,
   onPageSizeChange,
+  pageSizeOptions: pageSizeOptionsProp,
 }) => {
-  const pageSizeOptions = [10, 20, 50, 100];
+  const pageSizeOptions = pageSizeOptionsProp ?? [10, 20, 50, 100];
+  const selectTriggerWidthClass =
+    pageSizeOptions.some((s) => s >= 1000) ? "w-24" : "w-20";
 
   return (
     <div className="mt-4">
@@ -42,7 +47,7 @@ const PaginationContainer: React.FC<PaginationContainerProps> = ({
             value={pageSize.toString()}
             onValueChange={(value) => onPageSizeChange(Number(value))}
           >
-            <SelectTrigger className="w-20">
+            <SelectTrigger className={selectTriggerWidthClass}>
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

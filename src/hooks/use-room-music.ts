@@ -1,4 +1,6 @@
-import roomsMusicApis from "@/apis/roomMusic.apis";
+import roomsMusicApis, {
+  type PruneUnavailableYoutubeParams,
+} from "@/apis/roomMusic.apis";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -41,6 +43,20 @@ export const useNormalizeSongs = () => {
         description: "Không thể chuẩn hóa dữ liệu bài hát",
         variant: "destructive",
       });
+    },
+  });
+};
+
+export const usePruneUnavailableYoutube = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: (params?: PruneUnavailableYoutubeParams) =>
+      roomsMusicApis.pruneUnavailableYoutube(params),
+    onSuccess: (_response, variables) => {
+      if (!variables?.dryRun) {
+        queryClient.invalidateQueries({ queryKey: ["songs-collection"] });
+      }
     },
   });
 };

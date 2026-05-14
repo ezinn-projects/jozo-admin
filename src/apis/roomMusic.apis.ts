@@ -4,6 +4,28 @@ import http from "@/utils/http";
 const ROOM_MUSIC_CONTROLLER = "/room-music";
 const ROOMS_MUSIC_CONTROLLER = "/rooms-music";
 
+/** POST /room-music/songs/prune-unavailable-youtube — `result` từ BE */
+export interface PruneUnavailableYoutubeResult {
+  checked: number;
+  skipped_unknown: number;
+  unavailable_on_youtube: number;
+  removed_from_db: number;
+  dry_run: boolean;
+  /** Rỗng khi gọi với `omit_ids=1` */
+  video_ids_removed_or_would_remove?: string[];
+}
+
+export type PruneUnavailableYoutubeParams = {
+  dryRun?: boolean;
+  /** `omit_ids=1` — BE không trả mảng video_id (chỉ số liệu) */
+  omitIds?: boolean;
+  concurrency?: number;
+  batchSize?: number;
+};
+
+/** Job toàn thư viện có thể rất lâu; tăng thêm ở proxy nếu cần */
+const PRUNE_YOUTUBE_TIMEOUT_MS = 1_800_000;
+
 interface SongsCollectionResponse {
   songs: Song[];
   pagination: {
@@ -45,6 +67,27 @@ const roomsMusicApis = {
     http.post<HTTPResponse>(
       `${ROOM_MUSIC_CONTROLLER}/songs/normalize`
     ),
+  pruneUnavailableYoutube: (params?: PruneUnavailableYoutubeParams) => {
+    const queryParams = new URLSearchParams();
+    if (params?.dryRun) {
+      queryParams.append("dry_run", "1");
+    }
+    if (params?.omitIds) {
+      queryParams.append("omit_ids", "1");
+    }
+    if (params?.concurrency != null) {
+      queryParams.append("concurrency", String(params.concurrency));
+    }
+    if (params?.batchSize != null) {
+      queryParams.append("batch_size", String(params.batchSize));
+    }
+    const qs = queryParams.toString();
+    return http.post<HTTPResponse<PruneUnavailableYoutubeResult>>(
+      `${ROOM_MUSIC_CONTROLLER}/songs/prune-unavailable-youtube${qs ? `?${qs}` : ""}`,
+      undefined,
+      { timeout: PRUNE_YOUTUBE_TIMEOUT_MS }
+    );
+  },
   deleteSong: (videoId: string) =>
     http.delete<HTTPResponse>(
       `${ROOM_MUSIC_CONTROLLER}/songs-collection/${videoId}`
