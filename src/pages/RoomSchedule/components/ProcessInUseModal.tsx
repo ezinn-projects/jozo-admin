@@ -145,6 +145,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
+  const [customerPaidInput, setCustomerPaidInput] = useState<string>("");
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -162,6 +163,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
       setIsEndDateManuallyAdjusted(false);
       setCustomerPhoneValue(schedule.customerPhone || "");
+      setCustomerPaidInput("");
     }
   }, [isOpen, schedule.startTime, schedule.customerPhone]);
 
@@ -235,25 +237,27 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  const { mutate: persistApplyFreeHourPromo, isPending: isSavingApplyFreeHour } =
-    useMutation({
-      mutationFn: (value: boolean) =>
-        roomsScheduleApis.updateSchedule(schedule._id, {
-          applyFreeHourPromo: value,
-        }),
-      onSuccess: () => {
-        refetchSchedules?.();
-      },
-      onError: (error) => {
-        console.error("Error updating KM 1 giờ đầu:", error);
-        setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
-        toast({
-          title: "Lỗi",
-          description: "Không thể lưu tùy chọn khuyến mãi 1 giờ đầu",
-          variant: "destructive",
-        });
-      },
-    });
+  const {
+    mutate: persistApplyFreeHourPromo,
+    isPending: isSavingApplyFreeHour,
+  } = useMutation({
+    mutationFn: (value: boolean) =>
+      roomsScheduleApis.updateSchedule(schedule._id, {
+        applyFreeHourPromo: value,
+      }),
+    onSuccess: () => {
+      refetchSchedules?.();
+    },
+    onError: (error) => {
+      console.error("Error updating KM 1 giờ đầu:", error);
+      setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
+      toast({
+        title: "Lỗi",
+        description: "Không thể lưu tùy chọn khuyến mãi 1 giờ đầu",
+        variant: "destructive",
+      });
+    },
+  });
 
   // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
   /*
@@ -717,6 +721,23 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     freeHourPromotion,
     giftDiscountAmount = 0,
   } = billResult;
+
+  const amountToThousands = (amount: number) => Math.round(amount / 1000);
+
+  const parsePaidToThousands = (value: string): number | null => {
+    const digits = value.replace(/\D/g, "");
+    if (!digits) return null;
+    const num = Number(digits);
+    if (!Number.isFinite(num)) return null;
+    return num >= 1000 ? amountToThousands(num) : num;
+  };
+
+  const billTotalThousands = amountToThousands(totalAmount || 0);
+  const customerPaidThousands = parsePaidToThousands(customerPaidInput);
+  const changeThousands =
+    customerPaidThousands !== null
+      ? customerPaidThousands - billTotalThousands
+      : null;
 
   const handleCompleteSession = () => {
     const actualEndTime = billDateTimePayload.actualEndTime;
@@ -1658,38 +1679,41 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   {applyFreeHourPromo &&
                     freeHourPromotion &&
                     freeHourPromotion.freeAmount > 0 && (
-                    <div className="flex justify-between text-xs sm:text-sm">
-                      <span className="text-blue-600 break-words">
-                        {(() => {
-                          // Tính khung giờ đầu tiên từ giờ bắt đầu + 60 phút
-                          const startTime = customStartTime
-                            ? dayjs(schedule.startTime)
-                                .set(
-                                  "hour",
-                                  parseInt(customStartTime.split(":")[0]),
-                                )
-                                .set(
-                                  "minute",
-                                  parseInt(customStartTime.split(":")[1]),
-                                )
-                                .set("second", 0)
-                            : dayjs(schedule.startTime);
-                          const endTime = startTime.add(60, "minute");
-                          const timeRange = `${startTime.format(
-                            "HH:mm",
-                          )} - ${endTime.format("HH:mm")}`;
-                          return `Chương trình KM (${timeRange}):`;
-                        })()}
-                      </span>
-                      <span className="text-blue-600 font-medium break-words ml-2 text-right">
-                        -
-                        {freeHourPromotion.freeAmount.toLocaleString("vi-VN", {
-                          style: "currency",
-                          currency: "VND",
-                        })}
-                      </span>
-                    </div>
-                  )}
+                      <div className="flex justify-between text-xs sm:text-sm">
+                        <span className="text-blue-600 break-words">
+                          {(() => {
+                            // Tính khung giờ đầu tiên từ giờ bắt đầu + 60 phút
+                            const startTime = customStartTime
+                              ? dayjs(schedule.startTime)
+                                  .set(
+                                    "hour",
+                                    parseInt(customStartTime.split(":")[0]),
+                                  )
+                                  .set(
+                                    "minute",
+                                    parseInt(customStartTime.split(":")[1]),
+                                  )
+                                  .set("second", 0)
+                              : dayjs(schedule.startTime);
+                            const endTime = startTime.add(60, "minute");
+                            const timeRange = `${startTime.format(
+                              "HH:mm",
+                            )} - ${endTime.format("HH:mm")}`;
+                            return `Chương trình KM (${timeRange}):`;
+                          })()}
+                        </span>
+                        <span className="text-blue-600 font-medium break-words ml-2 text-right">
+                          -
+                          {freeHourPromotion.freeAmount.toLocaleString(
+                            "vi-VN",
+                            {
+                              style: "currency",
+                              currency: "VND",
+                            },
+                          )}
+                        </span>
+                      </div>
+                    )}
 
                   {/* Tính toán giá gốc */}
                   {(() => {
@@ -1779,6 +1803,35 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     );
                   })()}
                 </div>
+
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 pt-2">
+                  <Label
+                    htmlFor="customer-paid"
+                    className="text-xs sm:text-sm whitespace-nowrap"
+                  >
+                    Khách đưa (nghìn):
+                  </Label>
+                  <Input
+                    id="customer-paid"
+                    type="text"
+                    inputMode="numeric"
+                    placeholder="500"
+                    value={customerPaidInput}
+                    onChange={(e) => setCustomerPaidInput(e.target.value)}
+                    className="w-full sm:w-28 h-9 sm:h-8 text-sm font-mono"
+                  />
+                  {changeThousands !== null && (
+                    <span
+                      className={`text-sm font-bold font-mono ${
+                        changeThousands < 0 ? "text-red-600" : "text-amber-900"
+                      }`}
+                    >
+                      {changeThousands < 0 ? "Thiếu" : "Thừa"}:{" "}
+                      {Math.abs(changeThousands)}
+                    </span>
+                  )}
+                </div>
+
                 <div>
                   <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
                     <span className="text-xs sm:text-sm whitespace-nowrap">
