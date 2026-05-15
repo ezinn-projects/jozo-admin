@@ -2,6 +2,15 @@ import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
+  AlertDialog,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -18,29 +27,99 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import type { PruneUnavailableYoutubeResult } from "@/apis/roomMusic.apis";
+import type { SongPruneJob } from "@/apis/roomMusic.apis";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
+  fetchSongPruneStatus,
+  useCancelSongPrune,
   useDeleteSong,
   useNormalizeSongs,
-  usePruneUnavailableYoutube,
   useSongsCollection,
+  useStartSongPruneAsync,
 } from "@/hooks/use-room-music";
 import { useToast } from "@/hooks/use-toast";
+import { useSocket } from "@/hooks/useSocket";
 import { formatDate } from "@/utils/formatters";
 import {
   Loader2,
   Music,
   RefreshCcw,
   Search,
+  StopCircle,
   Trash2,
   Wand2,
   Youtube,
 } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCallback, useEffect, useRef, useState } from "react";
 import PaginationContainer from "@/pages/RecruitmentPage/components/PaginationContainer";
 
-/** Chỉ render bảng video_id khi BE trả mảng và độ dài ≤ ngưỡng này */
-const MAX_VIDEO_IDS_TO_RENDER = 200;
+const PRUNE_STATUS_POLL_MS = 3000;
+
+const isSongPruneRunning = (job: SongPruneJob | null) =>
+  job?.status === "running";
+
+const isSongPruneTerminal = (job: SongPruneJob | null) =>
+  job?.status === "completed" ||
+  job?.status === "failed" ||
+  job?.status === "cancelled";
+
+const formatElapsed = (seconds?: number) => {
+  if (seconds == null || Number.isNaN(seconds)) return null;
+  const m = Math.floor(seconds / 60);
+  const s = Math.round(seconds % 60);
+  return m > 0 ? `${m} phút ${s}s` : `${s}s`;
+};
+
+type ConfirmDialogState =
+  | { type: "normalize" }
+  | { type: "startPrune" }
+  | { type: "cancelPrune" }
+  | { type: "deleteSong"; videoId: string; title: string };
+
+const getConfirmDialogContent = (state: ConfirmDialogState | null) => {
+  switch (state?.type) {
+    case "normalize":
+      return {
+        title: "Chuẩn hóa dữ liệu?",
+        description:
+          "Thao tác sẽ cập nhật title_normalized và author_normalized cho dữ liệu cũ trong collection.",
+        confirmLabel: "Tiếp tục",
+        destructive: false,
+      };
+    case "startPrune":
+      return {
+        title: "Bắt đầu quét thư viện?",
+        description:
+          "Quét toàn bộ bài YouTube không khả dụng. Job chạy nền; bạn có thể theo dõi tiến độ trên trang này.",
+        confirmLabel: "Bắt đầu quét",
+        destructive: false,
+      };
+    case "cancelPrune":
+      return {
+        title: "Hủy job đang chạy?",
+        description:
+          "Tiến trình dừng sau khi xong bài đang probe (có thể vài giây). Cron hoặc job API đều hủy được.",
+        confirmLabel: "Hủy job",
+        destructive: true,
+      };
+    case "deleteSong":
+      return {
+        title: "Xóa bài hát?",
+        description: `Bạn có chắc muốn xóa "${state.title}" khỏi collection? Hành động không hoàn tác.`,
+        confirmLabel: "Xóa",
+        destructive: true,
+      };
+    default:
+      return {
+        title: "",
+        description: "",
+        confirmLabel: "Xác nhận",
+        destructive: false,
+      };
+  }
+};
 
 const SongsCollectionPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
@@ -96,58 +175,239 @@ const SongsCollectionPage = () => {
     isPending: isDeleting,
   } = useDeleteSong();
 
-  const { mutateAsync: pruneUnavailableYoutube, isPending: isPruningYoutube } =
-    usePruneUnavailableYoutube();
+  const {
+    mutateAsync: startSongPruneAsync,
+    isPending: isStartingSongPrune,
+  } = useStartSongPruneAsync();
+  const {
+    mutateAsync: cancelSongPrune,
+    isPending: isCancellingSongPrune,
+  } = useCancelSongPrune();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const {
+    onSongPruneStarted,
+    offSongPruneStarted,
+    onSongPruneProgress,
+    offSongPruneProgress,
+    onSongPruneFinished,
+    offSongPruneFinished,
+  } = useSocket();
 
   const [youtubePruneOpen, setYoutubePruneOpen] = useState(false);
-  const [youtubePruneLoading, setYoutubePruneLoading] = useState(false);
-  const [youtubePrunePayload, setYoutubePrunePayload] = useState<{
-    message: string;
-    result: PruneUnavailableYoutubeResult;
-  } | null>(null);
+  const [youtubePruneDryRun, setYoutubePruneDryRun] = useState(false);
+  const [youtubePruneJob, setYoutubePruneJob] = useState<SongPruneJob | null>(
+    null,
+  );
+  const [youtubePruneStatusLoading, setYoutubePruneStatusLoading] =
+    useState(false);
+  const [youtubePruneCancelRequested, setYoutubePruneCancelRequested] =
+    useState(false);
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [confirmDialogState, setConfirmDialogState] =
+    useState<ConfirmDialogState | null>(null);
+  const [confirmDialogLoading, setConfirmDialogLoading] = useState(false);
+  const lastPruneNotifiedJobIdRef = useRef<string | null>(null);
+
+  const confirmDialogContent = getConfirmDialogContent(confirmDialogState);
+
+  const openConfirmDialog = (state: ConfirmDialogState) => {
+    setConfirmDialogState(state);
+    setConfirmDialogOpen(true);
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmDialogOpen(false);
+    setConfirmDialogState(null);
+    setConfirmDialogLoading(false);
+  };
 
   // Extract songs and pagination from response
   const songs = responseData?.result?.songs || [];
   const pagination = responseData?.result?.pagination;
 
-  const titleByVideoId = useMemo(
-    () => new Map(songs.map((s) => [s.video_id, s.title] as const)),
-    [songs],
-  );
+  const applySongPruneJob = useCallback((job: SongPruneJob) => {
+    setYoutubePruneJob(job);
+  }, []);
 
-  const handleYoutubePruneLibrary = async () => {
-    const ok = window.confirm(
-      "Chạy dọn toàn bộ bài YouTube không khả dụng trong thư viện? Một lần gọi API duy nhất — có thể rất lâu (nhiều phút). Giữ tab mở; nếu hay bị timeout hãy chạy từ BE/cron hoặc tăng timeout proxy.",
-    );
-    if (!ok) return;
-    setYoutubePrunePayload(null);
-    setYoutubePruneOpen(true);
-    setYoutubePruneLoading(true);
+  const refreshSongPruneStatus = useCallback(async () => {
     try {
-      const { data } = await pruneUnavailableYoutube({
-        omitIds: true,
-      });
-      const result = data?.result;
-      if (!result) {
+      const job = await fetchSongPruneStatus();
+      if (job) {
+        setYoutubePruneJob(job);
+      }
+      return job;
+    } catch {
+      return null;
+    }
+  }, []);
+
+  const handleSongPruneFinished = useCallback(
+    (job: SongPruneJob) => {
+      applySongPruneJob(job);
+      if (!isSongPruneTerminal(job)) return;
+      if (lastPruneNotifiedJobIdRef.current === job.job_id) return;
+      lastPruneNotifiedJobIdRef.current = job.job_id;
+
+      if (job.status === "completed") {
+        if (!job.dry_run) {
+          queryClient.invalidateQueries({ queryKey: ["songs-collection"] });
+        }
         toast({
-          title: "Thiếu dữ liệu",
-          description: "API không trả result.",
+          title: job.dry_run ? "Dry run hoàn tất" : "Dọn thư viện xong",
+          description: `Đã quét ${job.checked}/${job.total} · Xóa ${job.removed_from_db} bản ghi`,
+        });
+      } else if (job.status === "failed") {
+        toast({
+          title: "Dọn thư viện thất bại",
+          description: job.error ?? "Job kết thúc với lỗi.",
           variant: "destructive",
         });
-        setYoutubePruneOpen(false);
-        return;
+      } else if (job.status === "cancelled") {
+        setYoutubePruneCancelRequested(false);
+        if (!job.dry_run) {
+          queryClient.invalidateQueries({ queryKey: ["songs-collection"] });
+        }
+        toast({
+          title: "Đã hủy job dọn thư viện",
+          description: `Đã quét ${job.checked}/${job.total} · Xóa ${job.removed_from_db} bản ghi trước khi dừng`,
+        });
       }
-      setYoutubePrunePayload({
-        message: data?.message ?? "",
-        result,
+    },
+    [applySongPruneJob, queryClient, toast],
+  );
+
+  useEffect(() => {
+    void refreshSongPruneStatus();
+  }, [refreshSongPruneStatus]);
+
+  useEffect(() => {
+    const onStarted = (job: SongPruneJob) => {
+      if (job.job_id !== lastPruneNotifiedJobIdRef.current) {
+        lastPruneNotifiedJobIdRef.current = null;
+        setYoutubePruneCancelRequested(false);
+      }
+      applySongPruneJob(job);
+    };
+    const onProgress = (job: SongPruneJob) => {
+      applySongPruneJob(job);
+    };
+    const onFinished = (job: SongPruneJob) => {
+      handleSongPruneFinished(job);
+    };
+
+    onSongPruneStarted(onStarted);
+    onSongPruneProgress(onProgress);
+    onSongPruneFinished(onFinished);
+
+    return () => {
+      offSongPruneStarted(onStarted);
+      offSongPruneProgress(onProgress);
+      offSongPruneFinished(onFinished);
+    };
+  }, [
+    applySongPruneJob,
+    handleSongPruneFinished,
+    onSongPruneFinished,
+    onSongPruneProgress,
+    onSongPruneStarted,
+    offSongPruneFinished,
+    offSongPruneProgress,
+    offSongPruneStarted,
+  ]);
+
+  const youtubePruneJobRunning = isSongPruneRunning(youtubePruneJob);
+  const youtubePruneJobId = youtubePruneJob?.job_id;
+
+  useEffect(() => {
+    if (!youtubePruneJobRunning) return;
+
+    const poll = () => {
+      void refreshSongPruneStatus().then((job) => {
+        if (job && isSongPruneTerminal(job)) {
+          handleSongPruneFinished(job);
+        }
       });
-    } catch {
-      setYoutubePruneOpen(false);
+    };
+
+    const id = window.setInterval(poll, PRUNE_STATUS_POLL_MS);
+    return () => window.clearInterval(id);
+  }, [
+    youtubePruneJobRunning,
+    youtubePruneJobId,
+    refreshSongPruneStatus,
+    handleSongPruneFinished,
+  ]);
+
+  const openYoutubePruneDialog = async () => {
+    setYoutubePruneOpen(true);
+    setYoutubePruneStatusLoading(true);
+    try {
+      await refreshSongPruneStatus();
     } finally {
-      setYoutubePruneLoading(false);
+      setYoutubePruneStatusLoading(false);
     }
   };
+
+  const executeStartYoutubePrune = async () => {
+    try {
+      setYoutubePruneCancelRequested(false);
+      const job = await startSongPruneAsync({
+        omitIds: true,
+        dryRun: youtubePruneDryRun,
+      });
+      applySongPruneJob(job);
+      if (isSongPruneTerminal(job)) {
+        handleSongPruneFinished(job);
+      }
+    } catch {
+      // toast từ http interceptor
+    }
+  };
+
+  const executeCancelYoutubePrune = async () => {
+    try {
+      const { message, job } = await cancelSongPrune();
+      applySongPruneJob(job);
+      setYoutubePruneCancelRequested(true);
+      toast({
+        title: "Đã gửi yêu cầu hủy",
+        description: message,
+      });
+      if (job.status === "cancelled") {
+        handleSongPruneFinished(job);
+      }
+    } catch {
+      // 400: không có job — toast từ http interceptor
+    }
+  };
+
+  const handleConfirmDialogAction = async () => {
+    if (!confirmDialogState) return;
+    setConfirmDialogLoading(true);
+    try {
+      switch (confirmDialogState.type) {
+        case "normalize":
+          normalizeSongs();
+          break;
+        case "startPrune":
+          await executeStartYoutubePrune();
+          break;
+        case "cancelPrune":
+          await executeCancelYoutubePrune();
+          break;
+        case "deleteSong":
+          deleteSong(confirmDialogState.videoId);
+          break;
+      }
+      closeConfirmDialog();
+    } catch {
+      setConfirmDialogLoading(false);
+    }
+  };
+
+  const youtubePruneRunning = youtubePruneJobRunning;
+  const youtubePruneDone = isSongPruneTerminal(youtubePruneJob);
   
   // Use pagination info from API
   const total = pagination?.total || 0;
@@ -171,13 +431,8 @@ const SongsCollectionPage = () => {
     setCurrentPage(1); // Reset về trang đầu tiên khi thay đổi page size
   };
 
-  const handleDeleteSong = (videoId: string, title: string) => {
-    const confirmed = window.confirm(
-      `Bạn có chắc chắn muốn xóa bài hát "${title}" khỏi collection?`
-    );
-    if (confirmed) {
-      deleteSong(videoId);
-    }
+  const requestDeleteSong = (videoId: string, title: string) => {
+    openConfirmDialog({ type: "deleteSong", videoId, title });
   };
 
   if (isLoading) {
@@ -215,12 +470,7 @@ const SongsCollectionPage = () => {
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
-              onClick={() => {
-                const ok = window.confirm(
-                  "Chuẩn hóa sẽ cập nhật title_normalized/author_normalized cho dữ liệu cũ. Tiếp tục?"
-                );
-                if (ok) normalizeSongs();
-              }}
+              onClick={() => openConfirmDialog({ type: "normalize" })}
               disabled={isNormalizing}
             >
               {isNormalizing ? (
@@ -233,15 +483,18 @@ const SongsCollectionPage = () => {
             <Button
               variant="outline"
               type="button"
-              onClick={handleYoutubePruneLibrary}
-              disabled={isPruningYoutube}
+              onClick={() => void openYoutubePruneDialog()}
+              disabled={isStartingSongPrune}
             >
-              {isPruningYoutube ? (
+              {youtubePruneRunning || isStartingSongPrune ? (
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
               ) : (
                 <Youtube className="w-4 h-4 mr-2" />
               )}
               Dọn thư viện YouTube
+              {youtubePruneRunning && youtubePruneJob
+                ? ` (${youtubePruneJob.percent}%)`
+                : null}
             </Button>
             <Button
               variant="outline"
@@ -257,133 +510,264 @@ const SongsCollectionPage = () => {
         }
       />
 
-      <Dialog
-        open={youtubePruneOpen}
-        onOpenChange={(open) => {
-          if (!open && youtubePruneLoading) return;
-          setYoutubePruneOpen(open);
-          if (!open) {
-            setYoutubePrunePayload(null);
-            setYoutubePruneLoading(false);
-          }
-        }}
-      >
-        <DialogContent
-          className="max-w-lg max-h-[85vh] flex flex-col gap-0 p-0"
-          onPointerDownOutside={(e) => youtubePruneLoading && e.preventDefault()}
-          onEscapeKeyDown={(e) => youtubePruneLoading && e.preventDefault()}
-        >
+      <Dialog open={youtubePruneOpen} onOpenChange={setYoutubePruneOpen}>
+        <DialogContent className="max-w-lg max-h-[85vh] flex flex-col gap-0 p-0">
           <DialogHeader className="p-6 pb-2 space-y-1 shrink-0">
             <DialogTitle>Dọn thư viện YouTube</DialogTitle>
             <DialogDescription>
-              Một lần gọi{" "}
-              <span className="font-mono text-xs">
-                POST /room-music/songs/prune-unavailable-youtube?omit_ids=1
-              </span>
-              . Phản hồi chỉ gồm số liệu (không tải mảng video_id).
+              Job chạy nền (
+              <span className="font-mono text-xs">async=1</span>
+              ). Tiến độ realtime qua socket; poll{" "}
+              <span className="font-mono text-xs">GET .../status</span> mỗi 3 giây
+              khi đang chạy.
             </DialogDescription>
           </DialogHeader>
           <div className="px-6 pb-4 space-y-4 overflow-y-auto flex-1 min-h-0 text-sm">
-            {youtubePruneLoading ? (
-              <div className="flex flex-col items-center gap-4 py-10 text-center text-muted-foreground">
-                <Loader2 className="h-10 w-10 animate-spin text-foreground" />
-                <p>
-                  Đang chạy trên server — có thể rất lâu với thư viện lớn. Không đóng tab;
-                  nếu trình duyệt hay timeout, hãy chạy job từ BE nội bộ hoặc cron.
-                </p>
+            {youtubePruneStatusLoading && !youtubePruneJob ? (
+              <div className="flex items-center justify-center gap-2 py-8 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Đang tải trạng thái job…
               </div>
-            ) : youtubePrunePayload ? (
-              <>
-                {youtubePrunePayload.message ? (
-                  <div className="space-y-1 rounded-md border bg-muted/40 p-3">
-                    <p className="text-xs font-medium uppercase text-muted-foreground">
-                      message
-                    </p>
-                    <p className="whitespace-pre-wrap">{youtubePrunePayload.message}</p>
+            ) : null}
+
+            {youtubePruneRunning && youtubePruneJob ? (
+              <div className="space-y-3">
+                <div className="space-y-2">
+                  <div className="flex justify-between text-xs text-muted-foreground">
+                    <span>
+                      {youtubePruneJob.source === "cron"
+                        ? "Cron (4h sáng)"
+                        : "Đang quét"}
+                    </span>
+                    <span className="tabular-nums font-medium text-foreground">
+                      {youtubePruneJob.percent}%
+                    </span>
                   </div>
-                ) : null}
+                  <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-red-600 transition-[width] duration-300"
+                      style={{
+                        width: `${Math.min(100, Math.max(0, youtubePruneJob.percent))}%`,
+                      }}
+                    />
+                  </div>
+                  <p className="text-sm">
+                    Đã quét{" "}
+                    <span className="font-medium tabular-nums">
+                      {youtubePruneJob.checked.toLocaleString()}
+                    </span>
+                    /{" "}
+                    <span className="font-medium tabular-nums">
+                      {youtubePruneJob.total.toLocaleString()}
+                    </span>
+                    {" · "}
+                    Đã xóa{" "}
+                    <span className="font-medium tabular-nums">
+                      {youtubePruneJob.removed_from_db.toLocaleString()}
+                    </span>
+                    {youtubePruneJob.dry_run ? " (dry run)" : null}
+                  </p>
+                  {formatElapsed(youtubePruneJob.elapsed_sec) ? (
+                    <p className="text-xs text-muted-foreground">
+                      Thời gian: {formatElapsed(youtubePruneJob.elapsed_sec)}
+                    </p>
+                  ) : null}
+                  {youtubePruneCancelRequested ? (
+                    <p className="text-xs text-amber-700 dark:text-amber-400">
+                      Đã gửi yêu cầu hủy — chờ xong video đang probe rồi dừng…
+                    </p>
+                  ) : null}
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="w-full text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={() => openConfirmDialog({ type: "cancelPrune" })}
+                  disabled={isCancellingSongPrune || youtubePruneCancelRequested}
+                >
+                  {isCancellingSongPrune ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <StopCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Hủy job
+                </Button>
+              </div>
+            ) : null}
+
+            {!youtubePruneRunning ? (
+              <div className="flex items-start gap-3 rounded-md border p-3">
+                <Checkbox
+                  id="youtube-prune-dry-run"
+                  checked={youtubePruneDryRun}
+                  disabled={youtubePruneRunning || isStartingSongPrune}
+                  onCheckedChange={(checked) =>
+                    setYoutubePruneDryRun(checked === true)
+                  }
+                />
+                <div className="space-y-1">
+                  <Label htmlFor="youtube-prune-dry-run" className="cursor-pointer">
+                    Chạy thử (dry_run)
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Gửi <span className="font-mono">dry_run=1</span> — quét nhưng không
+                    xóa DB.
+                  </p>
+                </div>
+              </div>
+            ) : null}
+
+            {youtubePruneDone && youtubePruneJob ? (
+              <div className="space-y-3">
+                <div
+                  className={`rounded-md border p-3 text-sm ${
+                    youtubePruneJob.status === "failed"
+                      ? "border-destructive/50 bg-destructive/5"
+                      : youtubePruneJob.status === "cancelled"
+                        ? "border-amber-600/30 bg-amber-50 dark:bg-amber-950/20"
+                        : "border-green-600/30 bg-green-50 dark:bg-green-950/20"
+                  }`}
+                >
+                  <p className="font-medium">
+                    {youtubePruneJob.status === "completed"
+                      ? youtubePruneJob.dry_run
+                        ? "Dry run hoàn tất"
+                        : "Hoàn tất"
+                      : youtubePruneJob.status === "cancelled"
+                        ? "Đã hủy"
+                        : "Thất bại"}
+                  </p>
+                  {youtubePruneJob.error ? (
+                    <p className="mt-1 text-destructive">{youtubePruneJob.error}</p>
+                  ) : null}
+                </div>
                 <div className="grid grid-cols-2 gap-x-4 gap-y-1 rounded-md border bg-muted/40 p-3">
                   <span className="text-muted-foreground">checked</span>
                   <span className="font-medium tabular-nums">
-                    {youtubePrunePayload.result.checked}
+                    {youtubePruneJob.checked}
                   </span>
                   <span className="text-muted-foreground">skipped_unknown</span>
                   <span className="font-medium tabular-nums">
-                    {youtubePrunePayload.result.skipped_unknown}
+                    {youtubePruneJob.skipped_unknown}
                   </span>
                   <span className="text-muted-foreground">unavailable_on_youtube</span>
                   <span className="font-medium tabular-nums">
-                    {youtubePrunePayload.result.unavailable_on_youtube}
+                    {youtubePruneJob.unavailable_on_youtube}
                   </span>
                   <span className="text-muted-foreground">removed_from_db</span>
                   <span className="font-medium tabular-nums">
-                    {youtubePrunePayload.result.removed_from_db}
+                    {youtubePruneJob.removed_from_db}
                   </span>
                   <span className="text-muted-foreground">dry_run</span>
                   <span className="font-medium">
-                    {youtubePrunePayload.result.dry_run ? "true" : "false"}
+                    {youtubePruneJob.dry_run ? "true" : "false"}
                   </span>
+                  {youtubePruneJob.source ? (
+                    <>
+                      <span className="text-muted-foreground">source</span>
+                      <span className="font-medium">{youtubePruneJob.source}</span>
+                    </>
+                  ) : null}
                 </div>
-                {(() => {
-                  const ids =
-                    youtubePrunePayload.result.video_ids_removed_or_would_remove ??
-                    [];
-                  if (ids.length === 0) {
-                    return (
-                      <p className="text-muted-foreground">
-                        Không có danh sách video_id trong phản hồi (omit_ids=1 hoặc không có
-                        bản ghi tương ứng).
-                      </p>
-                    );
-                  }
-                  if (ids.length > MAX_VIDEO_IDS_TO_RENDER) {
-                    return (
-                      <p className="text-muted-foreground">
-                        Danh sách quá dài ({ids.length} mục) — không hiển thị bảng trên FE.
-                      </p>
-                    );
-                  }
-                  return (
-                    <div className="space-y-2">
-                      <p className="text-xs font-medium text-muted-foreground">
-                        video_ids_removed_or_would_remove
-                      </p>
-                      <div className="max-h-[min(40vh,240px)] overflow-auto rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead className="w-[140px]">video_id</TableHead>
-                              <TableHead>Tiêu đề (trang hiện tại)</TableHead>
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {ids.map((vid) => (
-                              <TableRow key={vid}>
-                                <TableCell className="font-mono text-xs">{vid}</TableCell>
-                                <TableCell>{titleByVideoId.get(vid) ?? "—"}</TableCell>
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </>
+              </div>
             ) : null}
+
+            {!youtubePruneRunning &&
+            !youtubePruneDone &&
+            !youtubePruneStatusLoading ? (
+              <p className="text-muted-foreground">
+                Nhấn &quot;Bắt đầu quét&quot; để chạy job nền. Nếu cron 4h sáng đang
+                chạy, mở lại dialog sẽ thấy tiến độ.
+              </p>
+            ) : null}
+
           </div>
-          <DialogFooter className="p-6 pt-2 border-t bg-background shrink-0 flex-row flex-wrap gap-2 sm:justify-end">
+          <DialogFooter className="p-6 pt-2 border-t bg-background shrink-0 flex-row flex-wrap gap-2 sm:justify-between">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                variant="default"
+                onClick={() => openConfirmDialog({ type: "startPrune" })}
+                disabled={
+                  youtubePruneRunning ||
+                  isStartingSongPrune ||
+                  youtubePruneStatusLoading ||
+                  isCancellingSongPrune
+                }
+              >
+                {isStartingSongPrune ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <Youtube className="w-4 h-4 mr-2" />
+                )}
+                Bắt đầu quét
+              </Button>
+              {youtubePruneRunning ? (
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="text-destructive border-destructive/40 hover:bg-destructive/10"
+                  onClick={() => openConfirmDialog({ type: "cancelPrune" })}
+                  disabled={isCancellingSongPrune || youtubePruneCancelRequested}
+                >
+                  {isCancellingSongPrune ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <StopCircle className="w-4 h-4 mr-2" />
+                  )}
+                  Hủy job
+                </Button>
+              ) : null}
+            </div>
             <Button
               type="button"
               variant="outline"
               onClick={() => setYoutubePruneOpen(false)}
-              disabled={youtubePruneLoading}
             >
               Đóng
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={confirmDialogOpen}
+        onOpenChange={(open) => {
+          if (!open && !confirmDialogLoading) closeConfirmDialog();
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{confirmDialogContent.title}</AlertDialogTitle>
+            <AlertDialogDescription>
+              {confirmDialogState?.type === "startPrune" && youtubePruneDryRun ? (
+                <>
+                  <span className="font-medium text-foreground">Dry run</span> — quét
+                  nhưng không xóa DB.{" "}
+                </>
+              ) : null}
+              {confirmDialogContent.description}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={confirmDialogLoading}>
+              Đóng
+            </AlertDialogCancel>
+            <Button
+              type="button"
+              variant={confirmDialogContent.destructive ? "destructive" : "default"}
+              disabled={confirmDialogLoading}
+              onClick={() => void handleConfirmDialogAction()}
+            >
+              {confirmDialogLoading ? (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              ) : null}
+              {confirmDialogContent.confirmLabel}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <Card>
         <CardContent className="pt-6">
@@ -469,7 +853,7 @@ const SongsCollectionPage = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      onClick={() => handleDeleteSong(song.video_id, song.title)}
+                      onClick={() => requestDeleteSong(song.video_id, song.title)}
                       disabled={isDeleting}
                       className="text-red-600 hover:text-red-700 hover:bg-red-50"
                     >

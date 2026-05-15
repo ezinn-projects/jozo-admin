@@ -9,6 +9,7 @@ import {
   ICoffeeOrderSocketPayload,
   IOrderBatchStatusChangedSocketPayload,
 } from "@/@types/CoffeeSessionOrder";
+import type { SongPruneJob } from "@/apis/roomMusic.apis";
 
 export const useSocket = () => {
   const { toast } = useToast();
@@ -331,6 +332,30 @@ export const useSocket = () => {
     socketRef.current?.off("gift_claimed", callback);
   };
 
+  const onSongPruneStarted = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.on("song_prune_started", callback);
+  };
+
+  const offSongPruneStarted = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.off("song_prune_started", callback);
+  };
+
+  const onSongPruneProgress = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.on("song_prune_progress", callback);
+  };
+
+  const offSongPruneProgress = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.off("song_prune_progress", callback);
+  };
+
+  const onSongPruneFinished = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.on("song_prune_finished", callback);
+  };
+
+  const offSongPruneFinished = (callback: (job: SongPruneJob) => void) => {
+    socketRef.current?.off("song_prune_finished", callback);
+  };
+
   return {
     socket: socketRef.current,
     joinRoom,
@@ -359,5 +384,11 @@ export const useSocket = () => {
     offNewNotification,
     onGiftClaimed,
     offGiftClaimed,
+    onSongPruneStarted,
+    offSongPruneStarted,
+    onSongPruneProgress,
+    offSongPruneProgress,
+    onSongPruneFinished,
+    offSongPruneFinished,
   };
 };
