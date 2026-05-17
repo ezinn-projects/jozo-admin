@@ -1412,9 +1412,9 @@ const RoomTimelineTable: React.FC = () => {
                                 <TooltipContent>
                                   <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
                                   <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
-                                  {/* <p className="text-xs text-gray-500">
-                              Kéo để di chuyển
-                            </p> */}
+                                  {schedule.note && (
+                                    <p>Ghi chú: {schedule.note}</p>
+                                  )}
                                 </TooltipContent>
                               </Tooltip>
                             );
