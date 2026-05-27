@@ -33,7 +33,9 @@ import {
 } from "@/utils/coffeeOrderLineItemSelections";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
+import { Printer } from "lucide-react";
 import React from "react";
+import { AxiosError } from "axios";
 
 interface CoffeeInUseModalProps {
   isOpen: boolean;
@@ -118,7 +120,8 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   const [customerPhone, setCustomerPhone] = React.useState("");
   const [peopleCount, setPeopleCount] = React.useState("1");
   const [note, setNote] = React.useState("");
-  const [isOrderModalOpen, setIsOrderModalOpen] = React.useState(false);
+  const [isOrderEditorExpanded, setIsOrderEditorExpanded] =
+    React.useState(false);
   const [draftOrder, setDraftOrder] =
     React.useState<ICoffeeSessionOrder>(EMPTY_ORDER);
   const sessionDetailQuery = useQuery({
@@ -176,11 +179,11 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
 
   React.useEffect(() => {
     if (!isOpen) {
-      setIsOrderModalOpen(false);
+      setIsOrderEditorExpanded(false);
       return;
     }
 
-    setIsOrderModalOpen(defaultOpenOrderEditor);
+    setIsOrderEditorExpanded(defaultOpenOrderEditor);
   }, [defaultOpenOrderEditor, isOpen]);
 
   const updateSessionMutation = useMutation({
@@ -206,7 +209,8 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
       });
       onClose();
     },
-    onError: (error) => {
+    onError: (error: AxiosError<HTTPResponse<ICoffeeSession>>) => {
+      console.error(error);
       toast({
         title: "Không thể cập nhật phiên",
         description: error.message || "Vui lòng thử lại.",
@@ -350,6 +354,27 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     },
   });
 
+  const printBatchMutation = useMutation({
+    mutationFn: (batchId: string) =>
+      coffeeSessionOrderApis.printCoffeeSessionOrderBatch(
+        sessionDetail?._id || "",
+        batchId,
+      ),
+    onSuccess: () => {
+      toast({
+        title: "Đã gửi lệnh in",
+        description: "Phiếu order đã được gửi tới máy in.",
+      });
+    },
+    onError: (error) => {
+      toast({
+        title: "Không thể in phiếu",
+        description: error.message || "Vui lòng thử lại.",
+        variant: "destructive",
+      });
+    },
+  });
+
   const handleQuantityChange = (item: FnBMenuItem, nextQuantity: number) => {
     const category = item.category.toLowerCase();
     const targetKey =
@@ -386,6 +411,33 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
       ),
     [draftOrder.drinks, draftOrder.snacks],
   );
+  const editableOrderItems = React.useMemo(() => {
+    const items = menuItemsQuery.data ?? [];
+    const menuById = new Map(items.map((item) => [item._id || "", item]));
+    const quantities = {
+      ...(draftOrder.drinks || {}),
+      ...(draftOrder.snacks || {}),
+    };
+
+    return Object.entries(quantities)
+      .map(([itemId, quantity]) => {
+        const qty = Number(quantity) || 0;
+        if (qty <= 0) return null;
+        const menuItem = menuById.get(itemId);
+        if (!menuItem) return null;
+        return { itemId, menuItem, quantity: qty };
+      })
+      .filter(
+        (
+          item,
+        ): item is {
+          itemId: string;
+          menuItem: FnBMenuItem;
+          quantity: number;
+        } => item !== null,
+      );
+  }, [draftOrder.drinks, draftOrder.snacks, menuItemsQuery.data]);
+
   const orderHistoryItems = React.useMemo(() => {
     const menuItems = menuItemsQuery.data || [];
     const templates = customizationTemplatesQuery.data || [];
@@ -424,6 +476,8 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     (a, b) => dayjs(b.submittedAt).valueOf() - dayjs(a.submittedAt).valueOf(),
   );
   const orderTotals = orderQuery.data?.orderTotals;
+  const isUpdatingOrder =
+    updateOrderMutation.isPending || deleteOrderMutation.isPending;
 
   return (
     <>
@@ -517,6 +571,9 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div>
                   <h3 className="font-semibold">Order</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Thêm, sửa hoặc xóa món trực tiếp tại đây.
+                  </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
                   {sortedOrderBatches.some((b) => b.status === "pending") ? (
@@ -524,9 +581,22 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                   ) : null}
                   <Badge variant="secondary">
                     {totalOrderItems > 0
-                      ? `${totalOrderItems} món (chỉnh sửa)`
-                      : "Chưa chỉnh trên editor"}
+                      ? `${totalOrderItems} món`
+                      : "Chưa có món"}
                   </Badge>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={isOrderEditorExpanded ? "secondary" : "outline"}
+                    disabled={
+                      menuItemsQuery.isLoading ||
+                      updateOrderMutation.isPending ||
+                      deleteOrderMutation.isPending
+                    }
+                    onClick={() => setIsOrderEditorExpanded((prev) => !prev)}
+                  >
+                    {isOrderEditorExpanded ? "Ẩn menu món" : "Thêm món"}
+                  </Button>
                 </div>
               </div>
               {orderTotals ? (
@@ -544,6 +614,80 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                 </p>
               ) : (
                 <>
+                  {editableOrderItems.length > 0 ? (
+                    <div className="mt-3 space-y-2 rounded-md border bg-background p-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="text-sm font-medium">Món trong order</p>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          loading={deleteOrderMutation.isPending}
+                          disabled={
+                            updateOrderMutation.isPending ||
+                            deleteOrderMutation.isPending
+                          }
+                          onClick={() => deleteOrderMutation.mutate()}
+                        >
+                          Xóa toàn bộ
+                        </Button>
+                      </div>
+                      {editableOrderItems.map(({ itemId, menuItem, quantity }) => (
+                        <div
+                          key={itemId}
+                          className="flex flex-wrap items-center justify-between gap-3 rounded-md border px-3 py-2"
+                        >
+                          <div className="min-w-0">
+                            <p className="truncate font-medium">
+                              {menuItem.name}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {menuItem.category.toLowerCase().startsWith("drink")
+                                ? "Đồ uống"
+                                : "Đồ ăn"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={
+                                isUpdatingOrder ||
+                                quantity <= 0
+                              }
+                              onClick={() =>
+                                handleQuantityChange(
+                                  menuItem,
+                                  Math.max(0, quantity - 1),
+                                )
+                              }
+                            >
+                              -
+                            </Button>
+                            <Badge
+                              variant="secondary"
+                              className="min-w-10 justify-center"
+                            >
+                              {quantity}
+                            </Badge>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              disabled={isUpdatingOrder}
+                              onClick={() =>
+                                handleQuantityChange(menuItem, quantity + 1)
+                              }
+                            >
+                              +
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {sortedOrderBatches.length > 0 ? (
                     <div className="mt-3 space-y-3">
                       <p className="text-sm font-medium">Đợt order</p>
@@ -584,28 +728,49 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                                   ? "Chờ phục vụ"
                                   : "Đã phục vụ"}
                               </Badge>
-                              {batch.status === "pending" ? (
+                              <div className="flex flex-wrap justify-end gap-2">
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   loading={
-                                    markBatchServedMutation.isPending &&
-                                    markBatchServedMutation.variables ===
+                                    printBatchMutation.isPending &&
+                                    printBatchMutation.variables ===
                                       batch.batchId
                                   }
                                   disabled={
-                                    markBatchServedMutation.isPending ||
+                                    printBatchMutation.isPending ||
                                     !sessionDetail?._id
                                   }
                                   onClick={() =>
-                                    markBatchServedMutation.mutate(
-                                      batch.batchId,
-                                    )
+                                    printBatchMutation.mutate(batch.batchId)
                                   }
                                 >
-                                  Đã phục vụ
+                                  <Printer className="h-3.5 w-3.5" aria-hidden />
+                                  In phiếu
                                 </Button>
-                              ) : null}
+                                {batch.status === "pending" ? (
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    loading={
+                                      markBatchServedMutation.isPending &&
+                                      markBatchServedMutation.variables ===
+                                        batch.batchId
+                                    }
+                                    disabled={
+                                      markBatchServedMutation.isPending ||
+                                      !sessionDetail?._id
+                                    }
+                                    onClick={() =>
+                                      markBatchServedMutation.mutate(
+                                        batch.batchId,
+                                      )
+                                    }
+                                  >
+                                    Đã phục vụ
+                                  </Button>
+                                ) : null}
+                              </div>
                             </div>
                           </div>
                           <div className="space-y-1 border-t pt-2">
@@ -663,7 +828,8 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                   ) : null}
 
                   {sortedOrderBatches.length === 0 &&
-                  orderHistoryItems.length > 0 ? (
+                  orderHistoryItems.length > 0 &&
+                  editableOrderItems.length === 0 ? (
                     <div className="mt-3 space-y-2 rounded-md border bg-background p-3">
                       <p className="text-sm font-medium">
                         Tổng hợp món trong phiên
@@ -717,10 +883,29 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                       ))}
                     </div>
                   ) : sortedOrderBatches.length === 0 &&
-                    orderHistoryItems.length === 0 ? (
+                    orderHistoryItems.length === 0 &&
+                    editableOrderItems.length === 0 ? (
                     <p className="mt-3 text-sm text-muted-foreground">
-                      Chưa có order cho phiên này.
+                      Chưa có order cho phiên này. Bấm &quot;Thêm món&quot; để
+                      bắt đầu.
                     </p>
+                  ) : null}
+
+                  {isOrderEditorExpanded ? (
+                    <div className="mt-4 space-y-3 rounded-md border bg-background p-3">
+                      <p className="text-sm font-medium">Chọn món từ menu</p>
+                      {(orderQuery.isLoading || menuItemsQuery.isLoading) && (
+                        <Badge variant="secondary">Đang tải dữ liệu...</Badge>
+                      )}
+                      <CoffeeOrderEditor
+                        menuItems={menuItemsQuery.data ?? []}
+                        order={draftOrder}
+                        orderDetail={orderQuery.data}
+                        isUpdating={isUpdatingOrder}
+                        onQuantityChange={handleQuantityChange}
+                        onClearOrder={() => deleteOrderMutation.mutate()}
+                      />
+                    </div>
                   ) : null}
                 </>
               )}
@@ -729,17 +914,6 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
 
           <DialogFooter className="sticky bottom-0 -mx-6 flex flex-wrap justify-between gap-2 border-t bg-background px-6 py-4">
             <div className="flex flex-wrap gap-2">
-              <Button
-                loading={
-                  updateOrderMutation.isPending ||
-                  deleteOrderMutation.isPending ||
-                  markBatchServedMutation.isPending
-                }
-                onClick={() => setIsOrderModalOpen(true)}
-                disabled={updateSessionMutation.isPending}
-              >
-                Order
-              </Button>
               <Button
                 variant="outline"
                 loading={updateSessionMutation.isPending}
@@ -757,43 +931,6 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
             </div>
 
             <Button variant="outline" onClick={onClose}>
-              Đóng
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={isOrderModalOpen} onOpenChange={setIsOrderModalOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Order cho admin/staff</DialogTitle>
-            <DialogDescription>
-              Bàn{" "}
-              <span className="font-medium">{tableName || "Coffee table"}</span>{" "}
-              - quản lý đồ ăn và đồ uống qua `coffee-session-orders`.
-            </DialogDescription>
-          </DialogHeader>
-
-          {(orderQuery.isLoading || menuItemsQuery.isLoading) && (
-            <Badge variant="secondary">Đang tải dữ liệu...</Badge>
-          )}
-
-          <CoffeeOrderEditor
-            menuItems={menuItemsQuery.data || []}
-            order={draftOrder}
-            orderDetail={orderQuery.data}
-            isUpdating={
-              updateOrderMutation.isPending || deleteOrderMutation.isPending
-            }
-            onQuantityChange={handleQuantityChange}
-            onClearOrder={() => deleteOrderMutation.mutate()}
-          />
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setIsOrderModalOpen(false)}
-            >
               Đóng
             </Button>
           </DialogFooter>

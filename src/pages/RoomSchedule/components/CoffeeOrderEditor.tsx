@@ -33,6 +33,7 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
   order,
   isUpdating,
   onQuantityChange,
+  onClearOrder,
 }) => {
   const [searchTerm, setSearchTerm] = React.useState("");
   const [selectedCategory, setSelectedCategory] = React.useState("all");
@@ -100,6 +101,15 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
       ...(order.snacks || {}),
     };
   }, [order]);
+
+  const totalSelectedItems = React.useMemo(
+    () =>
+      Object.values(quantities).reduce(
+        (sum, quantity) => sum + (Number(quantity) || 0),
+        0,
+      ),
+    [quantities],
+  );
 
   const renderMenuItem = (item: FnBMenuItem) => {
     const children = groupedItems.childrenMap[item._id || ""] || [];
@@ -209,6 +219,26 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
 
   return (
     <div className="space-y-4">
+      {totalSelectedItems > 0 ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/30 px-3 py-2">
+          <p className="text-sm text-muted-foreground">
+            Đang chọn{" "}
+            <span className="font-medium text-foreground">
+              {totalSelectedItems} món
+            </span>
+          </p>
+          <Button
+            type="button"
+            variant="destructive"
+            size="sm"
+            disabled={isUpdating}
+            onClick={onClearOrder}
+          >
+            Xóa toàn bộ order
+          </Button>
+        </div>
+      ) : null}
+
       <div className="relative">
         <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         <Input

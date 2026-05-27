@@ -1,4 +1,4 @@
-import { ICoffeeSession, CoffeeSessionStatus } from "@/@types/CoffeeSession";
+import { CoffeeSessionStatus, ICoffeeSession } from "@/@types/CoffeeSession";
 import coffeeSessionApis from "@/apis/coffeeSession.apis";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,13 +14,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import dayjs from "dayjs";
-import React from "react";
 import {
   getCoffeeSessionDisplayEnd,
   getCoffeeSessionDisplayStart,
 } from "@/utils/coffeeSession";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import dayjs from "dayjs";
+import React from "react";
 
 interface CoffeeBookedModalProps {
   isOpen: boolean;
@@ -86,13 +86,6 @@ const CoffeeBookedModal: React.FC<CoffeeBookedModalProps> = ({
               : "Đã lưu thông tin phiên booked.",
       });
       onClose();
-    },
-    onError: (error) => {
-      toast({
-        title: "Không thể cập nhật phiên",
-        description: error.message || "Vui lòng thử lại.",
-        variant: "destructive",
-      });
     },
   });
 

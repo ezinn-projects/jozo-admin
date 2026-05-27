@@ -29,6 +29,13 @@ const coffeeSessionOrderApis = {
     http.patch<HTTPResponse<IMarkCoffeeSessionOrderBatchServedResult>>(
       `${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}/batches/${batchId}/served`,
     ),
+  printCoffeeSessionOrderBatch: (
+    coffeeSessionId: string,
+    batchId: string,
+  ) =>
+    http.post<HTTPResponse>(
+      `${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}/batches/${batchId}/print`,
+    ),
 };
 
 export default coffeeSessionOrderApis;
