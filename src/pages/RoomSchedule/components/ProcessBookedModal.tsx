@@ -445,14 +445,19 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     mutationFn: (updateData: Partial<IRoomSchedule>) =>
       roomsScheduleApis.updateSchedule(schedule._id, updateData),
     onSuccess: (_, variables) => {
-      onClose();
       refetchSchedules();
-      toast({
-        title: "Success",
-        description: `Schedule updated${
-          variables.status ? " to " + variables.status : ""
-        }`,
-      });
+      if (variables.status) {
+        onClose();
+        toast({
+          title: "Success",
+          description: `Schedule updated to ${variables.status}`,
+        });
+      } else {
+        toast({
+          title: "Success",
+          description: "Thời gian đã được cập nhật",
+        });
+      }
     },
   });
 
