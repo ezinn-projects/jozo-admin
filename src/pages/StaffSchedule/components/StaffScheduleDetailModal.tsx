@@ -203,7 +203,6 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
       });
       setRejectedReason("");
       refetchSchedules?.();
-      onClose();
     },
     onError: (error: unknown) => {
       const axiosError = error as {
@@ -231,14 +230,23 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
         status: EmployeeScheduleStatus;
         rejectedReason?: string;
       }) => staffScheduleApis.updateScheduleStatus(schedule!._id, data),
-      onSuccess: () => {
+      onSuccess: (_data, variables) => {
+        queryClient.invalidateQueries({ queryKey: ["staffSchedules"] });
+        queryClient.invalidateQueries({ queryKey: ["mySchedules"] });
+        queryClient.invalidateQueries({ queryKey: ["staff-schedules"] });
+        queryClient.invalidateQueries({ queryKey: ["schedule-detail"] });
+        queryClient.invalidateQueries({
+          queryKey: ["schedule-detail-modal", schedule!._id],
+        });
         toast({
           title: "Success",
           description: "Schedule status updated successfully",
         });
         setRejectedReason("");
         refetchSchedules?.();
-        onClose();
+        if (variables.status === EmployeeScheduleStatus.Completed) {
+          onClose();
+        }
       },
       onError: (error: unknown) => {
         const axiosError = error as {

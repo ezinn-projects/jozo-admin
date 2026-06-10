@@ -5,6 +5,7 @@ import staffScheduleApis, {
 import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Card,
   CardContent,
@@ -39,10 +40,12 @@ import {
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
+import StaffEarningsMobileView from "./components/StaffEarningsMobileView";
 
 const StaffEarningsDetailPage = () => {
   const navigate = useNavigate();
   const { userId } = useParams<{ userId: string }>();
+  const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
 
   // Array mapping for day names in Vietnamese (0 = Sunday, 1 = Monday, ...)
@@ -231,7 +234,9 @@ const StaffEarningsDetailPage = () => {
             Math.round((schedule.salary?.hours ?? hours) * 100) / 100;
           const hourlyRate = schedule.salary?.hourlyRate ?? 0;
           const expectedSalary =
-            schedule.salary?.totalAmount ?? roundedHours * hourlyRate;
+            schedule.status === EmployeeScheduleStatus.Rejected
+              ? 0
+              : (schedule.salary?.totalAmount ?? roundedHours * hourlyRate);
           const salary = schedule.salary
             ? schedule.salary.isPayable
               ? schedule.salary.totalAmount
@@ -339,8 +344,8 @@ const StaffEarningsDetailPage = () => {
         backUrl={PATHS.STAFF_SCHEDULE}
       />
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Summary Cards - desktop only (mobile uses hero card) */}
+      <div className="hidden md:grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Card className="border-green-200 bg-green-50/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Tổng Lương</CardTitle>
@@ -404,49 +409,61 @@ const StaffEarningsDetailPage = () => {
         </Card>
       </div>
 
-      {/* Filters and Export */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Bộ Lọc</CardTitle>
-          <CardDescription>
-            Chọn tháng để xem chi tiết lương và ca làm việc
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4">
-            <Select
-              value={selectedMonth.format("YYYY-MM")}
-              onValueChange={(value) => setSelectedMonth(dayjs(value))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Chọn tháng" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((month) => (
-                  <SelectItem
-                    key={month.format("YYYY-MM")}
-                    value={month.format("YYYY-MM")}
-                  >
-                    {month.format("MM/YYYY")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters - desktop only (mobile has built-in month navigator) */}
+      {!isMobile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Bộ Lọc</CardTitle>
+            <CardDescription>
+              Chọn tháng để xem chi tiết lương và ca làm việc
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <Select
+                value={selectedMonth.format("YYYY-MM")}
+                onValueChange={(value) => setSelectedMonth(dayjs(value))}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Chọn tháng" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((month) => (
+                    <SelectItem
+                      key={month.format("YYYY-MM")}
+                      value={month.format("YYYY-MM")}
+                    >
+                      {month.format("MM/YYYY")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Earnings Table */}
-      <Card>
-        <CardHeader>
+      {/* Earnings Detail */}
+      <Card className={isMobile ? "border-0 shadow-none bg-transparent" : ""}>
+        <CardHeader className={isMobile ? "px-0 pt-0" : ""}>
           <CardTitle>Chi Tiết Ca Làm Việc</CardTitle>
-          <CardDescription>
-            Danh sách tất cả các ca làm việc trong tháng{" "}
-            {selectedMonth.format("MM/YYYY")}
-          </CardDescription>
+          {!isMobile && (
+            <CardDescription>
+              Danh sách tất cả các ca làm việc trong tháng{" "}
+              {selectedMonth.format("MM/YYYY")}
+            </CardDescription>
+          )}
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
+        <CardContent className={isMobile ? "px-0" : ""}>
+          {isMobile ? (
+            <StaffEarningsMobileView
+              earningsData={earningsData}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              dayNames={dayNames}
+              isLoading={isLoading}
+            />
+          ) : isLoading ? (
             <div className="flex items-center justify-center h-64">
               <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>

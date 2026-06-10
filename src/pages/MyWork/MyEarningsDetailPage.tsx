@@ -24,15 +24,17 @@ import {
 } from "@/components/ui/table";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import PATHS from "@/constants/paths";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { useMySchedules } from "@/hooks/use-my-schedules";
+import StaffEarningsMobileView from "@/pages/StaffSchedule/components/StaffEarningsMobileView";
 import dayjs, { Dayjs } from "dayjs";
 import { Calendar as CalendarIcon, Clock, DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
 
 const MyEarningsDetailPage = () => {
+  const isMobile = useIsMobile();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
 
-  // Day names (0 = Sunday, …)
   const dayNames = [
     "Sunday",
     "Monday",
@@ -42,6 +44,7 @@ const MyEarningsDetailPage = () => {
     "Friday",
     "Saturday",
   ];
+  const dayShortNames = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
   // Calculate startDate and endDate from selected month
   const startDate = useMemo(
@@ -81,6 +84,7 @@ const MyEarningsDetailPage = () => {
       endTime: string;
       hours: number;
       salary: number;
+      expectedSalary: number;
       status: EmployeeScheduleStatus | "not-registered";
       schedule?: (typeof schedules)[0];
     }> = [];
@@ -98,6 +102,7 @@ const MyEarningsDetailPage = () => {
           endTime: "-",
           hours: 0,
           salary: 0,
+          expectedSalary: 0,
           status: "not-registered" as const,
         });
       } else {
@@ -153,14 +158,16 @@ const MyEarningsDetailPage = () => {
           const finalHours =
             Math.round((schedule.salary?.hours ?? roundedHours) * 100) / 100;
           const hourlyRate = schedule.salary?.hourlyRate ?? 0;
-          const calculatedSalary =
-            schedule.salary?.totalAmount ?? finalHours * hourlyRate;
+          const expectedSalary =
+            schedule.status === EmployeeScheduleStatus.Rejected
+              ? 0
+              : (schedule.salary?.totalAmount ?? finalHours * hourlyRate);
           const salary = schedule.salary
             ? schedule.salary.isPayable
               ? schedule.salary.totalAmount
               : 0
             : schedule.status === EmployeeScheduleStatus.Completed
-              ? calculatedSalary
+              ? expectedSalary
               : 0;
 
           data.push({
@@ -169,6 +176,7 @@ const MyEarningsDetailPage = () => {
             endTime,
             hours: finalHours,
             salary,
+            expectedSalary,
             status: schedule.status,
             schedule,
           });
@@ -195,12 +203,31 @@ const MyEarningsDetailPage = () => {
       (item) => item.status !== "not-registered",
     ).length;
 
+    const expectedItems = data.filter(
+      (item) =>
+        item.status !== "not-registered" &&
+        item.status !== EmployeeScheduleStatus.Absent &&
+        item.status !== EmployeeScheduleStatus.Rejected &&
+        item.status !== EmployeeScheduleStatus.Cancelled,
+    );
+    const expectedHours = expectedItems.reduce(
+      (sum, item) => sum + item.hours,
+      0,
+    );
+    const expectedSalary = expectedItems.reduce(
+      (sum, item) => sum + item.expectedSalary,
+      0,
+    );
+
     return {
       items: data,
       totalHours: Math.round(totalHours * 100) / 100,
       totalSalary,
       totalShifts: completedItems.length,
       totalRegistered,
+      expectedHours: Math.round(expectedHours * 100) / 100,
+      expectedSalary,
+      expectedShifts: expectedItems.length,
     };
   }, [schedules, selectedMonth]);
 
@@ -224,8 +251,8 @@ const MyEarningsDetailPage = () => {
         backUrl={PATHS.MY_SCHEDULE}
       />
 
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-4">
+      {/* Summary Cards - desktop only */}
+      <div className="hidden md:grid gap-4 md:grid-cols-4">
         <Card className="border-green-200 bg-green-50/50">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -276,57 +303,73 @@ const MyEarningsDetailPage = () => {
         </Card>
       </div>
 
-      <Card className="border-amber-200 bg-amber-50/70">
-        <CardContent className="pt-6">
-          <p className="text-sm font-medium text-amber-800">
-            Note: If your take-home total looks wrong, contact an admin right
-            away so we can review it.
-          </p>
-        </CardContent>
-      </Card>
+      {!isMobile && (
+        <Card className="border-amber-200 bg-amber-50/70">
+          <CardContent className="pt-6">
+            <p className="text-sm font-medium text-amber-800">
+              Note: If your take-home total looks wrong, contact an admin right
+              away so we can review it.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Filters and Export */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-          <CardDescription>
-            Pick a month to view earnings and shift details
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between gap-4">
-            <Select
-              value={selectedMonth.format("YYYY-MM")}
-              onValueChange={(value) => setSelectedMonth(dayjs(value))}
-            >
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Select month" />
-              </SelectTrigger>
-              <SelectContent>
-                {monthOptions.map((month) => (
-                  <SelectItem
-                    key={month.format("YYYY-MM")}
-                    value={month.format("YYYY-MM")}
-                  >
-                    {month.format("MM/YYYY")}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Filters - desktop only */}
+      {!isMobile && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Filters</CardTitle>
+            <CardDescription>
+              Pick a month to view earnings and shift details
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between gap-4">
+              <Select
+                value={selectedMonth.format("YYYY-MM")}
+                onValueChange={(value) => setSelectedMonth(dayjs(value))}
+              >
+                <SelectTrigger className="w-[200px]">
+                  <SelectValue placeholder="Select month" />
+                </SelectTrigger>
+                <SelectContent>
+                  {monthOptions.map((month) => (
+                    <SelectItem
+                      key={month.format("YYYY-MM")}
+                      value={month.format("YYYY-MM")}
+                    >
+                      {month.format("MM/YYYY")}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Earnings Table */}
-      <Card>
-        <CardHeader>
+      {/* Shift details */}
+      <Card className={isMobile ? "border-0 shadow-none bg-transparent" : ""}>
+        <CardHeader className={isMobile ? "px-0 pt-0" : ""}>
           <CardTitle>Shift details</CardTitle>
-          <CardDescription>
-            All shifts for {selectedMonth.format("MM/YYYY")}
-          </CardDescription>
+          {!isMobile && (
+            <CardDescription>
+              All shifts for {selectedMonth.format("MM/YYYY")}
+            </CardDescription>
+          )}
         </CardHeader>
-        <CardContent>
-          {isLoading ? (
+        <CardContent className={isMobile ? "px-0" : ""}>
+          {isMobile ? (
+            <StaffEarningsMobileView
+              earningsData={earningsData}
+              selectedMonth={selectedMonth}
+              onMonthChange={setSelectedMonth}
+              dayNames={dayNames}
+              dayShortNames={dayShortNames}
+              isLoading={isLoading}
+              locale="en"
+            />
+          ) : isLoading ? (
             <div className="flex items-center justify-center h-64">
               <Clock className="h-8 w-8 animate-spin text-muted-foreground" />
             </div>
