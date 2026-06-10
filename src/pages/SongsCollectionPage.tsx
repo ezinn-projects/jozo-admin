@@ -38,10 +38,15 @@ import {
   useSongsCollection,
   useStartSongPruneAsync,
 } from "@/hooks/use-room-music";
+import {
+  getMediaStatusLabel,
+  useMediaDownload,
+} from "@/hooks/use-media-download";
 import { useToast } from "@/hooks/use-toast";
 import { useSocket } from "@/hooks/useSocket";
 import { formatDate } from "@/utils/formatters";
 import {
+  Download,
   Loader2,
   Music,
   RefreshCcw,
@@ -184,6 +189,12 @@ const SongsCollectionPage = () => {
     isPending: isCancellingSongPrune,
   } = useCancelSongPrune();
   const { toast } = useToast();
+  const {
+    startDownload,
+    isBusy: isMediaDownloadBusy,
+    isStarting: isMediaDownloadStarting,
+    getDownload: getMediaDownload,
+  } = useMediaDownload();
   const queryClient = useQueryClient();
   const {
     onSongPruneStarted,
@@ -799,7 +810,7 @@ const SongsCollectionPage = () => {
                 <TableHead>Thời lượng</TableHead>
                 <TableHead>Ngày thêm</TableHead>
                 <TableHead>Cập nhật</TableHead>
-                <TableHead className="w-[100px]">Hành động</TableHead>
+                <TableHead className="w-[160px]">Hành động</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -850,15 +861,59 @@ const SongsCollectionPage = () => {
                       : "-"}
                   </TableCell>
                   <TableCell>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => requestDeleteSong(song.video_id, song.title)}
-                      disabled={isDeleting}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
+                    <div className="flex flex-col gap-1">
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => void startDownload(song.video_id)}
+                          disabled={isMediaDownloadBusy(song.video_id)}
+                          title="Tải và encode video qua media service"
+                        >
+                          {isMediaDownloadStarting(song.video_id) ||
+                          isMediaDownloadBusy(song.video_id) ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Download className="w-4 h-4" />
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            requestDeleteSong(song.video_id, song.title)
+                          }
+                          disabled={isDeleting}
+                          className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                      {(() => {
+                        const download = getMediaDownload(song.video_id);
+                        if (!download) return null;
+                        return (
+                          <div className="text-xs text-muted-foreground space-y-0.5">
+                            <p>{getMediaStatusLabel(download.status)}</p>
+                            {download.status === "ready" && download.hlsUrl ? (
+                              <a
+                                href={download.hlsUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 hover:underline break-all line-clamp-2"
+                              >
+                                HLS
+                              </a>
+                            ) : null}
+                            {download.status === "failed" && download.error ? (
+                              <p className="text-destructive line-clamp-2">
+                                {download.error}
+                              </p>
+                            ) : null}
+                          </div>
+                        );
+                      })()}
+                    </div>
                   </TableCell>
                 </TableRow>
               ))}

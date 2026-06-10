@@ -30,6 +30,11 @@ export default defineConfig({
         changeOrigin: true,
         ws: true,
       },
+      "/media-service": {
+        target: "http://localhost:4001",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/media-service/, ""),
+      },
     },
   },
   preview: {
