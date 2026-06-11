@@ -1,4 +1,5 @@
 import { IRoom } from "@/@types/Room";
+import roomApis from "@/apis/room.apis";
 import roomsScheduleApis, {
   ICreateRoomScheduleRequest,
 } from "@/apis/roomSchedule.api";
@@ -28,14 +29,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { RoomStatus } from "@/constants/enum";
+import { RoomStatus, RoomType } from "@/constants/enum";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Switch } from "@/components/ui/switch";
+import { roomTypeOptions } from "@/pages/RoomsManagement/constants";
 
 // Define schema using zod
 const scheduleSchema = z.object({
@@ -44,6 +46,7 @@ const scheduleSchema = z.object({
   startTime: z.string().nonempty("Start time is required"),
   endTime: z.string().nonempty("End time is required"),
   status: z.nativeEnum(RoomStatus),
+  roomType: z.nativeEnum(RoomType).optional(),
   note: z.string().max(200).optional(),
   giftEnabled: z.boolean().optional(),
 });
@@ -95,6 +98,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const [isEndTimeModified, setIsEndTimeModified] = useState(false);
 
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // Load schedule khi mở modal chỉnh sửa (scheduleId có giá trị)
   const { data: scheduleData } = useQuery({
@@ -136,7 +140,17 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     },
   });
 
-  const { mutate: createSchedule, isPending: isCreating } = useMutation({
+  const { mutateAsync: updateRoom, isPending: isUpdatingRoom } = useMutation({
+    mutationFn: (updatedRoom: IRoom) => roomApis.updateRoom(updatedRoom),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["rooms"] });
+    },
+    onError: (error) => {
+      console.error("Error updating room type:", error);
+    },
+  });
+
+  const { mutateAsync: createSchedule, isPending: isCreating } = useMutation({
     mutationFn: (payload: ICreateRoomScheduleRequest) =>
       roomsScheduleApis.createSchedule(payload),
     onSuccess: async (response) => {
@@ -166,6 +180,12 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   // Dùng ref để đảm bảo khởi tạo giá trị mặc định chỉ chạy 1 lần
   const isInitialized = useRef(false);
 
+  useEffect(() => {
+    if (!scheduleId && room && isOpen) {
+      setValue("roomType", room.roomType);
+    }
+  }, [scheduleId, room, isOpen, setValue]);
+
   // Set default date & time khi tạo mới schedule (chỉ chạy 1 lần)
   useEffect(() => {
     if (!scheduleId && selectedDate && !isInitialized.current) {
@@ -193,12 +213,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   // Cập nhật End Date & End Time tự động nếu người dùng chưa chỉnh sửa thủ công
   useEffect(() => {
-    if (
-      !scheduleId &&
-      startDateValue &&
-      startTimeValue &&
-      !isEndTimeModified
-    ) {
+    if (!scheduleId && startDateValue && startTimeValue && !isEndTimeModified) {
       const startDateTime = dayjs(`${startDateValue}T${startTimeValue}`);
 
       let endDateTime;
@@ -230,9 +245,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         return dayjs(`${dateStr}T${timeStr}`).toISOString();
       };
 
-      const startDt = dayjs(
-        toISO(values.startDate, values.startTime)
-      );
+      const startDt = dayjs(toISO(values.startDate, values.startTime));
       let endDt = dayjs(toISO(values.endDate, values.endTime));
       let endTimeISO = endDt.toISOString();
       // Nếu end < start (qua 00h) thì tự động coi end là ngày hôm sau
@@ -259,6 +272,13 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         if (!room) {
           throw new Error("Room information is required to create schedule.");
         }
+        if (values.roomType && values.roomType !== room.roomType) {
+          await updateRoom({
+            ...room,
+            roomType: values.roomType,
+          });
+        }
+
         const scheduleData: ICreateRoomScheduleRequest = {
           roomId: room._id,
           startTime: startTimeISO,
@@ -267,10 +287,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
           note: values.note,
           giftEnabled: values.giftEnabled,
         };
-        createSchedule(scheduleData);
+        await createSchedule(scheduleData);
       }
-      refetchSchedules();
-      onClose();
     } catch (error) {
       console.error("Error submitting schedule:", error);
     }
@@ -363,37 +381,71 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   )}
                 />
               </div>
-              <FormField
-                control={control}
-                name="status"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Status</FormLabel>
-                    <FormControl>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={RoomStatus.Booked}>
-                            Booked
-                          </SelectItem>
-                          <SelectItem value={RoomStatus.Locked}>
-                            Locked
-                          </SelectItem>
-                          <SelectItem value={RoomStatus.Maintenance}>
-                            Maintenance
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <FormField
+                  control={control}
+                  name="status"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Status</FormLabel>
+                      <FormControl>
+                        <Select
+                          onValueChange={field.onChange}
+                          value={field.value}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select status" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value={RoomStatus.Booked}>
+                              Booked
+                            </SelectItem>
+                            <SelectItem value={RoomStatus.Locked}>
+                              Locked
+                            </SelectItem>
+                            <SelectItem value={RoomStatus.Maintenance}>
+                              Maintenance
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                {!scheduleId && room && (
+                  <FormField
+                    control={control}
+                    name="roomType"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Room Type</FormLabel>
+                        <FormControl>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select room type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {roomTypeOptions.map((option) => (
+                                <SelectItem
+                                  value={option.value}
+                                  key={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                 )}
-              />
+              </div>
               <FormField
                 control={control}
                 name="note"
@@ -429,7 +481,10 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 )}
               />
               <DialogFooter>
-                <Button type="submit" loading={isCreating || isUpdating}>
+                <Button
+                  type="submit"
+                  loading={isCreating || isUpdating || isUpdatingRoom}
+                >
                   {scheduleId ? "Update" : "Create"}
                 </Button>
               </DialogFooter>
