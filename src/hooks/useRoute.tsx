@@ -26,6 +26,8 @@ const UpsertRoomPage = lazy(
 const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const PricePage = lazy(() => import("@/pages/PricePage"));
 const CoffeePricingPage = lazy(() => import("@/pages/CoffeePricingPage"));
 const RoomTypesListPage = lazy(
@@ -87,6 +89,8 @@ function useRoute() {
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
           <Route path={PATHS.LOGIN} element={<LoginPage />} />
+          <Route path={PATHS.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={PATHS.RESET_PASSWORD} element={<ResetPasswordPage />} />
           <Route path={PATHS.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
           <Route element={<AuthGuard />}>

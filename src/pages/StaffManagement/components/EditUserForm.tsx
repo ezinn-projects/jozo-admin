@@ -1,11 +1,11 @@
 import { PageHeader } from "@/components/shared";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, UserCog } from "lucide-react";
+import { CalendarIcon, KeyRound, UserCog } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -28,6 +28,22 @@ import { useNavigate, useParams } from "react-router-dom";
 import PATHS from "@/constants/paths";
 import { format } from "date-fns";
 import { cn } from "@/utils";
+import authorizationApis from "@/apis/authorization.apis";
+import { useMutation } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+const FORGOT_PASSWORD_SUCCESS_MESSAGE =
+  "Nếu email tồn tại trong hệ thống, link đặt lại mật khẩu đã được gửi. Link có hiệu lực trong 15 phút.";
 
 const splitIsoToDateAndTime = (iso?: string | null): {
   date?: Date;
@@ -101,10 +117,30 @@ const EditUserForm = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { updateUser, useUserById, isUpdatingUser } = useUsers();
+  const { toast } = useToast();
+  const [forgotPasswordOpen, setForgotPasswordOpen] = useState(false);
 
   const { data: userData, isLoading: isLoadingUser } = useUserById(id || "");
 
   const user = userData?.data?.result || ({} as User);
+  const staffEmail = user.email?.trim() || "";
+
+  const { mutate: sendForgotPassword, isPending: isSendingForgotPassword } =
+    useMutation({
+      mutationFn: authorizationApis.forgotPassword,
+      onSettled: () => {
+        setForgotPasswordOpen(false);
+        toast({
+          title: "Đã gửi",
+          description: FORGOT_PASSWORD_SUCCESS_MESSAGE,
+        });
+      },
+    });
+
+  const handleConfirmForgotPassword = () => {
+    if (!staffEmail) return;
+    sendForgotPassword({ email: staffEmail });
+  };
 
   const form = useForm<UpdateUserFormData>({
     resolver: zodResolver(updateUserSchema),
@@ -503,6 +539,30 @@ const EditUserForm = () => {
               </div>
             </div>
 
+            <div className="border-t pt-6 space-y-3">
+              <div>
+                <div className="text-base font-semibold">Mật khẩu</div>
+                <p className="text-sm text-muted-foreground">
+                  Gửi link đặt lại mật khẩu qua email. Chỉ hoạt động khi tài
+                  khoản đã có email trong hệ thống.
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!staffEmail || isSendingForgotPassword}
+                onClick={() => setForgotPasswordOpen(true)}
+              >
+                <KeyRound className="mr-2 h-4 w-4" />
+                Gửi link quên mật khẩu
+              </Button>
+              {!staffEmail && (
+                <p className="text-sm text-muted-foreground">
+                  Tài khoản chưa có email — không thể gửi link đặt lại mật khẩu.
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-4 pt-4">
               <Button
                 type="submit"
@@ -523,6 +583,32 @@ const EditUserForm = () => {
           </form>
         </CardContent>
       </Card>
+
+      <AlertDialog open={forgotPasswordOpen} onOpenChange={setForgotPasswordOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Gửi link quên mật khẩu?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Link đặt lại mật khẩu sẽ được gửi tới{" "}
+              <span className="font-medium text-foreground">{staffEmail}</span>.
+              Link có hiệu lực trong 15 phút.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isSendingForgotPassword}>
+              Hủy
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                onClick={handleConfirmForgotPassword}
+                disabled={isSendingForgotPassword}
+              >
+                {isSendingForgotPassword ? "Đang gửi..." : "Gửi link"}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

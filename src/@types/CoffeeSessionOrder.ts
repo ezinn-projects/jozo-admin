@@ -100,6 +100,20 @@ export interface IMarkCoffeeSessionOrderBatchServedResult {
   aggregatedOrder: ICompactCoffeeSessionOrder | null;
 }
 
+/** PATCH .../batches/:batchId/lines/:lineId — body */
+export interface IUpdateCoffeeSessionOrderBatchLineRequestBody {
+  quantity?: number;
+  selections?: ICoffeeSessionOrderSelection[];
+  note?: string | null;
+  updatedBy?: string;
+}
+
+/** PATCH .../batches/:batchId/lines/:lineId — `result` */
+export interface IUpdateCoffeeSessionOrderBatchLineResult {
+  batch: ICompactCoffeeSessionOrderBatch;
+  aggregatedOrder: ICompactCoffeeSessionOrder | null;
+}
+
 /** Payload socket `order:new` / `order:created` (contract mới) */
 export interface IOrderCreatedSocketPayload {
   tableId: string;

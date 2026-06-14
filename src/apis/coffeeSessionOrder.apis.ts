@@ -1,6 +1,8 @@
 import {
   ICoffeeSessionOrderDetail,
   IMarkCoffeeSessionOrderBatchServedResult,
+  IUpdateCoffeeSessionOrderBatchLineRequestBody,
+  IUpdateCoffeeSessionOrderBatchLineResult,
   IUpdateCoffeeSessionOrderRequestBody,
 } from "@/@types/CoffeeSessionOrder";
 import http from "@/utils/http";
@@ -35,6 +37,16 @@ const coffeeSessionOrderApis = {
   ) =>
     http.post<HTTPResponse>(
       `${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}/batches/${batchId}/print`,
+    ),
+  updateCoffeeSessionOrderBatchLine: (
+    coffeeSessionId: string,
+    batchId: string,
+    lineId: string,
+    payload: IUpdateCoffeeSessionOrderBatchLineRequestBody,
+  ) =>
+    http.patch<HTTPResponse<IUpdateCoffeeSessionOrderBatchLineResult>>(
+      `${COFFEE_SESSION_ORDER_CONTROLLER}/${coffeeSessionId}/batches/${batchId}/lines/${lineId}`,
+      payload,
     ),
 };
 

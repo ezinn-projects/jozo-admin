@@ -81,3 +81,13 @@ export type ChangePasswordRequestBody = {
 export type ChangePasswordResponse = {
   message: string;
 };
+
+export type ForgotPasswordRequestBody = {
+  email: string;
+};
+
+export type ResetPasswordRequestBody = {
+  forgot_password_token: string;
+  password: string;
+  confirm_password: string;
+};
