@@ -17,7 +17,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { RoomStatus } from "@/constants/enum";
+import { RoomStatus, RoomType } from "@/constants/enum";
 import roomApis from "@/apis/room.apis";
 import useAuth from "@/hooks/useAuth";
 import { toast } from "@/hooks/use-toast";
@@ -48,7 +48,9 @@ import {
   UserCheck,
   Building,
   Gift,
+  Users,
 } from "lucide-react";
+import { Label } from "@/components/ui/label";
 
 // Import type MenuItem từ MenuItemsModal
 interface MenuItem {
@@ -71,6 +73,26 @@ interface MenuItem {
   quantity?: string;
   variants?: string;
 }
+
+const PEOPLE_COUNT_LARGE_THRESHOLD = 5;
+
+const getRoomTypeForPeopleCount = (
+  count: number,
+): RoomType.Medium | RoomType.Large =>
+  count > PEOPLE_COUNT_LARGE_THRESHOLD ? RoomType.Large : RoomType.Medium;
+
+const getRoomTypeLabel = (type: RoomType) => {
+  switch (type) {
+    case RoomType.Large:
+      return "Lớn";
+    case RoomType.Medium:
+      return "Vừa";
+    case RoomType.Dorm:
+      return "Dorm";
+    default:
+      return type;
+  }
+};
 
 /** Ghép YYYY-MM-DD + HH:mm(ss) theo giờ tường VN rồi trả về ISO UTC (chuẩn BE). */
 const wallTimeVietnamToUtcIso = (dateStr: string, timeStr: string) => {
@@ -134,6 +156,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // State đổi phòng
   const [targetRoomId, setTargetRoomId] = React.useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = React.useState<string>("");
+
+  // State số lượng khách
+  const [peopleCount, setPeopleCount] = React.useState<string>("");
 
   const queryClient = useQueryClient();
 
@@ -350,7 +375,15 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
   const rooms = (roomsData?.data?.result || []) as IRoom[];
+  const currentRoom = rooms.find(
+    (room) => String(room._id) === String(schedule.roomId),
+  );
   const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
+  const parsedPeopleCount = Math.max(1, Number(peopleCount) || 0);
+  const suggestedRoomType =
+    peopleCount && parsedPeopleCount >= 1
+      ? getRoomTypeForPeopleCount(parsedPeopleCount)
+      : null;
 
   // Hàm lấy thông tin source và màu sắc
   const getSourceInfo = (source?: string) => {
@@ -423,6 +456,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       setIsEditingNote(false);
       setTargetRoomId("");
       setRoomChangeNote("");
+      setPeopleCount("");
     }
   }, [schedule]);
 
@@ -525,6 +559,66 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     },
   });
 
+  // Mutation cập nhật loại phòng theo số người
+  const { mutateAsync: updateRoomType, isPending: isUpdatingRoomType } =
+    useMutation({
+      mutationFn: (updatedRoom: IRoom) => roomApis.updateRoom(updatedRoom),
+      onSuccess: () => {
+        queryClient.invalidateQueries({ queryKey: ["rooms"] });
+      },
+    });
+
+  const syncRoomTypeWithPeopleCount = async (
+    options: { requireInput?: boolean } = {},
+  ): Promise<boolean> => {
+    const { requireInput = false } = options;
+
+    if (!currentRoom || currentRoom.roomType === RoomType.Dorm) {
+      return true;
+    }
+
+    const count = Math.max(1, Number(peopleCount) || 0);
+    if (!peopleCount || count < 1) {
+      if (requireInput) {
+        toast({
+          title: "Thiếu thông tin",
+          description: "Vui lòng nhập số lượng người trước khi tiếp tục.",
+          variant: "destructive",
+        });
+      }
+      return !requireInput;
+    }
+
+    const targetType = getRoomTypeForPeopleCount(count);
+    if (currentRoom.roomType === targetType) {
+      return true;
+    }
+
+    try {
+      await updateRoomType({
+        ...currentRoom,
+        roomType: targetType,
+      });
+      toast({
+        title: "Đã cập nhật loại phòng",
+        description: `Phòng tự động chuyển sang ${getRoomTypeLabel(targetType)} (${count} người)`,
+      });
+      return true;
+    } catch {
+      toast({
+        title: "Lỗi",
+        description: "Không thể cập nhật loại phòng",
+        variant: "destructive",
+      });
+      return false;
+    }
+  };
+
+  const handlePeopleCountBlur = () => {
+    if (!peopleCount || Number(peopleCount) < 1) return;
+    void syncRoomTypeWithPeopleCount();
+  };
+
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
     mutationFn: (payload: IChangeRoomRequest) =>
@@ -579,6 +673,11 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   };
 
   const handleUpdate = async (newStatus: RoomStatus) => {
+    if (newStatus === RoomStatus.InUse) {
+      const synced = await syncRoomTypeWithPeopleCount({ requireInput: true });
+      if (!synced) return;
+    }
+
     const updateData: Partial<IRoomSchedule> = { status: newStatus };
 
     // Nếu chuyển sang "In use", sử dụng thời gian đã điều chỉnh hoặc thời gian hiện tại
@@ -809,6 +908,60 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </div>
           </div>
         )}
+
+        {/* Số lượng khách & tự động cập nhật loại phòng */}
+        <div className="mt-4 space-y-2">
+          <h3 className="font-semibold flex items-center gap-2">
+            <Users className="w-4 h-4" />
+            Số lượng khách
+          </h3>
+          <div className="space-y-2 rounded-lg border bg-slate-50 p-3">
+            <div className="space-y-1">
+              <Label htmlFor="people-count">Số người</Label>
+              <Input
+                id="people-count"
+                type="number"
+                min={1}
+                value={peopleCount}
+                onChange={(e) => setPeopleCount(e.target.value)}
+                onBlur={handlePeopleCountBlur}
+                placeholder="Nhập số người"
+                disabled={isUpdatingRoomType}
+              />
+            </div>
+            {currentRoom && (
+              <p className="text-sm text-muted-foreground">
+                Loại phòng hiện tại:{" "}
+                <Badge variant="outline">
+                  {getRoomTypeLabel(currentRoom.roomType)}
+                </Badge>
+              </p>
+            )}
+            {suggestedRoomType && currentRoom?.roomType !== RoomType.Dorm && (
+              <p className="text-sm text-muted-foreground">
+                Loại phòng đề xuất:{" "}
+                <Badge variant="secondary">
+                  {getRoomTypeLabel(suggestedRoomType)}
+                </Badge>
+                {currentRoom && currentRoom.roomType !== suggestedRoomType && (
+                  <span className="ml-2 text-orange-600">
+                    (sẽ tự động cập nhật khi rời ô nhập hoặc bấm Mark as In
+                    Use)
+                  </span>
+                )}
+              </p>
+            )}
+            {currentRoom?.roomType === RoomType.Dorm && (
+              <p className="text-sm text-muted-foreground">
+                Phòng Dorm không tự động đổi loại phòng.
+              </p>
+            )}
+            <p className="text-xs text-muted-foreground">
+              Quy tắc: trên {PEOPLE_COUNT_LARGE_THRESHOLD} người → phòng Lớn,
+              từ {PEOPLE_COUNT_LARGE_THRESHOLD} người trở xuống → phòng Vừa.
+            </p>
+          </div>
+        </div>
 
         {/* Thông tin room upgrade */}
         {schedule.upgraded && schedule.originalRoomType && (
@@ -1157,9 +1310,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           <Button
             variant="default"
             onClick={() => {
-              handleUpdate(RoomStatus.InUse);
+              void handleUpdate(RoomStatus.InUse);
             }}
-            loading={isPending}
+            loading={isPending || isUpdatingRoomType}
           >
             Mark as In Use
             {adjustedStartTime && (
