@@ -70,6 +70,7 @@ export type UsersQueryParams = {
   limit?: number;
   search?: string;
   role?: string;
+  enabled?: boolean;
 };
 
 export type ChangePasswordRequestBody = {

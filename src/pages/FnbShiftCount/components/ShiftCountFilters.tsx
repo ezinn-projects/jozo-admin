@@ -42,7 +42,11 @@ const ShiftCountFilters = ({
   onStaffIdChange,
   onSearchChange,
 }: ShiftCountFiltersProps) => {
-  const { users, isLoadingUsers } = useUsers({ role: Role.Staff, limit: 1000 });
+  const { users, isLoadingUsers } = useUsers({
+    role: Role.Staff,
+    limit: 1000,
+    enabled: isAdmin,
+  });
   const selectedDate = date ? dayjs(date, "YYYY-MM-DD").toDate() : undefined;
   const todayVn = dayjs().tz("Asia/Ho_Chi_Minh").format("YYYY-MM-DD");
 
