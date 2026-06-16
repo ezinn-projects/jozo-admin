@@ -1,7 +1,9 @@
 import {
   BarChart3,
   BedDouble,
+  Briefcase,
   Calendar,
+  ClipboardList,
   Clock,
   Coffee,
   DollarSign,
@@ -13,7 +15,6 @@ import {
   UtensilsCrossed,
   Users,
   UserPlus,
-  Briefcase,
   KeyRound,
   Gift,
   Gamepad2,
@@ -43,6 +44,13 @@ const MENU_ITEMS: MenuItem[] = [
     url: PATHS.MY_SCHEDULE,
     icon: Briefcase,
     subItems: [], // No sub-items for My Schedule
+    roles: [Role.Admin, Role.Staff],
+  },
+  {
+    title: "FNB Inventory",
+    url: PATHS.FNB_SHIFT_COUNT,
+    icon: ClipboardList,
+    subItems: [],
     roles: [Role.Admin, Role.Staff],
   },
   {
@@ -129,6 +137,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "FNB Statistics",
         url: PATHS.FNB_STATS,
         icon: BarChart3,
+        roles: [Role.Admin],
+      },
+      {
+        title: "FNB Inventory",
+        url: PATHS.FNB_SHIFT_COUNT,
+        icon: ClipboardList,
         roles: [Role.Admin],
       },
       {

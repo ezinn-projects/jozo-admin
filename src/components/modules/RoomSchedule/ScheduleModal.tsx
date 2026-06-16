@@ -43,10 +43,8 @@ import { roomTypeOptions } from "@/pages/RoomsManagement/constants";
 
 const PEOPLE_COUNT_LARGE_THRESHOLD = 5;
 
-const getRoomTypeForPeopleCount = (
-  count: number,
-): RoomType.Medium | RoomType.Large =>
-  count > PEOPLE_COUNT_LARGE_THRESHOLD ? RoomType.Large : RoomType.Medium;
+const getRoomTypeForBooking = (use4Mic: boolean): RoomType.Medium | RoomType.Large =>
+  use4Mic ? RoomType.Large : RoomType.Medium;
 
 const getRoomTypeLabel = (type?: RoomType) => {
   switch (type) {
@@ -81,6 +79,7 @@ const buildScheduleSchema = (requirePeopleCount: boolean) =>
       : z.coerce.number().optional(),
     note: z.string().max(200).optional(),
     giftEnabled: z.boolean().optional(),
+    use4Mic: z.boolean().optional(),
   });
 
 type FormValues = z.infer<ReturnType<typeof buildScheduleSchema>>;
@@ -123,6 +122,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       note: "",
       giftEnabled: false,
       peopleCount: undefined,
+      use4Mic: false,
     },
   });
 
@@ -131,6 +131,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const startTimeValue = watch("startTime");
   const statusValue = watch("status");
   const peopleCountValue = watch("peopleCount");
+  const use4MicValue = watch("use4Mic");
   const parsedPeopleCount =
     typeof peopleCountValue === "number"
       ? peopleCountValue
@@ -139,7 +140,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     peopleCountValue !== undefined &&
     !Number.isNaN(Number(peopleCountValue)) &&
     parsedPeopleCount >= 1
-      ? getRoomTypeForPeopleCount(parsedPeopleCount)
+      ? getRoomTypeForBooking(!!use4MicValue)
       : null;
   const willChangeRoomType =
     !!room &&
@@ -232,11 +233,14 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
 
   // Dùng ref để đảm bảo khởi tạo giá trị mặc định chỉ chạy 1 lần
   const isInitialized = useRef(false);
+  const prevPeopleCountRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     if (!scheduleId && room && isOpen) {
       setValue("roomType", room.roomType);
       setValue("peopleCount", undefined);
+      setValue("use4Mic", false);
+      prevPeopleCountRef.current = undefined;
     }
   }, [scheduleId, room, isOpen, setValue]);
 
@@ -249,10 +253,25 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     }
 
     const count = Number(peopleCountValue);
-    if (count >= 1 && room && room.roomType !== RoomType.Dorm) {
-      setValue("roomType", getRoomTypeForPeopleCount(count));
+    const prevCount = prevPeopleCountRef.current;
+    let effectiveUse4Mic = !!use4MicValue;
+
+    if (count > PEOPLE_COUNT_LARGE_THRESHOLD) {
+      if (
+        prevCount === undefined ||
+        prevCount <= PEOPLE_COUNT_LARGE_THRESHOLD
+      ) {
+        effectiveUse4Mic = true;
+        setValue("use4Mic", true);
+      }
     }
-  }, [peopleCountValue, room, setValue]);
+
+    prevPeopleCountRef.current = count;
+
+    if (count >= 1 && room && room.roomType !== RoomType.Dorm) {
+      setValue("roomType", getRoomTypeForBooking(effectiveUse4Mic));
+    }
+  }, [peopleCountValue, use4MicValue, room, setValue]);
 
   // Set default date & time khi tạo mới schedule (chỉ chạy 1 lần)
   useEffect(() => {
@@ -342,7 +361,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         }
 
         if (room.roomType !== RoomType.Dorm && values.peopleCount) {
-          values.roomType = getRoomTypeForPeopleCount(values.peopleCount);
+          values.roomType = getRoomTypeForBooking(!!values.use4Mic);
         }
 
         if (values.roomType && values.roomType !== room.roomType) {
@@ -377,9 +396,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
         <DialogContent className="sm:max-w-[480px]">
           <DialogHeader>
             <DialogTitle>
-              {scheduleId
-                ? "Sửa lịch"
-                : `Đặt phòng ${room?.roomName ?? ""}`}
+              {scheduleId ? "Sửa lịch" : `Đặt phòng ${room?.roomName ?? ""}`}
             </DialogTitle>
             {!scheduleId && (
               <DialogDescription>
@@ -487,8 +504,12 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value={RoomStatus.Booked}>Booked</SelectItem>
-                        <SelectItem value={RoomStatus.Locked}>Locked</SelectItem>
+                        <SelectItem value={RoomStatus.Booked}>
+                          Booked
+                        </SelectItem>
+                        <SelectItem value={RoomStatus.Locked}>
+                          Locked
+                        </SelectItem>
                         <SelectItem value={RoomStatus.Maintenance}>
                           Maintenance
                         </SelectItem>
@@ -534,10 +555,28 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                           </p>
                         ) : (
                           <p className="text-xs text-muted-foreground">
-                            Từ 6 khách trở lên thì set phòng lớn.
+                            Bật 4 mic để chuyển sang phòng lớn. Từ 6 khách
+                            trở lên mặc định bật 4 mic.
                           </p>
                         )}
                         <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name="use4Mic"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-2">
+                        <FormLabel className="font-normal">
+                          Sử dụng 4 mic
+                        </FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value ?? false}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
                       </FormItem>
                     )}
                   />
@@ -605,7 +644,9 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 name="giftEnabled"
                 render={({ field }) => (
                   <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-2">
-                    <FormLabel className="font-normal">Cho phép nhận quà</FormLabel>
+                    <FormLabel className="font-normal">
+                      Cho phép nhận quà
+                    </FormLabel>
                     <FormControl>
                       <Switch
                         checked={field.value}
@@ -616,11 +657,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                 )}
               />
               <DialogFooter className="gap-2 sm:justify-end pt-1">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={onClose}
-                >
+                <Button type="button" variant="outline" onClick={onClose}>
                   Huỷ
                 </Button>
                 <Button
