@@ -1,4 +1,5 @@
 import { OrderDetail } from "@/@types/FnbOrder";
+import { getOrderItemQuantity, mergeBillItemsByItemId, mergeOrderDetailItems } from "@/utils/mergeOrderDetailItems";
 import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
@@ -381,12 +382,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         if (!schedule._id || !user?._id) return;
 
         // Get current quantity
-        const currentQuantity =
-          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
-            ?.quantity ||
-          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
-            ?.quantity ||
-          0;
+        const currentQuantity = getOrderItemQuantity(orderDetailData, itemId);
 
         const diff = quantity - currentQuantity;
 
@@ -430,12 +426,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         ]);
 
         // Get current quantity from orderDetailData
-        const currentQuantity =
-          orderDetailData?.items?.drinks?.find((item) => item.itemId === itemId)
-            ?.quantity ||
-          orderDetailData?.items?.snacks?.find((item) => item.itemId === itemId)
-            ?.quantity ||
-          0;
+        const currentQuantity = getOrderItemQuantity(orderDetailData, itemId);
 
         const quantityDiff = quantity - currentQuantity;
 
@@ -458,7 +449,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           ) => {
             if (!old?.data?.result?.items) return old;
 
-            const updatedItems = old.data.result.items.map((item: BillItem) =>
+            const updatedItems = mergeBillItemsByItemId(
+              old.data.result.items,
+            ).map((item: BillItem) =>
               item.itemId === itemId ? { ...item, quantity } : item,
             );
 
@@ -492,11 +485,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           (old: OrderDetail | undefined) => {
             if (!old) return old;
 
-            const newDrinks = old.items.drinks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item,
+            const newDrinks = mergeOrderDetailItems(old.items.drinks).map(
+              (item) =>
+                item.itemId === itemId ? { ...item, quantity } : item,
             );
-            const newSnacks = old.items.snacks.map((item) =>
-              item.itemId === itemId ? { ...item, quantity } : item,
+            const newSnacks = mergeOrderDetailItems(old.items.snacks).map(
+              (item) =>
+                item.itemId === itemId ? { ...item, quantity } : item,
             );
 
             return {
@@ -672,7 +667,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     const billItems = (billData.data.result as BillResponse)?.items || [];
     console.log("Bill items:", billItems);
 
-    return billItems.map((item: BillItem) => {
+    const mappedItems = billItems.map((item: BillItem) => {
       // Thử tìm trong orderDetailData trước
       let orderItem = orderItems.find(
         (orderItem) =>
@@ -705,6 +700,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       console.log("Mapped item:", mappedItem);
       return mappedItem;
     });
+
+    return mergeBillItemsByItemId(mappedItems);
   }, [billData?.data.result, orderDetailData, menuItems]);
 
   // Sử dụng trực tiếp dữ liệu từ API vì backend đã tính toán promotion
@@ -712,7 +709,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const {
     totalAmount,
     roomTotal,
-    items = itemsWithDetails, // Sử dụng itemsWithDetails thay vì items
     createdAt,
     fnbTotal,
     paymentMethod = PaymentMethod.Cash,
@@ -721,6 +717,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     freeHourPromotion,
     giftDiscountAmount = 0,
   } = billResult;
+  const items = itemsWithDetails;
 
   const amountToThousands = (amount: number) => Math.round(amount / 1000);
 
@@ -965,12 +962,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           if (!open) onClose();
         }}
       >
-        <DialogContent className="max-w-5xl w-[95vw] max-h-[100vh] sm:max-h-[94vh] p-0 flex flex-col overflow-y-auto">
-          <div
-            className="overflow-y-auto flex-1 px-4 sm:px-6 pt-4 sm:pt-6"
-            style={{ WebkitOverflowScrolling: "touch" }}
-          >
-            <DialogHeader className="pb-4">
+        <DialogContent
+          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-5xl sm:w-[95vw]"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
+          <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
+            <DialogHeader className="pb-4 pr-10">
               <DialogTitle className="text-lg sm:text-xl">
                 Session Management
               </DialogTitle>
@@ -1916,10 +1913,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
               </div>
             </div>
-          </div>
 
-          {/* Fixed Footer with Buttons */}
-          <div className="border-t bg-background px-4 sm:px-6 py-4 flex-shrink-0">
+          <div className="pt-6 border-t mt-6">
             <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mb-4">
               <Button
                 variant="outline"
@@ -1963,6 +1958,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 Đóng
               </Button>
             </DialogFooter>
+          </div>
           </div>
         </DialogContent>
       </Dialog>

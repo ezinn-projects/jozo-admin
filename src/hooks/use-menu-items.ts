@@ -132,6 +132,11 @@ const deleteMenuItem = async (itemId: string): Promise<void> => {
   await fnbMenuApis.deleteMenuItem(itemId);
 };
 
+const cleanupMenuItems = async (dryRun: boolean) => {
+  const response = await fnbMenuApis.cleanupMenuItems(dryRun);
+  return response.data;
+};
+
 // Hook cũ (để tương thích)
 export const useMenuItems = () => {
   const queryClient = useQueryClient();
@@ -253,6 +258,27 @@ export const useMenuItems = () => {
       toast({
         title: "Thành công",
         description: "Đã cập nhật menu item",
+      });
+    },
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: cleanupMenuItems,
+    onSuccess: (data, dryRun) => {
+      if (!dryRun) {
+        toast({
+          title: "Thành công",
+          description: data.message,
+        });
+        queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
+      }
+    },
+    onError: (err: Error) => {
+      console.error("Error cleaning up menu items:", err);
+      toast({
+        title: "Lỗi",
+        description: err.message || "Không thể dọn dữ liệu menu",
+        variant: "destructive",
       });
     },
   });
@@ -384,6 +410,7 @@ export const useMenuItems = () => {
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isCleaningUp: cleanupMutation.isPending,
 
     // Error
     error,
@@ -392,6 +419,7 @@ export const useMenuItems = () => {
     createMenuItem: createMenuItemWithFormData,
     updateMenuItem: updateMenuItemWithFormData,
     deleteMenuItem: deleteMutation.mutate,
+    cleanupMenuItems: cleanupMutation.mutateAsync,
     refetch,
 
     // Helper functions

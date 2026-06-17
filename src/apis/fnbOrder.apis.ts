@@ -2,6 +2,7 @@
 import { IFnbOrder } from "@/@types/FnbOrder";
 import http from "@/utils/http";
 import type { OrderDetail } from "@/@types/FnbOrder";
+import { normalizeOrderDetail } from "@/utils/mergeOrderDetailItems";
 
 // Interface cho result của complete order
 export interface ICompleteOrderResult {
@@ -158,9 +159,19 @@ const fnbOrderApis = {
   },
   // Lấy chi tiết order theo roomScheduleId (API mới)
   getFnbOrderDetail: (roomScheduleId: string) => {
-    return http.get<HTTPResponse<OrderDetail>>(
-      `${FNB_ORDER_CONTROLLER}/detail/${roomScheduleId}`
-    );
+    return http
+      .get<HTTPResponse<OrderDetail>>(
+        `${FNB_ORDER_CONTROLLER}/detail/${roomScheduleId}`,
+      )
+      .then((res) => ({
+        ...res,
+        data: {
+          ...res.data,
+          result: res.data.result
+            ? normalizeOrderDetail(res.data.result)
+            : res.data.result,
+        },
+      }));
   },
   // Mark order as served
   markOrderAsServed: (roomId: string, orderId: string) => {

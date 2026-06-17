@@ -7,6 +7,7 @@ export interface IFnbShiftCountLine {
   itemName: string;
   category: FnbShiftCountCategory;
   openingCount?: number;
+  midShiftAddition?: number;
   closingCount?: number;
 }
 
@@ -41,6 +42,7 @@ export interface IFnbShiftCountResponse {
 export interface IFnbShiftCountSaveItem {
   itemId: string;
   openingCount?: number;
+  midShiftAddition?: number;
   closingCount?: number;
 }
 

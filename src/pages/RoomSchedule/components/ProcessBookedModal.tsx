@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -678,15 +677,19 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[725px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Process Booked Event</DialogTitle>
-          <DialogDescription>
-            Here is the event details. You can cancel the booking, mark the
-            event as in use, or adjust the event time.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
+      <DialogContent
+        className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[725px]"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle>Process Booked Event</DialogTitle>
+            <DialogDescription>
+              Here is the event details. You can cancel the booking, mark the
+              event as in use, or adjust the event time.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
           <p>
             <span className="font-medium">Start:</span>{" "}
             {eventStart.format("HH:mm")}
@@ -1149,38 +1152,49 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
           </Button>
         </div>
 
-        <DialogFooter className="flex justify-end space-x-2 mt-4">
-          <Button variant="outline" onClick={() => setIsMenuModalOpen(true)}>
-            Order Snacks & Drinks
-          </Button>
+          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2 pt-6 border-t mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setIsMenuModalOpen(true)}
+              className="w-full sm:w-auto"
+            >
+              Order Snacks & Drinks
+            </Button>
 
-          <Button
-            variant="default"
-            onClick={() => {
-              handleUpdate(RoomStatus.InUse);
-            }}
-            loading={isPending}
-          >
-            Mark as In Use
-            {adjustedStartTime && (
-              <span className="text-xs ml-1 opacity-70">
-                ({adjustedStartTime})
-              </span>
-            )}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => {
-              handleUpdate(RoomStatus.Cancelled);
-            }}
-            loading={isPending}
-          >
-            Cancel Booking
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
+            <Button
+              variant="default"
+              onClick={() => {
+                handleUpdate(RoomStatus.InUse);
+              }}
+              loading={isPending}
+              className="w-full sm:w-auto"
+            >
+              Mark as In Use
+              {adjustedStartTime && (
+                <span className="text-xs ml-1 opacity-70">
+                  ({adjustedStartTime})
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                handleUpdate(RoomStatus.Cancelled);
+              }}
+              loading={isPending}
+              className="w-full sm:w-auto"
+            >
+              Cancel Booking
+            </Button>
+            <Button
+              variant="outline"
+              onClick={onClose}
+              className="w-full sm:w-auto"
+            >
+              Close
+            </Button>
+          </div>
+        </div>
       </DialogContent>
 
       {/* Modal đặt đồ ăn */}

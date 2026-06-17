@@ -6,10 +6,16 @@ export const toFormItem = (item: IFnbShiftCountReportItem): FnbShiftCountFormIte
   itemId: item.itemId,
   itemName: item.itemName,
   category: item.category,
+  isParent: false,
+  isVariant: false,
   openingCount:
     item.openingCount === undefined || item.openingCount === null
       ? ""
       : item.openingCount,
+  midShiftAddition:
+    item.midShiftAddition === undefined || item.midShiftAddition === null
+      ? ""
+      : item.midShiftAddition,
   closingCount:
     item.closingCount === undefined || item.closingCount === null
       ? ""
@@ -29,6 +35,10 @@ const overlayShiftCountData = (
     saved.openingCount === undefined || saved.openingCount === null
       ? base.openingCount
       : saved.openingCount;
+  const midShiftAddition =
+    saved.midShiftAddition === undefined || saved.midShiftAddition === null
+      ? base.midShiftAddition
+      : saved.midShiftAddition;
   const closingCount =
     saved.closingCount === undefined || saved.closingCount === null
       ? base.closingCount
@@ -39,6 +49,7 @@ const overlayShiftCountData = (
     itemName: saved.itemName || base.itemName,
     category: saved.category || base.category,
     openingCount,
+    midShiftAddition,
     closingCount,
     physicalSold: saved.physicalSold ?? base.physicalSold,
     systemSold: saved.systemSold ?? 0,
@@ -54,18 +65,41 @@ const normalizeMenuCategory = (
   return "snack";
 };
 
-const getMenuItemDisplayName = (
-  menuItem: FnBMenuItem,
+const getVariantsForParent = (
+  parent: FnBMenuItem,
   menuItems: FnBMenuItem[],
-): string => {
-  if (!menuItem.parentId) return menuItem.name;
-  const parent = menuItems.find((item) => item._id === menuItem.parentId);
-  return parent ? `${parent.name} - ${menuItem.name}` : menuItem.name;
+): FnBMenuItem[] => {
+  if (parent.variants?.length) {
+    return parent.variants.map((variant) => ({
+      ...variant,
+      parentId: variant.parentId ?? parent._id ?? null,
+    }));
+  }
+
+  return menuItems.filter((item) => item.parentId === parent._id);
 };
 
-/** Món cần kiểm kê: biến thể hoặc món độc lập (không phải parent chỉ để gom variant). */
-export const getCountableMenuItems = (menuItems: FnBMenuItem[]): FnBMenuItem[] =>
-  menuItems.filter((item) => !!item._id && (!!item.parentId || !item.hasVariant));
+const buildCountableFormItem = (
+  menuItem: FnBMenuItem,
+  itemName: string,
+  countMap: Map<string, IFnbShiftCountReportItem>,
+  isVariant = false,
+): FnbShiftCountFormItem => {
+  const saved = countMap.get(menuItem._id!);
+  const base: FnbShiftCountFormItem = {
+    itemId: menuItem._id!,
+    itemName,
+    category: normalizeMenuCategory(menuItem.category),
+    isParent: false,
+    isVariant,
+    openingCount: "",
+    midShiftAddition: "",
+    closingCount: "",
+    systemSold: 0,
+  };
+
+  return overlayShiftCountData(base, saved);
+};
 
 export const mergeMenuWithShiftCount = (
   menuItems: FnBMenuItem[],
@@ -74,48 +108,85 @@ export const mergeMenuWithShiftCount = (
   const countMap = new Map(
     (shiftCountItems ?? []).map((item) => [item.itemId, item]),
   );
-  const countableMenuItems = getCountableMenuItems(menuItems);
-  const mergedFromMenu = countableMenuItems.map((menuItem) => {
-    const saved = countMap.get(menuItem._id!);
-    const base: FnbShiftCountFormItem = {
-      itemId: menuItem._id!,
-      itemName: getMenuItemDisplayName(menuItem, menuItems),
-      category: normalizeMenuCategory(menuItem.category),
+  const mergedFromMenu: FnbShiftCountFormItem[] = [];
+  const countableIds = new Set<string>();
+
+  const sortByName = (a: FnBMenuItem, b: FnBMenuItem) =>
+    a.name.localeCompare(b.name, "vi");
+
+  const topLevelItems = menuItems
+    .filter((item) => !!item._id && !item.parentId)
+    .sort((a, b) => {
+      const categoryOrder =
+        CATEGORY_ORDER.indexOf(normalizeMenuCategory(a.category)) -
+        CATEGORY_ORDER.indexOf(normalizeMenuCategory(b.category));
+      if (categoryOrder !== 0) return categoryOrder;
+      return sortByName(a, b);
+    });
+
+  const parentItems = topLevelItems.filter((item) => item.hasVariant);
+  const standaloneItems = topLevelItems.filter((item) => !item.hasVariant);
+
+  for (const item of parentItems) {
+    const variants = getVariantsForParent(item, menuItems)
+      .filter((variant) => !!variant._id)
+      .sort(sortByName);
+
+    if (variants.length === 0) continue;
+
+    mergedFromMenu.push({
+      itemId: item._id!,
+      itemName: item.name,
+      category: normalizeMenuCategory(item.category),
+      isParent: true,
+      isVariant: false,
       openingCount: "",
+      midShiftAddition: "",
       closingCount: "",
       systemSold: 0,
-    };
+    });
 
-    return overlayShiftCountData(base, saved);
-  });
+    for (const variant of variants) {
+      mergedFromMenu.push(
+        buildCountableFormItem(variant, variant.name, countMap, true),
+      );
+      countableIds.add(variant._id!);
+    }
+  }
 
-  const menuIds = new Set(countableMenuItems.map((item) => item._id));
+  for (const item of standaloneItems) {
+    mergedFromMenu.push(buildCountableFormItem(item, item.name, countMap, false));
+    countableIds.add(item._id!);
+  }
+
   const orphanSavedItems = (shiftCountItems ?? [])
-    .filter((item) => !menuIds.has(item.itemId))
+    .filter((item) => !countableIds.has(item.itemId))
     .map(toFormItem);
 
-  return [...mergedFromMenu, ...orphanSavedItems].sort((a, b) => {
-    const categoryOrder =
-      CATEGORY_ORDER.indexOf(a.category) - CATEGORY_ORDER.indexOf(b.category);
-    if (categoryOrder !== 0) return categoryOrder;
-    return a.itemName.localeCompare(b.itemName, "vi");
-  });
+  return [...mergedFromMenu, ...orphanSavedItems];
 };
 
 export const previewPhysicalSold = (
   openingCount: number | "",
   closingCount: number | "",
+  midShiftAddition: number | "" = "",
 ): number | undefined => {
   if (openingCount === "" || closingCount === "") return undefined;
-  return openingCount - closingCount;
+  const addition = midShiftAddition === "" ? 0 : midShiftAddition;
+  return openingCount + addition - closingCount;
 };
 
 export const previewVariance = (
   openingCount: number | "",
   closingCount: number | "",
   systemSold: number,
+  midShiftAddition: number | "" = "",
 ): number | undefined => {
-  const physicalSold = previewPhysicalSold(openingCount, closingCount);
+  const physicalSold = previewPhysicalSold(
+    openingCount,
+    closingCount,
+    midShiftAddition,
+  );
   if (physicalSold === undefined) return undefined;
   return systemSold - physicalSold;
 };

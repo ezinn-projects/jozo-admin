@@ -3,6 +3,30 @@ import { FnBMenuItem } from "@/hooks/use-menu-items";
 import http from "@/utils/http";
 // import { FnbMenu } from '../types/fnbMenu.types';
 
+export interface FnBMenuItemCleanupOrphan {
+  _id: string;
+  name: string;
+  parentId: string;
+}
+
+export interface FnBMenuItemCleanupNormalized {
+  _id: string;
+  name: string;
+}
+
+export interface FnBMenuItemCleanupRemovedFields {
+  _id: string;
+  name: string;
+  fields: string[];
+}
+
+export interface FnBMenuItemCleanupResult {
+  dryRun: boolean;
+  deletedOrphans: FnBMenuItemCleanupOrphan[];
+  normalizedParentIds: FnBMenuItemCleanupNormalized[];
+  removedExtraFields: FnBMenuItemCleanupRemovedFields[];
+}
+
 const fnbMenuApis = {
   createMenu: (menu: Omit<FnbMenu, "_id">) =>
     http.postForm<FnbMenu>("/fnb-menu", menu, {
@@ -47,6 +71,12 @@ const fnbMenuApis = {
         "Content-Type": "multipart/form-data",
       },
     }),
+
+  cleanupMenuItems: (dryRun: boolean) =>
+    http.post<HTTPResponse<FnBMenuItemCleanupResult>>(
+      "/fnb-menu-item/cleanup",
+      { dryRun },
+    ),
 };
 
 export default fnbMenuApis;

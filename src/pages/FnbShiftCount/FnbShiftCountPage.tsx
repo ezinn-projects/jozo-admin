@@ -87,9 +87,14 @@ const FnbShiftCountPage = () => {
       ...(isAdmin && queryConfig.staffId ? { staffId: queryConfig.staffId } : {}),
       body: {
         note: note.trim() || undefined,
-        items: formItems.map((item) => ({
+        items: formItems
+          .filter((item) => !item.isParent)
+          .map((item) => ({
           itemId: item.itemId,
           ...(item.openingCount !== "" ? { openingCount: item.openingCount } : {}),
+          ...(item.midShiftAddition !== ""
+            ? { midShiftAddition: item.midShiftAddition }
+            : {}),
           ...(item.closingCount !== "" ? { closingCount: item.closingCount } : {}),
         })),
       },

@@ -1,5 +1,6 @@
 import { PageHeader } from "@/components/shared";
 import UpsertMenuItemModal from "@/components/modules/FnB/UpsertMenuItemModal";
+import CleanupMenuItemsModal from "@/components/modules/FnB/CleanupMenuItemsModal";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import {
   Plus,
   Search,
   Trash2,
+  Wand2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -32,18 +34,21 @@ const MenuItemsPage = () => {
     isCreating,
     isUpdating,
     isDeleting,
+    isCleaningUp,
     deleteMenuItem,
+    cleanupMenuItems,
     refetch,
   } = useMenuItems();
 
   const [searchTerm, setSearchTerm] = useState("");
   const [filteredItems, setFilteredItems] = useState<FnBMenuItem[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isCleanupModalOpen, setIsCleanupModalOpen] = useState(false);
   const [selectedItem, setSelectedItem] = useState<FnBMenuItem | null>(null);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [itemToDelete, setItemToDelete] = useState<FnBMenuItem | null>(null);
   const [expandedVariants, setExpandedVariants] = useState<Set<string>>(
-    new Set()
+    new Set(),
   );
 
   // Filter items based on search term
@@ -52,7 +57,7 @@ const MenuItemsPage = () => {
       (item) =>
         item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         (item.parent?.name &&
-          item.parent.name.toLowerCase().includes(searchTerm.toLowerCase()))
+          item.parent.name.toLowerCase().includes(searchTerm.toLowerCase())),
     );
     setFilteredItems(filtered);
   }, [menuItems, searchTerm]);
@@ -122,14 +127,24 @@ const MenuItemsPage = () => {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Quản lý Menu Items"
+        title="Quản lý số tồn kho FNB"
         description="Quản lý các món ăn, đồ uống và variants"
         icon={Utensils}
         actions={
-        <Button onClick={handleCreate} disabled={isCreating}>
-          <Plus className="w-4 h-4 mr-2" />
-          Thêm Menu Item
-        </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsCleanupModalOpen(true)}
+              disabled={isCleaningUp}
+            >
+              <Wand2 className="w-4 h-4 mr-2" />
+              Dọn dữ liệu
+            </Button>
+            <Button onClick={handleCreate} disabled={isCreating}>
+              <Plus className="w-4 h-4 mr-2" />
+              Thêm Menu Item
+            </Button>
+          </div>
         }
       />
 
@@ -215,7 +230,7 @@ const MenuItemsPage = () => {
                           {item.variants?.reduce(
                             (total, variant) =>
                               total + variant.inventory.quantity,
-                            0
+                            0,
                           ) || 0}
                         </span>
                         <Badge variant="outline" className="text-xs">
@@ -334,6 +349,14 @@ const MenuItemsPage = () => {
         onConfirm={handleDeleteConfirm}
         title="Xóa Menu Item"
         description={`Bạn có chắc chắn muốn xóa "${itemToDelete?.name}"? Hành động này không thể hoàn tác.`}
+      />
+
+      <CleanupMenuItemsModal
+        isOpen={isCleanupModalOpen}
+        onClose={() => setIsCleanupModalOpen(false)}
+        onCleanup={cleanupMenuItems}
+        isLoading={isCleaningUp}
+        onSuccess={refetch}
       />
     </div>
   );

@@ -10,7 +10,12 @@ export interface FnbShiftCountFormItem {
   itemId: string;
   itemName: string;
   category: "drink" | "snack";
+  /** Món cha chỉ để nhóm variant — không nhập đầu ca / kết ca */
+  isParent?: boolean;
+  /** Biến thể của món cha — hiển thị thụt vào dưới parent */
+  isVariant?: boolean;
   openingCount: number | "";
+  midShiftAddition: number | "";
   closingCount: number | "";
   physicalSold?: number;
   systemSold: number;

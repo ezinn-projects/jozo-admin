@@ -393,22 +393,29 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="sm:max-w-[480px]">
-          <DialogHeader>
-            <DialogTitle>
-              {scheduleId ? "Sửa lịch" : `Đặt phòng ${room?.roomName ?? ""}`}
-            </DialogTitle>
-            {!scheduleId && (
-              <DialogDescription>
-                {formattedDate}
-                {room &&
-                  room.roomType !== RoomType.Dorm &&
-                  ` · hiện đang là phòng ${getRoomTypeLabel(room.roomType).toLowerCase()}`}
-              </DialogDescription>
-            )}
-          </DialogHeader>
+        <DialogContent
+          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[480px]"
+          style={{ WebkitOverflowScrolling: "touch" }}
+        >
           <Form {...form}>
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+            <form
+              onSubmit={handleSubmit(onSubmit)}
+              className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6"
+            >
+              <DialogHeader className="pr-10">
+                  <DialogTitle>
+                    {scheduleId ? "Sửa lịch" : `Đặt phòng ${room?.roomName ?? ""}`}
+                  </DialogTitle>
+                  {!scheduleId && (
+                    <DialogDescription>
+                      {formattedDate}
+                      {room &&
+                        room.roomType !== RoomType.Dorm &&
+                        ` · hiện đang là phòng ${getRoomTypeLabel(room.roomType).toLowerCase()}`}
+                    </DialogDescription>
+                  )}
+                </DialogHeader>
+                <div className="space-y-5 mt-4">
               <div className="space-y-3">
                 <p className="text-sm font-medium">Thời gian</p>
                 <div className="grid grid-cols-2 gap-3">
@@ -656,13 +663,21 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </FormItem>
                 )}
               />
-              <DialogFooter className="gap-2 sm:justify-end pt-1">
-                <Button type="button" variant="outline" onClick={onClose}>
+                </div>
+
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-6 border-t mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={onClose}
+                  className="w-full sm:w-auto"
+                >
                   Huỷ
                 </Button>
                 <Button
                   type="submit"
                   loading={isCreating || isUpdating || isUpdatingRoom}
+                  className="w-full sm:w-auto"
                 >
                   {scheduleId ? "Lưu" : "Tạo booking"}
                 </Button>
