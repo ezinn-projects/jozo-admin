@@ -37,7 +37,7 @@ interface MenuItem {
   updatedAt: string;
   existingImage?: string;
   quantity?: string;
-  variants?: string; // JSON string của variants
+  variants?: MenuItem[] | string;
   customizationGroups?: {
     groupKey: string;
     label: string;
@@ -59,6 +59,36 @@ interface MenuItemsModalProps {
   scheduleId?: string; // Thêm prop cho schedule ID
   createdBy?: string; // Thêm prop cho user ID
 }
+
+const isParentMenuItem = (item: MenuItem) => !item.parentId;
+
+const parseNestedVariants = (parent: MenuItem): MenuItem[] => {
+  if (!parent.variants) return [];
+
+  const rawVariants = Array.isArray(parent.variants)
+    ? parent.variants
+    : (() => {
+        try {
+          const parsed = JSON.parse(parent.variants);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
+  return rawVariants.map((variant) => ({
+    ...variant,
+    parentId: variant.parentId || parent._id,
+    category: variant.category || parent.category,
+    hasVariant: false,
+    inventory: {
+      quantity: variant.inventory?.quantity ?? 0,
+      minStock: variant.inventory?.minStock,
+      maxStock: variant.inventory?.maxStock,
+      lastUpdated: variant.inventory?.lastUpdated,
+    },
+  }));
+};
 
 const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   isOpen,
@@ -117,20 +147,38 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     return categories;
   }, [menuItems]);
 
-  // Group các item con vào parent
+  // Group các item con vào parent (hỗ trợ cả flat parentId và nested variants[])
   const groupedItems = React.useMemo(() => {
     const parents: MenuItem[] = [];
     const childrenMap: Record<string, MenuItem[]> = {};
+    const itemById: Record<string, MenuItem> = {};
+
+    const addChild = (parentId: string, child: MenuItem) => {
+      if (!childrenMap[parentId]) childrenMap[parentId] = [];
+      if (!childrenMap[parentId].some((existing) => existing._id === child._id)) {
+        childrenMap[parentId].push(child);
+      }
+      itemById[child._id] = child;
+    };
+
     menuItems.forEach((item) => {
-      if (!item.parentId) {
+      itemById[item._id] = item;
+
+      if (isParentMenuItem(item)) {
         parents.push(item);
-      } else {
-        if (!childrenMap[item.parentId]) childrenMap[item.parentId] = [];
-        childrenMap[item.parentId].push(item);
+        parseNestedVariants(item).forEach((variant) => addChild(item._id, variant));
+        return;
+      }
+
+      if (item.parentId) {
+        addChild(item.parentId, item);
       }
     });
-    return { parents, childrenMap };
+
+    return { parents, childrenMap, itemById };
   }, [menuItems]);
+
+  const findMenuItem = (key: string) => groupedItems.itemById[key];
 
   // Hàm normalize tiếng Việt không dấu và lower case
   const normalize = (str: string) =>
@@ -277,25 +325,49 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
       { queryKey: ["menuItems"] },
       (old: { data?: { result?: MenuItem[] } } | undefined) => {
         if (!old?.data?.result) return old;
+
+        const updateItemInventory = (item: MenuItem): MenuItem => {
+          if (item._id === key) {
+            return {
+              ...item,
+              inventory: {
+                ...item.inventory,
+                quantity: Math.max(
+                  0,
+                  (item.inventory?.quantity || 0) - quantityDiff
+                ),
+              },
+            };
+          }
+
+          if (!item.variants) return item;
+
+          const nestedVariants = parseNestedVariants(item);
+          if (nestedVariants.length === 0) return item;
+
+          const updatedVariants = nestedVariants.map((variant) =>
+            variant._id === key
+              ? {
+                  ...variant,
+                  inventory: {
+                    ...variant.inventory,
+                    quantity: Math.max(
+                      0,
+                      (variant.inventory?.quantity || 0) - quantityDiff
+                    ),
+                  },
+                }
+              : variant
+          );
+
+          return { ...item, variants: updatedVariants };
+        };
+
         return {
           ...old,
           data: {
             ...old.data,
-            result: old.data.result.map((item: MenuItem) => {
-              if (item._id === key) {
-                return {
-                  ...item,
-                  inventory: {
-                    ...item.inventory,
-                    quantity: Math.max(
-                      0,
-                      (item.inventory?.quantity || 0) - quantityDiff
-                    ),
-                  },
-                };
-              }
-              return item;
-            }),
+            result: old.data.result.map(updateItemInventory),
           },
         };
       }
@@ -426,7 +498,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   // Xử lý khi thay đổi số lượng qua input
   const handleQuantityChange = (key: string, newValue: number) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
 
     const currentValue = quantities[key] || 0;
@@ -447,14 +519,14 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   // Hàm handle cho nút + (thêm 1)
   const handleAddOne = (key: string) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
     addMutation.mutate({ key, quantity: 1, category: item.category });
   };
 
   // Hàm handle cho nút - (giảm 1)
   const handleRemoveOne = (key: string) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
     removeMutation.mutate({ key, quantity: 1, category: item.category });
   };
