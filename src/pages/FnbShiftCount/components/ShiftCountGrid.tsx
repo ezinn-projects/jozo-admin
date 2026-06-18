@@ -45,12 +45,12 @@ const inputRefKey = (itemId: string, field: CountField) => `${itemId}-${field}`;
 
 const shouldNavigateHorizontally = (
   input: HTMLInputElement,
-  key: "ArrowLeft" | "ArrowRight",
+  direction: "left" | "right",
 ) => {
   const { selectionStart, selectionEnd, value } = input;
   if (selectionStart === null || selectionEnd === null) return true;
   if (selectionStart !== selectionEnd) return true;
-  if (key === "ArrowLeft") return selectionStart === 0;
+  if (direction === "left") return selectionStart === 0;
   return selectionEnd === value.length;
 };
 
