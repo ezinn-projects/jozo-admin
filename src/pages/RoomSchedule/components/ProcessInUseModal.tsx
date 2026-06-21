@@ -4,7 +4,10 @@ import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
-import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
+import roomsScheduleApis, {
+  IChangeRoomRequest,
+  ICreateRoomScheduleRequest,
+} from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { Button } from "@/components/ui/button";
 import {
@@ -53,12 +56,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { buildBillDateTimeFromSchedule } from "@/utils/billDateTime";
-import { CalendarDays, Clock, Gift, Minus, Plus, Printer } from "lucide-react";
+import {
+  CalendarDays,
+  Clock,
+  Gift,
+  Minus,
+  Plus,
+  Printer,
+  User,
+} from "lucide-react";
 
 // Define bill interfaces
 interface BillItem {
@@ -147,6 +159,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const [customerPaidInput, setCustomerPaidInput] = useState<string>("");
+  const [isGiftEnabled, setIsGiftEnabled] = useState<boolean>(
+    schedule.giftEnabled || false,
+  );
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -172,6 +187,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (!isOpen) return;
     setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
   }, [isOpen, schedule.applyFreeHourPromo]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setIsGiftEnabled(Boolean(schedule.giftEnabled));
+  }, [isOpen, schedule.giftEnabled]);
 
   console.log("promotionList", promotionList);
 
@@ -260,8 +280,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
-  /*
   const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
     useMutation({
       mutationFn: (giftEnabled: boolean) =>
@@ -313,7 +331,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         });
       },
     });
-  */
+
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
     mutationFn: (payload: IChangeRoomRequest) =>
@@ -978,8 +996,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            {/* Membership & Quà tặng — đoạn UI tạm ẩn
-              <div className="mb-4">
+            <div className="mb-4">
               <div
                 className={`${
                   gift || isGiftEnabled
@@ -1141,7 +1158,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
               </div>
             </div>
-            */}
 
             {/* Đổi phòng */}
             <div className="mb-4 space-y-2">
