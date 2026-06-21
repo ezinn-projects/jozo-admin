@@ -19,6 +19,39 @@ export default defineConfig({
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes("node_modules")) return;
+
+          if (id.includes("@radix-ui")) {
+            return "vendor-radix";
+          }
+
+          if (id.includes("@tanstack")) {
+            return "vendor-tanstack";
+          }
+
+          if (id.includes("lucide-react")) {
+            return "vendor-icons";
+          }
+
+          if (id.includes("date-fns") || id.includes("dayjs")) {
+            return "vendor-date";
+          }
+
+          if (
+            /node_modules\/(react|react-dom|react-router-dom)\//.test(id)
+          ) {
+            return "vendor-react";
+          }
+
+          return "vendor";
+        },
+      },
+    },
+  },
   server: {
     // cho phép truy cập từ subdomain cụ thể
     host: "0.0.0.0",

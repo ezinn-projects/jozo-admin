@@ -3,9 +3,6 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
-import CalendarPage from "@/pages/CalendarPage";
-import PromotionPage from "@/pages/PromotionPage";
-import RevenueStatisticsPage from "@/pages/RevenueStatisticsPage";
 
 import { lazy, Suspense } from "react";
 import {
@@ -17,6 +14,11 @@ import {
 import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
+const PromotionPage = lazy(() => import("@/pages/PromotionPage"));
+const RevenueStatisticsPage = lazy(
+  () => import("@/pages/RevenueStatisticsPage")
+);
 const RoomsListPage = lazy(
   () => import("@/pages/RoomsManagement/pages/RoomsListPage")
 );
