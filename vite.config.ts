@@ -41,12 +41,6 @@ export default defineConfig({
             return "vendor-date";
           }
 
-          if (
-            /node_modules\/(react|react-dom|react-router-dom)\//.test(id)
-          ) {
-            return "vendor-react";
-          }
-
           return "vendor";
         },
       },
