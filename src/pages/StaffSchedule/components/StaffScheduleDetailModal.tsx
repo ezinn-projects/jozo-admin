@@ -17,6 +17,7 @@ import { IEmployeeSchedule } from "@/apis/staffSchedule.apis";
 import { EmployeeScheduleStatus } from "@/constants/enum";
 import dayjs from "dayjs";
 import { format } from "date-fns";
+import { AlertTriangle } from "lucide-react";
 import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
 import useAuth from "@/hooks/useAuth";
 import { Badge } from "@/components/ui/badge";
@@ -464,14 +465,16 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
   const canApprove =
     displaySchedule.status === EmployeeScheduleStatus.Pending && !isStaff;
   const canReject =
-    displaySchedule.status === EmployeeScheduleStatus.Pending && !isStaff;
+    !isStaff &&
+    (displaySchedule.status === EmployeeScheduleStatus.Pending ||
+      displaySchedule.status === EmployeeScheduleStatus.Approved);
   const canStart =
     !isStaff && displaySchedule.status === EmployeeScheduleStatus.Approved;
   const canComplete =
     displaySchedule.status === EmployeeScheduleStatus.InProgress;
   const canMarkAbsent =
     displaySchedule.status === EmployeeScheduleStatus.InProgress;
-  const canDelete = !isStaff && !isPastSchedule;
+  const canDelete = !isStaff && (!isPastSchedule || isAdmin);
   const canEmployeeSelfUnregister =
     allowEmployeeSelfDelete &&
     canEmployeeDeleteRegistration(displaySchedule, user?._id);
@@ -521,12 +524,22 @@ const StaffScheduleDetailModal: React.FC<StaffScheduleDetailModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-4xl lg:max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Schedule Details</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-4">
+          {isPastSchedule && isAdmin && (
+            <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              <p>
+                Bạn đang chỉnh sửa dữ liệu ca làm trong quá khứ. Hãy kiểm tra kỹ
+                trước khi lưu thay đổi.
+              </p>
+            </div>
+          )}
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <Label className="text-sm font-semibold text-gray-500">

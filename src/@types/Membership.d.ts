@@ -109,13 +109,29 @@ export interface IEligibleGift {
 }
 
 // User info trong response
+export interface IPendingGiftsUserProgress {
+  currentTier: string;
+  nextTier?: {
+    tier: string;
+    required: number;
+  };
+}
+
 export interface IPendingGiftsUser {
   userId: string;
-  name: string;
+  full_name?: string | null;
+  name?: string | null;
+  username?: string | null;
+  email?: string | null;
   phone_number: string;
+  date_of_birth?: string | null;
+  avatar?: string | null;
   tier: string;
   availablePoint: number;
+  lifetimePoint?: number;
+  totalPoint?: number;
   streakCount: number;
+  progress?: IPendingGiftsUserProgress;
 }
 
 // Response từ GET /pending-gifts
@@ -127,6 +143,42 @@ export interface IPendingGiftsResponse {
 
 // Payload cho POST /claim-gift
 export interface IClaimGiftPayload {
+  phone: string;
+  streakCount: number;
+  scheduleId: string;
+}
+
+// Quà streak sẵn sàng phục vụ — GET /streak-gifts
+export interface IAvailableStreakGift {
+  streakCount: number;
+  giftId: string;
+  giftName: string;
+  giftType: string;
+  giftImage?: string;
+  bonusPoints?: number;
+}
+
+// Tiến độ mốc streak — GET /streak-gifts
+export interface IStreakRewardProgress {
+  streakCount: number;
+  giftId?: string;
+  giftName?: string;
+  giftType?: string;
+  giftImage?: string;
+  bonusPoints?: number;
+  claimed: boolean;
+  isNext?: boolean;
+}
+
+// Response từ GET /streak-gifts
+export interface IStreakGiftsResponse {
+  user: IPendingGiftsUser;
+  availableGifts: IAvailableStreakGift[];
+  streakRewards: IStreakRewardProgress[];
+}
+
+// Payload cho POST /membership/serve-streak-gift
+export interface IServeStreakGiftPayload {
   phone: string;
   streakCount: number;
   scheduleId: string;

@@ -1226,11 +1226,15 @@ const RoomTimelineTable: React.FC = () => {
                           //   dragState.isDragging &&
                           //   dragState.scheduleId === schedule._id;
                           const eventElement = (
-                            <div
+                            <button
                               key={schedule._id}
-                              className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md`}
-                              style={{ left, width }}
+                              type="button"
+                              className={`absolute top-0 bottom-0 my-1.5 ${bgColor} opacity-80 rounded-md shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500`}
+                              style={{ left, width: Math.max(width, 44) }}
                               title={`${schedule.status} - ${dayjs(
+                                schedule.startTime,
+                              ).format("HH:mm")}`}
+                              aria-label={`${room.roomName} ${schedule.status} từ ${dayjs(
                                 schedule.startTime,
                               ).format("HH:mm")}`}
                               // draggable
@@ -1252,15 +1256,15 @@ const RoomTimelineTable: React.FC = () => {
                               }}
                             >
                               {/* Hiển thị thời gian trong schedule block */}
-                              <div className="relative flex h-full items-center justify-center px-1">
-                                <span className="absolute left-1 top-0.5 text-xs text-white font-medium">
+                              <div className="relative flex h-full min-h-9 items-center justify-center px-1.5">
+                                <span className="absolute left-1 top-0.5 text-[11px] text-white font-medium leading-none">
                                   {dayjs(schedule.startTime).format("HH:mm")}
                                 </span>
-                                <span className="max-w-full truncate text-sm font-semibold text-white">
+                                <span className="max-w-full truncate text-xs sm:text-sm font-semibold text-white">
                                   {room.roomName}
                                 </span>
                               </div>
-                            </div>
+                            </button>
                           );
                           if (schedule.status.toLowerCase() === "booked") {
                             const eventStart = dayjs(schedule.startTime);

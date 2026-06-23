@@ -3,6 +3,8 @@ import {
   IClaimGiftPayload,
   IMembershipConfig,
   IPendingGiftsResponse,
+  IServeStreakGiftPayload,
+  IStreakGiftsResponse,
   IUserStreakInfo,
   MembershipConfigPayload,
   UpdateStreakPayload,
@@ -37,6 +39,12 @@ const membershipApis = {
     ),
   claimGift: (payload: IClaimGiftPayload) =>
     http.post<HTTPResponse>(`/membership/claim-gift`, payload),
+  getStreakGifts: (phone: string) =>
+    http.get<HTTPResponse<IStreakGiftsResponse>>(
+      `/membership/streak-gifts?phone=${encodeURIComponent(phone)}`,
+    ),
+  serveStreakGift: (payload: IServeStreakGiftPayload) =>
+    http.post<HTTPResponse>(`/membership/serve-streak-gift`, payload),
 };
 
 export default membershipApis;

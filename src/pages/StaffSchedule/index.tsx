@@ -21,6 +21,7 @@ import { EmployeeScheduleStatus, Role, ShiftType } from "@/constants/enum";
 import PATHS from "@/constants/paths";
 import { useStaffSchedules, ViewMode } from "@/hooks/use-staff-schedules";
 import { useToast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/usePermission";
 import { useUsers } from "@/hooks/use-users";
 import { useSocket } from "@/hooks/useSocket";
 import { cn } from "@/lib/utils";
@@ -49,6 +50,7 @@ const StaffSchedulePage = () => {
   );
 
   const { users, isLoadingUsers } = useUsers();
+  const isAdmin = useIsAdmin();
 
   // Array mapping for day names in Vietnamese
   const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -227,9 +229,10 @@ const StaffSchedulePage = () => {
   // Get color by status
   const getStatusColor = (
     status: EmployeeScheduleStatus | null,
-    isPast: boolean
+    isPast: boolean,
+    canInteract: boolean
   ): string => {
-    if (isPast) {
+    if (isPast && !canInteract) {
       if (!status) {
         return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
       }
@@ -250,6 +253,29 @@ const StaffSchedulePage = () => {
           return "bg-yellow-400 opacity-60 cursor-not-allowed";
         default:
           return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
+      }
+    }
+
+    if (isPast && canInteract) {
+      if (!status) {
+        return "bg-amber-50 border border-amber-300 border-dashed hover:bg-amber-100 hover:border-amber-400";
+      }
+      switch (status) {
+        case EmployeeScheduleStatus.Approved:
+          return "bg-blue-500 opacity-75 hover:bg-blue-600";
+        case EmployeeScheduleStatus.Completed:
+          return "bg-emerald-500 opacity-75 hover:bg-emerald-600";
+        case EmployeeScheduleStatus.InProgress:
+          return "bg-purple-500 opacity-75 hover:bg-purple-600";
+        case EmployeeScheduleStatus.Rejected:
+        case EmployeeScheduleStatus.Cancelled:
+          return "bg-red-500 opacity-75 hover:bg-red-600";
+        case EmployeeScheduleStatus.Absent:
+          return "bg-gray-400 opacity-75 hover:bg-gray-500";
+        case EmployeeScheduleStatus.Pending:
+          return "bg-yellow-400 opacity-75 hover:bg-yellow-500";
+        default:
+          return "bg-amber-50 border border-amber-300 border-dashed hover:bg-amber-100 hover:border-amber-400";
       }
     }
 
@@ -492,7 +518,9 @@ const StaffSchedulePage = () => {
                         ShiftType.Morning
                       );
                       const morningStatus = morningSchedule?.status || null;
-                      const morningCanClick = morningSchedule || !isPast;
+                      const canInteractPast = isAdmin;
+                      const morningCanClick =
+                        !!morningSchedule || !isPast || canInteractPast;
 
                       const afternoonSchedule = getScheduleStatus(
                         user._id,
@@ -500,7 +528,8 @@ const StaffSchedulePage = () => {
                         ShiftType.Afternoon
                       );
                       const afternoonStatus = afternoonSchedule?.status || null;
-                      const afternoonCanClick = afternoonSchedule || !isPast;
+                      const afternoonCanClick =
+                        !!afternoonSchedule || !isPast || canInteractPast;
 
                       const allSchedule = getScheduleStatus(
                         user._id,
@@ -508,7 +537,8 @@ const StaffSchedulePage = () => {
                         ShiftType.All
                       );
                       const allStatus = allSchedule?.status || null;
-                      const allCanClick = allSchedule || !isPast;
+                      const allCanClick =
+                        !!allSchedule || !isPast || canInteractPast;
 
                       const morningTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
 Ca: Shift 1
@@ -543,7 +573,11 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
                           <TableCell
                             className={cn(
                               "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
-                              getStatusColor(morningStatus, isPast),
+                              getStatusColor(
+                                morningStatus,
+                                isPast,
+                                morningCanClick
+                              ),
                               morningCanClick &&
                                 "cursor-pointer transition-colors"
                             )}
@@ -564,7 +598,11 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
                           <TableCell
                             className={cn(
                               "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
-                              getStatusColor(afternoonStatus, isPast),
+                              getStatusColor(
+                                afternoonStatus,
+                                isPast,
+                                afternoonCanClick
+                              ),
                               afternoonCanClick &&
                                 "cursor-pointer transition-colors"
                             )}
@@ -585,7 +623,7 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
                           <TableCell
                             className={cn(
                               "px-2 py-6 text-center min-w-[80px]",
-                              getStatusColor(allStatus, isPast),
+                              getStatusColor(allStatus, isPast, allCanClick),
                               allCanClick && "cursor-pointer transition-colors"
                             )}
                             title={allTooltip}
@@ -623,6 +661,7 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
           refetchSchedules={refetch}
           initialDate={initialDate}
           initialShift={initialShift}
+          allowPastDates={isAdmin}
         />
       )}
 

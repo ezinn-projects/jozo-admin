@@ -1,5 +1,9 @@
 import { OrderDetail } from "@/@types/FnbOrder";
-import { getOrderItemQuantity, mergeBillItemsByItemId, mergeOrderDetailItems } from "@/utils/mergeOrderDetailItems";
+import {
+  getOrderItemQuantity,
+  mergeBillItemsByItemId,
+  mergeOrderDetailItems,
+} from "@/utils/mergeOrderDetailItems";
 import { BillGift } from "@/@types/Gift";
 import { IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
@@ -21,8 +25,9 @@ import dayjs from "@/lib/dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import React, { useEffect, useState } from "react";
-import ClaimGiftModal from "./ClaimGiftModal";
-import MemberInfoModal from "./MemberInfoModal";
+import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import { getScheduleCustomerContact } from "../utils/memberPhone";
+import ScheduleMemberSection from "./ScheduleMemberSection";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
 import { IRoom } from "@/@types/Room";
@@ -54,6 +59,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
@@ -132,8 +138,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 }) => {
   const [isMenuItemsModalOpen, setIsMenuItemsModalOpen] = useState(false);
   const [isConfirmEndOpen, setIsConfirmEndOpen] = useState(false);
-  const [isClaimGiftModalOpen, setIsClaimGiftModalOpen] = useState(false);
-  const [isMemberInfoModalOpen, setIsMemberInfoModalOpen] = useState(false);
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [customStartTime, setCustomStartTime] = useState<string>("");
@@ -142,7 +146,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     useState<boolean>(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
-  const [customerPhoneValue, setCustomerPhoneValue] = useState<string>("");
   const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
@@ -152,6 +155,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const { data: standardPromotions } = useGetStandardPromotions();
   const promotionList = standardPromotions?.data.result || [];
   const queryClient = useQueryClient();
+
+  const billQueryKey = [
+    "bill",
+    schedule._id,
+    selectedPromotion,
+    customEndTime,
+    customStartTime,
+    customEndDate,
+    applyFreeHourPromo,
+  ] as const;
+
+  const member = useScheduleMemberPhone({
+    scheduleId: schedule._id,
+    initialPhone: schedule.customerPhone || "",
+    initialGiftEnabled: schedule.giftEnabled,
+    isOpen,
+    refetchSchedules,
+    onGiftServed: () => {
+      queryClient.invalidateQueries({ queryKey: billQueryKey });
+      queryClient.invalidateQueries({
+        queryKey: ["fnbOrderDetail", schedule._id],
+      });
+    },
+  });
 
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
@@ -163,10 +190,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
       setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
       setIsEndDateManuallyAdjusted(false);
-      setCustomerPhoneValue(schedule.customerPhone || "");
       setCustomerPaidInput("");
     }
-  }, [isOpen, schedule.startTime, schedule.customerPhone]);
+  }, [isOpen, schedule.startTime]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -181,15 +207,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const appliedPromotion = getAppliedPromotion();
-  const billQueryKey = [
-    "bill",
-    schedule._id,
-    selectedPromotion,
-    customEndTime,
-    customStartTime,
-    customEndDate,
-    applyFreeHourPromo,
-  ] as const;
 
   const roomsData = queryClient.getQueryData<
     AxiosResponse<HTTPResponse<IRoom[]>>
@@ -214,6 +231,23 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     onSuccess: (_, variables) => {
       refetchSchedules?.();
       onClose();
+
+      if (variables.status === RoomStatus.Finished) {
+        const memberLabel =
+          member.memberInfo?.full_name?.trim() ||
+          member.memberInfo?.name?.trim() ||
+          member.savedPhone.trim() ||
+          schedule.customerPhone ||
+          "khách";
+        const amountLabel = (totalAmount || 0).toLocaleString("vi-VN");
+
+        toast({
+          title: "Đã kết thúc phiên",
+          description: `Bill ${amountLabel}đ đã lưu. Member ${memberLabel} sẽ được backend cộng điểm nếu SĐT hợp lệ.`,
+        });
+        return;
+      }
+
       toast({
         title: "Success",
         description: `Schedule updated to ${variables.status}`,
@@ -260,60 +294,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  // Mutation để bật/tắt quyền nhận quà — bật lại khi mở khối Membership & Quà tặng
-  /*
-  const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
-    useMutation({
-      mutationFn: (giftEnabled: boolean) =>
-        roomsScheduleApis.updateSchedule(schedule._id, { giftEnabled }),
-      onMutate: async (giftEnabled) => {
-        const previous = isGiftEnabled;
-        setIsGiftEnabled(giftEnabled);
-        return { previous };
-      },
-      onSuccess: (_, giftEnabled) => {
-        refetchSchedules?.();
-        toast({
-          title: "Success",
-          description: giftEnabled
-            ? "Đã cho phép nhận quà"
-            : "Đã tắt quyền nhận quà",
-        });
-      },
-      onError: (_error, _giftEnabled, context) => {
-        if (context?.previous !== undefined) {
-          setIsGiftEnabled(context.previous);
-        }
-        toast({
-          title: "Error",
-          description: "Không thể cập nhật quyền nhận quà",
-          variant: "destructive",
-        });
-      },
-    });
-
-  const { mutate: updateCustomerPhone, isPending: isUpdatingCustomerPhone } =
-    useMutation({
-      mutationFn: (customerPhone: string) =>
-        roomsScheduleApis.updateSchedule(schedule._id, {
-          customerPhone,
-        } as Partial<ICreateRoomScheduleRequest>),
-      onSuccess: () => {
-        refetchSchedules?.();
-        toast({
-          title: "Success",
-          description: "Đã cập nhật số điện thoại khách hàng",
-        });
-      },
-      onError: () => {
-        toast({
-          title: "Error",
-          description: "Không thể cập nhật số điện thoại",
-          variant: "destructive",
-        });
-      },
-    });
-  */
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
     mutationFn: (payload: IChangeRoomRequest) =>
@@ -486,12 +466,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             if (!old) return old;
 
             const newDrinks = mergeOrderDetailItems(old.items.drinks).map(
-              (item) =>
-                item.itemId === itemId ? { ...item, quantity } : item,
+              (item) => (item.itemId === itemId ? { ...item, quantity } : item),
             );
             const newSnacks = mergeOrderDetailItems(old.items.snacks).map(
-              (item) =>
-                item.itemId === itemId ? { ...item, quantity } : item,
+              (item) => (item.itemId === itemId ? { ...item, quantity } : item),
             );
 
             return {
@@ -746,7 +724,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       roomId: schedule.roomId,
       items: items || [],
       totalAmount: totalAmount || 0,
-      customerPhone: customerPhoneValue || schedule.customerPhone,
+      customerPhone: member.savedPhone.trim() || schedule.customerPhone,
       paymentMethod: paymentMethod,
       startTime: actualStartTime,
       endTime: actualEndTime,
@@ -757,12 +735,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     // Save bill trước khi update schedule status
     saveBillMutation(billToSave, {
       onSuccess: () => {
-        // Invalidate pending-gifts query để refresh member info
-        if (customerPhoneValue) {
+        // Invalidate streak-gifts query để refresh member info
+        if (member.savedPhone.trim()) {
           queryClient.invalidateQueries({
-            queryKey: ["pending-gifts", customerPhoneValue],
+            queryKey: ["streak-gifts", member.savedPhone.trim()],
           });
         }
+
+        const { customerName, customerEmail } = getScheduleCustomerContact({
+          memberInfo: member.memberInfo,
+          scheduleCustomerName: schedule.customerName,
+          scheduleCustomerEmail: schedule.customerEmail,
+        });
 
         // Sau khi save bill thành công, update schedule status
         const updateData: Partial<IRoomSchedule> = {
@@ -770,6 +754,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           status: RoomStatus.Finished,
           endTime: actualEndTime,
           startTime: actualStartTime,
+          customerPhone: member.savedPhone.trim() || schedule.customerPhone || "",
+          customerName,
+          customerEmail,
         };
         mutate(updateData, { onSuccess: () => refetchSchedules?.() });
       },
@@ -966,183 +953,29 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-5xl sm:w-[95vw]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
-          <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
+          <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
             <DialogHeader className="pb-4 pr-10">
               <DialogTitle className="text-lg sm:text-xl">
-                Session Management
+                Quản lý phiên đang sử dụng
               </DialogTitle>
               <DialogDescription className="text-sm sm:text-base">
-                Session started at {dayjs(schedule.startTime).format("HH:mm")}{" "}
-                and end at {dayjs(schedule.endTime).format("HH:mm")}.<br />
-                You can choose to end or extend the current session.
+                Phiên bắt đầu lúc {dayjs(schedule.startTime).format("HH:mm")},{" "}
+                kết thúc dự kiến {dayjs(schedule.endTime).format("HH:mm")}. Bạn
+                có thể gia hạn hoặc kết thúc phiên.
               </DialogDescription>
             </DialogHeader>
 
-            {/* Membership & Quà tặng — đoạn UI tạm ẩn
-              <div className="mb-4">
-              <div
-                className={`${
-                  gift || isGiftEnabled
-                    ? "bg-gradient-to-r from-blue-50 to-pink-50"
-                    : "bg-blue-50"
-                } p-4 rounded-lg border ${
-                  gift || isGiftEnabled ? "border-pink-200" : "border-blue-200"
-                }`}
-              >
-                <div className="space-y-3">
-                  <div>
-                    <Label
-                      htmlFor="customer-phone"
-                      className="text-sm font-medium mb-2 block flex items-center gap-2"
-                    >
-                      <User className="w-4 h-4 text-blue-600" />
-                      Số điện thoại thành viên
-                    </Label>
-                    <Input
-                      id="customer-phone"
-                      type="tel"
-                      placeholder="Nhập số điện thoại..."
-                      value={customerPhoneValue}
-                      onChange={(e) => setCustomerPhoneValue(e.target.value)}
-                      disabled={isUpdatingCustomerPhone}
-                    />
-                    <p className="text-xs text-gray-600 mt-1">
-                      Nhập số điện thoại để tích điểm và quản lý quà tặng
-                    </p>
-                    <span className="text-sm font-medium">
-                      Trạng thái quà tặng:
-                    </span>
-                    <span
-                      className={`text-sm ${
-                        gift || isGiftEnabled
-                          ? "text-pink-600 font-semibold"
-                          : "text-gray-600"
-                      }`}
-                    >
-                      {gift
-                        ? "Đã nhận quà"
-                        : isGiftEnabled
-                          ? "Được phép nhận quà"
-                          : "Không được nhận quà"}
-                    </span>
-                  </div>
+            <Tabs defaultValue="bill" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-4 h-11">
+                <TabsTrigger value="bill" className="text-sm sm:text-base">
+                  Hóa đơn
+                </TabsTrigger>
+                <TabsTrigger value="member" className="text-sm sm:text-base">
+                  Thành viên
+                </TabsTrigger>
+              </TabsList>
 
-                  <div className="flex items-center justify-between pt-2 border-t border-gray-200">
-                    <div className="flex items-center gap-2">
-                      <Gift
-                        className={`w-4 h-4 ${
-                          gift || isGiftEnabled
-                            ? "text-pink-500"
-                            : "text-gray-500"
-                        }`}
-                      />
-                      <span className="text-sm font-medium">
-                        Trạng thái quà tặng:
-                      </span>
-                      <span
-                        className={`text-sm ${
-                          gift || isGiftEnabled
-                            ? "text-pink-600 font-semibold"
-                            : "text-gray-600"
-                        }`}
-                      >
-                        {gift
-                          ? "Đã nhận quà"
-                          : isGiftEnabled
-                            ? "Được phép nhận quà"
-                            : "Không được nhận quà"}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs sm:text-sm">Allow Gift</span>
-                      <Switch
-                        checked={isGiftEnabled}
-                        onCheckedChange={(checked) =>
-                          updateGiftEnabled(checked === true)
-                        }
-                        disabled={isUpdatingGiftEnabled}
-                      />
-                    </div>
-                  </div>
-
-                  {customerPhoneValue && (
-                    <div className="flex gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isUpdatingCustomerPhone}
-                        onClick={() => {
-                          if (customerPhoneValue !== schedule.customerPhone) {
-                            updateCustomerPhone(customerPhoneValue, {
-                              onSuccess: () => setIsMemberInfoModalOpen(true),
-                            });
-                          } else {
-                            setIsMemberInfoModalOpen(true);
-                          }
-                        }}
-                        className="flex-1 border-blue-300 text-blue-600 hover:bg-blue-100"
-                      >
-                        <User className="w-4 h-4 mr-1" />
-                        Xem thông tin
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        disabled={isUpdatingCustomerPhone}
-                        onClick={() => {
-                          if (customerPhoneValue !== schedule.customerPhone) {
-                            updateCustomerPhone(customerPhoneValue, {
-                              onSuccess: () => setIsClaimGiftModalOpen(true),
-                            });
-                          } else {
-                            setIsClaimGiftModalOpen(true);
-                          }
-                        }}
-                        className="flex-1 border-pink-300 text-pink-600 hover:bg-pink-50"
-                      >
-                        <Gift className="w-4 h-4 mr-1" />
-                        Phục vụ quà tặng
-                      </Button>
-                    </div>
-                  )}
-
-                  {gift && (
-                    <div className="pt-2 border-t border-pink-200 space-y-1">
-                      <div className="text-sm">
-                        <span className="font-medium">Tên quà:</span>{" "}
-                        <span className="text-pink-700">{gift.name}</span>
-                      </div>
-                      {gift.type === "discount" && gift.discountPercentage && (
-                        <div className="text-sm">
-                          <span className="font-medium">Giảm giá:</span>{" "}
-                          <span className="text-green-600 font-semibold">
-                            {gift.discountPercentage}%
-                          </span>
-                        </div>
-                      )}
-                      {gift.type === "snacks_drinks" &&
-                        gift.items &&
-                        gift.items.length > 0 && (
-                          <div className="text-sm space-y-1">
-                            <span className="font-medium">
-                              Items trong quà:
-                            </span>
-                            <ul className="list-disc list-inside ml-2 space-y-0.5">
-                              {gift.items.map((item, index) => (
-                                <li key={index} className="text-purple-600">
-                                  {item.name} x{item.quantity}
-                                </li>
-                              ))}
-                            </ul>
-                          </div>
-                        )}
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            */}
-
+              <TabsContent value="bill" className="space-y-4 mt-0">
             {/* Đổi phòng */}
             <div className="mb-4 space-y-2">
               <h4 className="text-base font-semibold">Đổi phòng</h4>
@@ -1913,52 +1746,83 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 </div>
               </div>
             </div>
+              </TabsContent>
 
-          <div className="pt-6 border-t mt-6">
-            <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mb-4">
-              <Button
-                variant="outline"
-                onClick={openMenuItemsModal}
-                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-              >
-                Thêm Menu Items
-              </Button>
-              <Button
-                onClick={handleExtendSession}
-                disabled={isPending}
-                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-              >
-                Gia hạn
-              </Button>
-              <Button
-                variant="outline"
-                className="border-purple-400 text-purple-600 hover:bg-purple-200 text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-                onClick={() => printBill()}
-              >
-                <Printer className="w-4 h-4 mr-2" />
-                In hóa đơn
-              </Button>
+              <TabsContent value="member" className="mt-0">
+                <ScheduleMemberSection
+                  inputId="in-use-member-phone"
+                  phone={member.phone}
+                  savedPhone={member.savedPhone}
+                  onPhoneChange={member.setPhone}
+                  isPhoneDirty={member.isPhoneDirty}
+                  hasSavedValidPhone={member.hasSavedValidPhone}
+                  isSavingPhone={member.isSavingPhone}
+                  onSavePhone={member.savePhone}
+                  isGiftEnabled={member.isGiftEnabled}
+                  onGiftEnabledChange={member.updateGiftEnabled}
+                  isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
+                  hasClaimedGift={!!gift}
+                  giftDetail={gift}
+                  customerName={schedule.customerName}
+                  customerEmail={schedule.customerEmail}
+                  memberInfo={member.memberInfo}
+                  isLoadingMemberInfo={member.isLoadingMemberInfo}
+                  isMemberInfoError={member.isMemberInfoError}
+                  isMemberNotFound={member.isMemberNotFound}
+                  availableGifts={member.availableGifts}
+                  streakRewards={member.streakRewards}
+                  giftItemsById={member.giftItemsById}
+                  onServeGift={member.serveStreakGift}
+                  isServingGift={member.isServingGift}
+                />
+              </TabsContent>
+            </Tabs>
 
-              <Button
-                variant="destructive"
-                onClick={() => setIsConfirmEndOpen(true)}
-                disabled={isPending || isSavingBill}
-                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-              >
-                Kết thúc
-              </Button>
+            <div className="pt-6 border-t mt-6">
+              <div className="flex flex-col sm:flex-row flex-wrap gap-2 sm:gap-4 mb-4">
+                <Button
+                  variant="outline"
+                  onClick={openMenuItemsModal}
+                  className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                >
+                  Thêm Menu Items
+                </Button>
+                <Button
+                  onClick={handleExtendSession}
+                  disabled={isPending}
+                  className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                >
+                  Gia hạn
+                </Button>
+                <Button
+                  variant="outline"
+                  className="border-purple-400 text-purple-600 hover:bg-purple-200 text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                  onClick={() => printBill()}
+                >
+                  <Printer className="w-4 h-4 mr-2" />
+                  In hóa đơn
+                </Button>
+
+                <Button
+                  variant="destructive"
+                  onClick={() => setIsConfirmEndOpen(true)}
+                  disabled={isPending || isSavingBill}
+                  className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                >
+                  Kết thúc
+                </Button>
+              </div>
+              <DialogFooter className="mt-0">
+                <Button
+                  variant="outline"
+                  onClick={onClose}
+                  disabled={isPending}
+                  className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
+                >
+                  Đóng
+                </Button>
+              </DialogFooter>
             </div>
-            <DialogFooter className="mt-0">
-              <Button
-                variant="outline"
-                onClick={onClose}
-                disabled={isPending}
-                className="text-sm sm:text-base px-4 sm:px-5 py-2.5 sm:py-2 h-auto w-full sm:w-auto"
-              >
-                Đóng
-              </Button>
-            </DialogFooter>
-          </div>
           </div>
         </DialogContent>
       </Dialog>
@@ -1992,27 +1856,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         roomId={schedule.roomId}
         scheduleId={schedule._id}
         createdBy={user?._id || ""}
-      />
-
-      <MemberInfoModal
-        isOpen={isMemberInfoModalOpen}
-        onClose={() => setIsMemberInfoModalOpen(false)}
-        phone={customerPhoneValue || schedule.customerPhone}
-      />
-
-      <ClaimGiftModal
-        isOpen={isClaimGiftModalOpen}
-        onClose={() => setIsClaimGiftModalOpen(false)}
-        scheduleId={schedule._id}
-        defaultPhone={customerPhoneValue || schedule.customerPhone || ""}
-        onGiftClaimed={() => {
-          // Refresh bill query
-          queryClient.invalidateQueries({
-            queryKey: billQueryKey,
-          });
-          // Refresh schedules
-          refetchSchedules?.();
-        }}
       />
     </>
   );
