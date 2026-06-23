@@ -27,6 +27,8 @@ import dayjs, {
 } from "@/lib/dayjs";
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
+import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import ScheduleMemberSection from "./ScheduleMemberSection";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
@@ -40,13 +42,10 @@ import {
   Plus,
   Minus,
   User,
-  Phone,
-  Mail,
   ArrowUpRight,
   Globe,
   UserCheck,
   Building,
-  Gift,
 } from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
@@ -135,6 +134,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const [roomChangeNote, setRoomChangeNote] = React.useState<string>("");
 
   const queryClient = useQueryClient();
+
+  const member = useScheduleMemberPhone({
+    scheduleId: schedule._id,
+    initialPhone: schedule.customerPhone || "",
+    initialGiftEnabled: schedule.giftEnabled,
+    isOpen,
+    refetchSchedules,
+  });
 
   // Query danh sách phòng để đổi
   const { data: roomsData, isLoading: isLoadingRooms } = useQuery({
@@ -681,476 +688,401 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[725px]"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
+        <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
           <DialogHeader className="pr-10">
-            <DialogTitle>Process Booked Event</DialogTitle>
+            <DialogTitle>Xử lý booking</DialogTitle>
             <DialogDescription>
-              Here is the event details. You can cancel the booking, mark the
-              event as in use, or adjust the event time.
+              Kiểm tra thông tin thành viên, điều chỉnh giờ hoặc chuyển trạng
+              thái phiên.
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-2">
-          <p>
-            <span className="font-medium">Start:</span>{" "}
-            {eventStart.format("HH:mm")}
-          </p>
-          <p>
-            <span className="font-medium">End:</span> {eventEnd.format("HH:mm")}
-          </p>
-          <div>
-            <span className="font-medium">Note:</span>
-            {isEditingNote ? (
-              <div className="mt-2 space-y-2">
-                <Input
-                  value={noteValue}
-                  onChange={(e) => setNoteValue(e.target.value)}
-                  placeholder="Nhập ghi chú..."
-                  className="w-full"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveNote}
-                    disabled={isUpdatingNote}
-                    className="bg-green-600 hover:bg-green-700"
-                  >
-                    {isUpdatingNote ? "Đang lưu..." : "Lưu"}
-                  </Button>
+
+          <ScheduleMemberSection
+            className="mt-4"
+            inputId="booked-member-phone"
+            phone={member.phone}
+            savedPhone={member.savedPhone}
+            onPhoneChange={member.setPhone}
+            isPhoneDirty={member.isPhoneDirty}
+            hasSavedValidPhone={member.hasSavedValidPhone}
+            isSavingPhone={member.isSavingPhone}
+            onSavePhone={member.savePhone}
+            isGiftEnabled={member.isGiftEnabled}
+            onGiftEnabledChange={member.updateGiftEnabled}
+            isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
+            hasClaimedGift={hasGift && isGiftClaimed}
+            giftDetail={
+              hasGift
+                ? {
+                    name: giftInfo?.name,
+                    status: giftStatus,
+                    type: giftInfo?.type,
+                    discountPercentage: giftInfo?.discountPercentage,
+                    items: giftItems,
+                  }
+                : null
+            }
+            customerName={schedule.customerName}
+            customerEmail={schedule.customerEmail}
+            memberInfo={member.memberInfo}
+            isLoadingMemberInfo={member.isLoadingMemberInfo}
+            isMemberInfoError={member.isMemberInfoError}
+            isMemberNotFound={member.isMemberNotFound}
+            availableGifts={member.availableGifts}
+            streakRewards={member.streakRewards}
+            giftItemsById={member.giftItemsById}
+            onServeGift={member.serveStreakGift}
+            isServingGift={member.isServingGift}
+          />
+
+          <div className="space-y-2 mt-4">
+            <p>
+              <span className="font-medium">Start:</span>{" "}
+              {eventStart.format("HH:mm")}
+            </p>
+            <p>
+              <span className="font-medium">End:</span>{" "}
+              {eventEnd.format("HH:mm")}
+            </p>
+            <div>
+              <span className="font-medium">Note:</span>
+              {isEditingNote ? (
+                <div className="mt-2 space-y-2">
+                  <Input
+                    value={noteValue}
+                    onChange={(e) => setNoteValue(e.target.value)}
+                    placeholder="Nhập ghi chú..."
+                    className="w-full"
+                  />
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      onClick={handleSaveNote}
+                      disabled={isUpdatingNote}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleCancelEditNote}
+                      disabled={isUpdatingNote}
+                    >
+                      Hủy
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1 flex items-start gap-2">
+                  <p className="flex-1 break-words">
+                    {currentSchedule.note || "Chưa có ghi chú"}
+                  </p>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={handleCancelEditNote}
+                    onClick={handleEditNote}
                     disabled={isUpdatingNote}
                   >
-                    Hủy
+                    Chỉnh sửa
                   </Button>
                 </div>
-              </div>
-            ) : (
-              <div className="mt-1 flex items-start gap-2">
-                <p className="flex-1 break-words">
-                  {currentSchedule.note || "Chưa có ghi chú"}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleEditNote}
-                  disabled={isUpdatingNote}
-                >
-                  Chỉnh sửa
-                </Button>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
 
-        {/* Thông tin nguồn booking */}
-        {schedule.source === "customer" && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              {React.createElement(getSourceInfo(schedule.source).icon, {
-                className: `w-4 h-4 ${getSourceInfo(schedule.source).color}`,
-              })}
-              Nguồn booking
-            </h3>
-            <div
-              className={`${
-                getSourceInfo(schedule.source).bgColor
-              } p-3 rounded-lg border ${
-                getSourceInfo(schedule.source).borderColor
-              }`}
-            >
-              <Badge
-                variant="outline"
-                className={`${getSourceInfo(schedule.source).color} ${
+          {/* Thông tin nguồn booking */}
+          {schedule.source === "customer" && (
+            <div className="mt-4">
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                {React.createElement(getSourceInfo(schedule.source).icon, {
+                  className: `w-4 h-4 ${getSourceInfo(schedule.source).color}`,
+                })}
+                Nguồn booking
+              </h3>
+              <div
+                className={`${
+                  getSourceInfo(schedule.source).bgColor
+                } p-3 rounded-lg border ${
                   getSourceInfo(schedule.source).borderColor
                 }`}
               >
-                {getSourceInfo(schedule.source).label}
-              </Badge>
-            </div>
-          </div>
-        )}
-
-        {/* Thông tin khách hàng */}
-        {(schedule.customerName ||
-          schedule.customerPhone ||
-          schedule.customerEmail) && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Thông tin khách hàng
-            </h3>
-            <div className="bg-blue-50 p-3 rounded-lg space-y-1">
-              {schedule.customerName && (
-                <div className="flex items-center gap-2">
-                  <User className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">Tên:</span>{" "}
-                    {schedule.customerName}
-                  </span>
-                </div>
-              )}
-              {schedule.customerPhone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">SĐT:</span>{" "}
-                    {schedule.customerPhone}
-                  </span>
-                </div>
-              )}
-              {schedule.customerEmail && (
-                <div className="flex items-center gap-2">
-                  <Mail className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">Email:</span>{" "}
-                    {schedule.customerEmail}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Thông tin room upgrade */}
-        {schedule.upgraded && schedule.originalRoomType && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <ArrowUpRight className="w-4 h-4 text-orange-500" />
-              Thông tin nâng cấp phòng
-            </h3>
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
                 <Badge
                   variant="outline"
-                  className="text-orange-600 border-orange-200"
+                  className={`${getSourceInfo(schedule.source).color} ${
+                    getSourceInfo(schedule.source).borderColor
+                  }`}
                 >
-                  Đã nâng cấp
+                  {getSourceInfo(schedule.source).label}
                 </Badge>
-                <span className="text-sm">
-                  <span className="font-medium">Phòng gốc:</span>{" "}
-                  {schedule.originalRoomType}
-                </span>
               </div>
             </div>
+          )}
+
+          {/* Đổi phòng */}
+          {schedule.upgraded && schedule.originalRoomType && (
+            <div className="mt-4">
+              <h3 className="font-semibold mb-2 flex items-center gap-2">
+                <ArrowUpRight className="w-4 h-4 text-orange-500" />
+                Thông tin nâng cấp phòng
+              </h3>
+              <div className="bg-orange-50 p-3 rounded-lg">
+                <div className="flex items-center gap-2">
+                  <Badge
+                    variant="outline"
+                    className="text-orange-600 border-orange-200"
+                  >
+                    Đã nâng cấp
+                  </Badge>
+                  <span className="text-sm">
+                    <span className="font-medium">Phòng gốc:</span>{" "}
+                    {schedule.originalRoomType}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Đổi phòng */}
+          <div className="mt-4 space-y-2">
+            <h3 className="font-semibold">Đổi phòng</h3>
+            <div className="space-y-2">
+              <Select
+                value={targetRoomId}
+                onValueChange={setTargetRoomId}
+                disabled={isLoadingRooms || availableRooms.length === 0}
+              >
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      availableRooms.length === 0
+                        ? "Không còn phòng khác để đổi"
+                        : "Chọn phòng muốn chuyển"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRooms.map((room) => (
+                    <SelectItem key={String(room._id)} value={String(room._id)}>
+                      {room.roomName} - {room.roomType}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Textarea
+                placeholder="Lý do đổi phòng (tuỳ chọn)"
+                value={roomChangeNote}
+                onChange={(e) => setRoomChangeNote(e.target.value)}
+                className="min-h-[80px]"
+              />
+
+              <Button
+                variant="secondary"
+                onClick={handleChangeRoom}
+                loading={isChangingRoom}
+                disabled={availableRooms.length === 0}
+              >
+                Chuyển sang phòng mới
+              </Button>
+            </div>
           </div>
-        )}
 
-        {/* Đổi phòng */}
-        <div className="mt-4 space-y-2">
-          <h3 className="font-semibold">Đổi phòng</h3>
-          <div className="space-y-2">
-            <Select
-              value={targetRoomId}
-              onValueChange={setTargetRoomId}
-              disabled={isLoadingRooms || availableRooms.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    availableRooms.length === 0
-                      ? "Không còn phòng khác để đổi"
-                      : "Chọn phòng muốn chuyển"
-                  }
+          {/* Hiển thị thông tin đã đặt snacks và drinks */}
+          {hasOrders && (
+            <div className="mt-4 space-y-2">
+              <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Drinks */}
+                {orderDetailData?.items?.drinks &&
+                  orderDetailData.items.drinks.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Coffee className="w-4 h-4" />
+                          Drinks
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-1">
+                          {orderDetailData.items.drinks.map((item) => (
+                            <div
+                              key={item.itemId}
+                              className="flex justify-between items-center"
+                            >
+                              <span className="text-sm">{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      "drinks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <Badge variant="secondary">
+                                  {item.quantity}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      1,
+                                      "drinks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+
+                {/* Snacks */}
+                {orderDetailData?.items?.snacks &&
+                  orderDetailData.items.snacks.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Utensils className="w-4 h-4" />
+                          Snacks
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-1">
+                          {orderDetailData.items.snacks.map((item) => (
+                            <div
+                              key={item.itemId}
+                              className="flex justify-between items-center"
+                            >
+                              <span className="text-sm">{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      "snacks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <Badge variant="secondary">
+                                  {item.quantity}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      1,
+                                      "snacks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
+              </div>
+            </div>
+          )}
+
+          {/* Phần điều chỉnh ngày & thời gian */}
+          <div className="mt-4 space-y-3">
+            <h3 className="font-semibold">Adjust Date & Time</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="adjustedStartDate" className="text-sm">
+                  Start Date:
+                </label>
+                <input
+                  id="adjustedStartDate"
+                  type="date"
+                  value={adjustedStartDate}
+                  onChange={(e) => setAdjustedStartDate(e.target.value)}
+                  className="border rounded p-1 w-full"
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {availableRooms.map((room) => (
-                  <SelectItem key={String(room._id)} value={String(room._id)}>
-                    {room.roomName} - {room.roomType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Textarea
-              placeholder="Lý do đổi phòng (tuỳ chọn)"
-              value={roomChangeNote}
-              onChange={(e) => setRoomChangeNote(e.target.value)}
-              className="min-h-[80px]"
-            />
-
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="adjustedEndDate" className="text-sm">
+                  End Date:
+                </label>
+                <input
+                  id="adjustedEndDate"
+                  type="date"
+                  value={adjustedEndDate}
+                  onChange={(e) => setAdjustedEndDate(e.target.value)}
+                  className="border rounded p-1 w-full"
+                />
+              </div>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label htmlFor="adjustedStartTime" className="text-sm">
+                  Start Time:
+                </label>
+                <input
+                  id="adjustedStartTime"
+                  type="time"
+                  value={adjustedStartTime}
+                  onChange={(e) => setAdjustedStartTime(e.target.value)}
+                  className="border rounded p-1 w-full"
+                />
+              </div>
+              <div className="space-y-1">
+                <label htmlFor="adjustedEndTime" className="text-sm">
+                  End Time:
+                </label>
+                <input
+                  id="adjustedEndTime"
+                  type="time"
+                  value={adjustedEndTime}
+                  onChange={(e) => setAdjustedEndTime(e.target.value)}
+                  className="border rounded p-1 w-full"
+                />
+              </div>
+            </div>
             <Button
-              variant="secondary"
-              onClick={handleChangeRoom}
-              loading={isChangingRoom}
-              disabled={availableRooms.length === 0}
+              variant="default"
+              onClick={handleUpdateTime}
+              loading={isPending}
             >
-              Chuyển sang phòng mới
+              Update Time
             </Button>
           </div>
-        </div>
-
-        {/* Thông tin quà tặng */}
-        {(hasGift || schedule.giftEnabled !== undefined) && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <Gift className="w-4 h-4 text-pink-500" />
-              Trạng thái quà tặng
-            </h3>
-
-            <div
-              className={`flex items-center gap-2 ${
-                hasGift || schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
-              } p-3 rounded-lg border ${
-                hasGift || schedule.giftEnabled
-                  ? "border-pink-200"
-                  : "border-gray-200"
-              }`}
-            >
-              <Badge
-                variant="outline"
-                className={`${
-                  hasGift || schedule.giftEnabled
-                    ? "text-pink-600 border-pink-200"
-                    : "text-gray-600 border-gray-200"
-                }`}
-              >
-                {hasGift
-                  ? isGiftClaimed
-                    ? "Đã nhận quà"
-                    : "Đã được gán quà"
-                  : schedule.giftEnabled
-                    ? "Được nhận quà"
-                    : "Không được nhận quà"}
-              </Badge>
-              {hasGift && (
-                <div className="text-sm space-y-1">
-                  <p className="font-medium">{giftInfo?.name || "Quà tặng"}</p>
-                  <p className="text-xs text-gray-600">
-                    Trạng thái: {giftStatus || "N/A"}
-                  </p>
-                  {giftInfo?.type === "snacks_drinks" &&
-                    giftItems.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <p className="font-semibold text-gray-700">Bao gồm:</p>
-                        <ul className="list-disc pl-5 space-y-0.5">
-                          {giftItems.map(
-                            (item: {
-                              itemId: string;
-                              name?: string;
-                              quantity?: number;
-                              category?: string;
-                            }) => (
-                              <li
-                                key={item.itemId}
-                                className="text-xs text-gray-700"
-                              >
-                                <span className="font-medium">
-                                  {item.name || "Món"}
-                                </span>
-                                {item.quantity !== undefined && (
-                                  <span className="ml-1">x{item.quantity}</span>
-                                )}
-                                {item.category && (
-                                  <span className="ml-2 text-gray-500">
-                                    ({item.category})
-                                  </span>
-                                )}
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Hiển thị thông tin đã đặt snacks và drinks */}
-        {hasOrders && (
-          <div className="mt-4 space-y-2">
-            <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Drinks */}
-              {orderDetailData?.items?.drinks &&
-                orderDetailData.items.drinks.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <Coffee className="w-4 h-4" />
-                        Drinks
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-1">
-                        {orderDetailData.items.drinks.map((item) => (
-                          <div
-                            key={item.itemId}
-                            className="flex justify-between items-center"
-                          >
-                            <span className="text-sm">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    -1,
-                                    "drinks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <Badge variant="secondary">{item.quantity}</Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    1,
-                                    "drinks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-              {/* Snacks */}
-              {orderDetailData?.items?.snacks &&
-                orderDetailData.items.snacks.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <Utensils className="w-4 h-4" />
-                        Snacks
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-1">
-                        {orderDetailData.items.snacks.map((item) => (
-                          <div
-                            key={item.itemId}
-                            className="flex justify-between items-center"
-                          >
-                            <span className="text-sm">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    -1,
-                                    "snacks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <Badge variant="secondary">{item.quantity}</Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    1,
-                                    "snacks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-            </div>
-          </div>
-        )}
-
-        {/* Phần điều chỉnh ngày & thời gian */}
-        <div className="mt-4 space-y-3">
-          <h3 className="font-semibold">Adjust Date & Time</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="adjustedStartDate" className="text-sm">
-                Start Date:
-              </label>
-              <input
-                id="adjustedStartDate"
-                type="date"
-                value={adjustedStartDate}
-                onChange={(e) => setAdjustedStartDate(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="adjustedEndDate" className="text-sm">
-                End Date:
-              </label>
-              <input
-                id="adjustedEndDate"
-                type="date"
-                value={adjustedEndDate}
-                onChange={(e) => setAdjustedEndDate(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="adjustedStartTime" className="text-sm">
-                Start Time:
-              </label>
-              <input
-                id="adjustedStartTime"
-                type="time"
-                value={adjustedStartTime}
-                onChange={(e) => setAdjustedStartTime(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="adjustedEndTime" className="text-sm">
-                End Time:
-              </label>
-              <input
-                id="adjustedEndTime"
-                type="time"
-                value={adjustedEndTime}
-                onChange={(e) => setAdjustedEndTime(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-          </div>
-          <Button
-            variant="default"
-            onClick={handleUpdateTime}
-            loading={isPending}
-          >
-            Update Time
-          </Button>
-        </div>
 
           <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2 pt-6 border-t mt-6">
             <Button
@@ -1169,7 +1101,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
               loading={isPending}
               className="w-full sm:w-auto"
             >
-              Mark as In Use
+              Bắt đầu sử dụng
               {adjustedStartTime && (
                 <span className="text-xs ml-1 opacity-70">
                   ({adjustedStartTime})
@@ -1184,14 +1116,14 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
               loading={isPending}
               className="w-full sm:w-auto"
             >
-              Cancel Booking
+              Hủy booking
             </Button>
             <Button
               variant="outline"
               onClick={onClose}
               className="w-full sm:w-auto"
             >
-              Close
+              Đóng
             </Button>
           </div>
         </div>

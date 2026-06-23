@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
-  DialogFooter,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -17,8 +17,9 @@ import { AxiosError } from "axios";
 import { useMutation } from "@tanstack/react-query";
 import FoodDrinkModal from "@/components/modules/RoomSchedule/FoodDrinkModal";
 import ExtendSessionModal from "./ExtendSessionModal";
-// Giả sử bạn đã import FoodDrinkModal từ vị trí tương ứng
-// import FoodDrinkModal from "@/components/modals/FoodDrinkModal";
+import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import ScheduleMemberSection from "./ScheduleMemberSection";
+import { Clock, Lock, UtensilsCrossed } from "lucide-react";
 
 interface ProcessLockedModalProps {
   isOpen: boolean;
@@ -36,25 +37,31 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
   const [isFnbModalOpen, setIsFnbModalOpen] = useState(false);
   const [isExtendSessionModalOpen, setIsExtendSessionModalOpen] =
     useState(false);
-  const openFnbModal = () => setIsFnbModalOpen(true);
-  const closeFnbModal = () => setIsFnbModalOpen(false);
+
+  const member = useScheduleMemberPhone({
+    scheduleId: schedule._id,
+    initialPhone: schedule.customerPhone || "",
+    initialGiftEnabled: schedule.giftEnabled,
+    isOpen,
+    refetchSchedules,
+  });
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
       roomScheduleApis.updateSchedule(schedule._id, payload),
-    onSuccess: (_, variables) => {
+    onSuccess: () => {
       refetchSchedules();
       onClose();
       toast({
-        title: "Success",
-        description: `Schedule updated to ${variables}`,
+        title: "Đã cập nhật",
+        description: "Trạng thái phiên đã được thay đổi",
       });
     },
     onError: (error) => {
       const _error = error as AxiosError;
       console.error("Error updating schedule:", _error.message);
       toast({
-        title: "Error",
+        title: "Lỗi",
         description: _error.message,
         variant: "destructive",
       });
@@ -75,52 +82,112 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
     mutate(updateData);
   };
 
-  const handleOpenExtendSessionModal = () => {
-    setIsExtendSessionModalOpen(true);
-  };
-
   const handleCloseExtendSessionModal = () => {
     setIsExtendSessionModalOpen(false);
     onClose();
     refetchSchedules();
   };
 
+  const startLabel = schedule.startTime
+    ? dayjs(schedule.startTime).format("HH:mm")
+    : "—";
+  const endLabel = schedule.endTime
+    ? dayjs(schedule.endTime).format("HH:mm")
+    : "—";
+
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Process Locked Schedule</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p>Please choose an action for the locked schedule:</p>
-            <div className="flex justify-end space-x-4">
+      <Dialog
+        open={isOpen}
+        onOpenChange={(open) => {
+          if (!open) onClose();
+        }}
+      >
+        <DialogContent className="max-w-lg gap-0 p-0 sm:max-w-xl">
+          <div className="px-4 pt-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6 sm:pt-6 sm:pb-6">
+            <DialogHeader className="pr-8">
+              <DialogTitle className="flex items-center gap-2 text-lg">
+                <Lock className="w-5 h-5 text-amber-600" />
+                Phiên đang khóa
+              </DialogTitle>
+              <DialogDescription>
+                Nhập SĐT thành viên trước khi mở phiên hoặc hủy booking.
+              </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5 flex items-center gap-2 text-sm text-amber-900">
+              <Clock className="w-4 h-4 shrink-0" />
+              <span>
+                Dự kiến: <strong>{startLabel}</strong> –{" "}
+                <strong>{endLabel}</strong>
+              </span>
+            </div>
+
+            <ScheduleMemberSection
+              className="mt-4"
+              inputId="locked-member-phone"
+              phone={member.phone}
+              savedPhone={member.savedPhone}
+              onPhoneChange={member.setPhone}
+              isPhoneDirty={member.isPhoneDirty}
+              hasSavedValidPhone={member.hasSavedValidPhone}
+              isSavingPhone={member.isSavingPhone}
+              onSavePhone={member.savePhone}
+              isGiftEnabled={member.isGiftEnabled}
+              onGiftEnabledChange={member.updateGiftEnabled}
+              isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
+              customerName={schedule.customerName}
+              customerEmail={schedule.customerEmail}
+              memberInfo={member.memberInfo}
+              isLoadingMemberInfo={member.isLoadingMemberInfo}
+              isMemberInfoError={member.isMemberInfoError}
+              isMemberNotFound={member.isMemberNotFound}
+              availableGifts={member.availableGifts}
+              streakRewards={member.streakRewards}
+              giftItemsById={member.giftItemsById}
+              onServeGift={member.serveStreakGift}
+              isServingGift={member.isServingGift}
+            />
+
+            <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
               <Button
                 variant="outline"
-                onClick={() => handleUpdate(RoomStatus.Cancelled)}
+                onClick={() => setIsFnbModalOpen(true)}
+                className="h-11 justify-start"
               >
-                Cancelled
+                <UtensilsCrossed className="w-4 h-4 mr-2" />
+                Đặt đồ ăn / uống
               </Button>
               <Button
-                onClick={handleOpenExtendSessionModal}
+                onClick={() => setIsExtendSessionModalOpen(true)}
                 loading={isPending}
+                className="h-11 justify-start bg-emerald-600 hover:bg-emerald-700"
               >
-                In use
+                Mở phiên (In use)
               </Button>
-              {/* Nút để mở modal F&B */}
-              <Button variant="outline" onClick={openFnbModal}>
-                Open F&B Modal
+              <Button
+                variant="destructive"
+                onClick={() => handleUpdate(RoomStatus.Cancelled)}
+                loading={isPending}
+                className="h-11 sm:col-span-2"
+              >
+                Hủy booking
+              </Button>
+              <Button
+                variant="ghost"
+                onClick={onClose}
+                className="h-11 sm:col-span-2"
+              >
+                Đóng
               </Button>
             </div>
           </div>
-          <DialogFooter />
         </DialogContent>
       </Dialog>
 
-      {/* Render FoodDrinkModal với trạng thái điều khiển */}
       <FoodDrinkModal
         isOpen={isFnbModalOpen}
-        onClose={closeFnbModal}
+        onClose={() => setIsFnbModalOpen(false)}
         scheduleId={schedule._id}
         refetch={refetchSchedules}
       />

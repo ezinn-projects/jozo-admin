@@ -3,10 +3,13 @@ import {
   GrantUserPointsPayload,
   IMembershipConfig,
   IPendingGiftsResponse,
+  IServeStreakGiftPayload,
+  IStreakGiftsResponse,
   IUserStreakInfo,
   MembershipConfigPayload,
   UpdateStreakPayload,
 } from "@/@types/Membership";
+import { normalizeStreakGiftsResponse } from "@/pages/RoomSchedule/utils/streakGifts";
 import { useToast } from "./use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -92,8 +95,7 @@ export const useUpdateMemberStreak = (userId?: string) => {
     onSuccess: (response) => {
       toast({
         title: "Thành công",
-        description:
-          response.data.message || "Đã cập nhật streak thành công",
+        description: response.data.message || "Đã cập nhật streak thành công",
       });
       queryClient.invalidateQueries({ queryKey: ["user-membership", userId] });
     },
@@ -109,7 +111,10 @@ export const useUpdateMemberStreak = (userId?: string) => {
   });
 };
 
-export const usePendingGifts = (phone?: string) => {
+export const usePendingGifts = (
+  phone?: string,
+  options?: { enabled?: boolean },
+) => {
   return useQuery({
     queryKey: ["pending-gifts", phone],
     queryFn: async () => {
@@ -119,9 +124,60 @@ export const usePendingGifts = (phone?: string) => {
       const response = await membershipApis.getPendingGifts(phone);
       return response.data.result as IPendingGiftsResponse | undefined;
     },
-    enabled: !!phone,
+    enabled: (options?.enabled ?? true) && !!phone,
     staleTime: 30 * 1000, // 30 giây
     refetchOnWindowFocus: true,
+  });
+};
+
+export const useStreakGifts = (
+  phone?: string,
+  options?: { enabled?: boolean },
+) => {
+  return useQuery({
+    queryKey: ["streak-gifts", phone],
+    queryFn: async () => {
+      if (!phone) {
+        throw new Error("Thiếu số điện thoại");
+      }
+      const response = await membershipApis.getStreakGifts(phone);
+      return normalizeStreakGiftsResponse(
+        response.data.result as IStreakGiftsResponse | undefined,
+      );
+    },
+    enabled: (options?.enabled ?? true) && !!phone,
+    staleTime: 30 * 1000,
+    refetchOnWindowFocus: true,
+  });
+};
+
+export const useServeStreakGift = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+
+  return useMutation({
+    mutationFn: (payload: IServeStreakGiftPayload) =>
+      membershipApis.serveStreakGift(payload),
+    onSuccess: (response, payload) => {
+      toast({
+        title: "Thành công",
+        description:
+          response.data.message || "Đã phục vụ quà tặng cho khách hàng",
+      });
+      queryClient.invalidateQueries({
+        queryKey: ["streak-gifts", payload.phone],
+      });
+    },
+    onError: (error: unknown) => {
+      const message =
+        (error as { response?: { data?: { message?: string } } })?.response?.data
+          ?.message || "Không thể phục vụ quà tặng. Vui lòng thử lại.";
+      toast({
+        title: "Lỗi",
+        description: message,
+        variant: "destructive",
+      });
+    },
   });
 };
 
