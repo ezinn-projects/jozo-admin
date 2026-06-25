@@ -33,6 +33,7 @@ export enum DayType {
  * @property {string} Dorm - A dorm zone
  */
 export enum RoomType {
+  Small = "small",
   Medium = "medium",
   Large = "large",
   Dorm = "dorm",

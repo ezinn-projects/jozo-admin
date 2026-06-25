@@ -65,9 +65,10 @@ interface ScheduleMemberSectionProps {
   hasSavedValidPhone?: boolean;
   isSavingPhone?: boolean;
   onSavePhone?: () => void;
-  isGiftEnabled: boolean;
-  onGiftEnabledChange: (enabled: boolean) => void;
+  isGiftEnabled?: boolean;
+  onGiftEnabledChange?: (enabled: boolean) => void;
   isUpdatingGiftEnabled?: boolean;
+  showGiftToggle?: boolean;
   hasClaimedGift?: boolean;
   giftDetail?: ScheduleGiftDetail | null;
   customerName?: string;
@@ -182,9 +183,10 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   hasSavedValidPhone = false,
   isSavingPhone = false,
   onSavePhone,
-  isGiftEnabled,
+  isGiftEnabled = false,
   onGiftEnabledChange,
   isUpdatingGiftEnabled = false,
+  showGiftToggle = true,
   hasClaimedGift = false,
   giftDetail,
   customerName,
@@ -211,11 +213,14 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
 
   const isPhoneValid = isValidMemberPhone(phone);
   const showPhoneError = phone.length > 0 && !isPhoneValid;
-  const isActive = hasClaimedGift || isGiftEnabled;
+  const isActive = hasClaimedGift || (showGiftToggle && isGiftEnabled);
   const showMemberLookup =
     hasSavedValidPhone &&
     !isPhoneDirty &&
-    (isLoadingMemberInfo || memberInfo || isMemberInfoError || isMemberNotFound);
+    (isLoadingMemberInfo ||
+      memberInfo ||
+      isMemberInfoError ||
+      isMemberNotFound);
   const showScheduleCustomer =
     (customerName || customerEmail) && !memberInfo && !isLoadingMemberInfo;
 
@@ -250,25 +255,32 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         <div>
           <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
             <Phone className="w-4 h-4 text-blue-600" />
-            Thành viên & quà tặng
+            {showGiftToggle ? "Thành viên & quà tặng" : "Thành viên"}
           </h3>
-          <p className="text-xs text-gray-600 mt-0.5">
-            Nhập SĐT để tích điểm, xem hạng và phục vụ quà
-          </p>
         </div>
-        <Badge
-          variant="outline"
-          className={cn(
-            "shrink-0",
-            hasClaimedGift
-              ? "border-pink-300 text-pink-700 bg-pink-50"
-              : isGiftEnabled
-                ? "border-emerald-300 text-emerald-700 bg-emerald-50"
-                : "border-gray-300 text-gray-600 bg-white",
-          )}
-        >
-          {getGiftStatusLabel(hasClaimedGift, isGiftEnabled)}
-        </Badge>
+        {showGiftToggle && (
+          <Badge
+            variant="outline"
+            className={cn(
+              "shrink-0",
+              hasClaimedGift
+                ? "border-pink-300 text-pink-700 bg-pink-50"
+                : isGiftEnabled
+                  ? "border-emerald-300 text-emerald-700 bg-emerald-50"
+                  : "border-gray-300 text-gray-600 bg-white",
+            )}
+          >
+            {getGiftStatusLabel(hasClaimedGift, isGiftEnabled)}
+          </Badge>
+        )}
+        {!showGiftToggle && hasClaimedGift && (
+          <Badge
+            variant="outline"
+            className="shrink-0 border-pink-300 text-pink-700 bg-pink-50"
+          >
+            Đã nhận quà
+          </Badge>
+        )}
       </div>
 
       {showMemberLookup && isLoadingMemberInfo && (
@@ -314,9 +326,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
               <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
               <span className="text-gray-500 w-20 shrink-0">Tên</span>
               <span className="font-medium truncate">
-                {memberInfo.full_name?.trim() ||
-                  memberInfo.name?.trim() ||
-                  "—"}
+                {memberInfo.full_name?.trim() || memberInfo.name?.trim() || "—"}
               </span>
             </div>
             <div className="flex items-center gap-2 text-gray-700">
@@ -367,10 +377,10 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         !isLoadingMemberInfo &&
         !memberInfo &&
         (isMemberInfoError || isMemberNotFound) && (
-        <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800">
-          Không tìm thấy tài khoản thành viên với SĐT này.
-        </div>
-      )}
+          <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800">
+            Không tìm thấy tài khoản thành viên với SĐT này.
+          </div>
+        )}
 
       {showScheduleCustomer && (
         <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm space-y-1">
@@ -416,9 +426,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                 Bấm Lưu SĐT để lưu và tra cứu thông tin thành viên
               </p>
             ) : hasSavedValidPhone ? (
-              <p className="text-xs text-emerald-600">
-                Đã lưu: {savedPhone}
-              </p>
+              <p className="text-xs text-emerald-600">Đã lưu: {savedPhone}</p>
             ) : (
               <p className="text-xs text-gray-500">
                 Nhấn Enter hoặc bấm Lưu sau khi nhập xong
@@ -445,27 +453,31 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/90 px-3 py-2.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <Gift
-            className={cn(
-              "w-4 h-4 shrink-0",
-              isGiftEnabled ? "text-pink-500" : "text-gray-400",
-            )}
-          />
-          <div className="min-w-0">
-            <p className="text-sm font-medium text-gray-800">Cho phép nhận quà</p>
-            <p className="text-xs text-gray-500 truncate">
-              Bật khi khách đủ điều kiện nhận quà trong phiên
-            </p>
+      {showGiftToggle && onGiftEnabledChange && (
+        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/90 px-3 py-2.5">
+          <div className="flex items-center gap-2 min-w-0">
+            <Gift
+              className={cn(
+                "w-4 h-4 shrink-0",
+                isGiftEnabled ? "text-pink-500" : "text-gray-400",
+              )}
+            />
+            <div className="min-w-0">
+              <p className="text-sm font-medium text-gray-800">
+                Cho phép nhận quà
+              </p>
+              <p className="text-xs text-gray-500 truncate">
+                Bật khi khách đủ điều kiện nhận quà trong phiên
+              </p>
+            </div>
           </div>
+          <Switch
+            checked={isGiftEnabled}
+            onCheckedChange={(checked) => onGiftEnabledChange(checked === true)}
+            disabled={isUpdatingGiftEnabled}
+          />
         </div>
-        <Switch
-          checked={isGiftEnabled}
-          onCheckedChange={(checked) => onGiftEnabledChange(checked === true)}
-          disabled={isUpdatingGiftEnabled}
-        />
-      </div>
+      )}
 
       {giftDetail && (
         <div className="rounded-lg border border-pink-200 bg-pink-50/80 px-3 py-2.5 space-y-1.5 text-sm">
@@ -599,66 +611,67 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                       : [];
 
                   return (
-                  <div
-                    key={reward.streakCount}
-                    className={cn(
-                      "rounded-md border px-2.5 py-2 text-sm",
-                      reward.claimed
-                        ? "border-gray-200 bg-gray-50 text-gray-500"
-                        : reward.isNext
-                          ? "border-orange-300 bg-orange-50 text-orange-900"
-                          : "border-gray-200 bg-white text-gray-700",
-                    )}
-                  >
-                    <div className="flex items-center gap-2">
                     <div
+                      key={reward.streakCount}
                       className={cn(
-                        "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold",
+                        "rounded-md border px-2.5 py-2 text-sm",
                         reward.claimed
-                          ? "bg-emerald-100 text-emerald-700"
+                          ? "border-gray-200 bg-gray-50 text-gray-500"
                           : reward.isNext
-                            ? "bg-orange-200 text-orange-800"
-                            : "bg-gray-100 text-gray-500",
+                            ? "border-orange-300 bg-orange-50 text-orange-900"
+                            : "border-gray-200 bg-white text-gray-700",
                       )}
                     >
-                      {reward.claimed ? (
-                        <Check className="w-3.5 h-3.5" />
-                      ) : (
-                        reward.streakCount
+                      <div className="flex items-center gap-2">
+                        <div
+                          className={cn(
+                            "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold",
+                            reward.claimed
+                              ? "bg-emerald-100 text-emerald-700"
+                              : reward.isNext
+                                ? "bg-orange-200 text-orange-800"
+                                : "bg-gray-100 text-gray-500",
+                          )}
+                        >
+                          {reward.claimed ? (
+                            <Check className="w-3.5 h-3.5" />
+                          ) : (
+                            reward.streakCount
+                          )}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium truncate">
+                            {getRewardLabel(reward)}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Streak {reward.streakCount}
+                            {reward.giftType &&
+                              ` • ${formatGiftType(reward.giftType)}`}
+                          </p>
+                        </div>
+                        {reward.claimed ? (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50"
+                          >
+                            Đã nhận
+                          </Badge>
+                        ) : reward.isNext ? (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-orange-300 text-orange-700 bg-orange-100"
+                          >
+                            Mốc tiếp
+                          </Badge>
+                        ) : null}
+                      </div>
+                      {bundleItems.length > 0 && (
+                        <GiftBundleItemsList
+                          items={bundleItems}
+                          variant="progress"
+                        />
                       )}
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-medium truncate">
-                        {getRewardLabel(reward)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        Streak {reward.streakCount}
-                        {reward.giftType && ` • ${formatGiftType(reward.giftType)}`}
-                      </p>
-                    </div>
-                    {reward.claimed ? (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50"
-                      >
-                        Đã nhận
-                      </Badge>
-                    ) : reward.isNext ? (
-                      <Badge
-                        variant="outline"
-                        className="shrink-0 border-orange-300 text-orange-700 bg-orange-100"
-                      >
-                        Mốc tiếp
-                      </Badge>
-                    ) : null}
-                    </div>
-                    {bundleItems.length > 0 && (
-                      <GiftBundleItemsList
-                        items={bundleItems}
-                        variant="progress"
-                      />
-                    )}
-                  </div>
                   );
                 })}
               </div>

@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   BellIcon,
   DoorOpen,
-  EditIcon,
   Gamepad2,
   Gift,
   UtensilsCrossed,
@@ -15,6 +14,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { RoomType } from "@/constants/enum";
+import { useIsStaff } from "@/hooks/usePermission";
 import {
   Collapsible,
   CollapsibleContent,
@@ -62,7 +62,6 @@ interface MobileTimelineViewProps {
   onResolveRequest: (roomId: string) => void;
   onOrderClick: (roomId: string) => void;
   onGiftClick?: (roomId: string) => void;
-  onEditRoomType: (room: IRoom) => void;
 }
 
 const getRoomTypeLabel = (type: RoomType) => {
@@ -201,8 +200,8 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
   onResolveRequest,
   onOrderClick,
   onGiftClick,
-  onEditRoomType,
 }) => {
+  const isStaff = useIsStaff();
   // State để cập nhật thời gian real-time
   const [currentTimeState, setCurrentTimeState] = useState(currentTime);
 
@@ -289,15 +288,6 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                     <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
                       {getRoomTypeLabel(room.roomType)}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditRoomType(room);
-                      }}
-                      className="text-gray-400 hover:text-blue-600 active:opacity-70 transition-colors flex-shrink-0 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </button>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {hasNotification && (
@@ -465,7 +455,15 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         })()}
 
                       {/* Schedule blocks */}
-                      {roomSchedules.map((schedule) => {
+                      {roomSchedules
+                        .filter((schedule) => {
+                          if (!isStaff) return true;
+                          const status = schedule.status.toLowerCase();
+                          return (
+                            status !== "finished" && status !== "completed"
+                          );
+                        })
+                        .map((schedule) => {
                         const { top, height, bgColor } = getVerticalMarkerStyle(
                           schedule,
                           currentTime,

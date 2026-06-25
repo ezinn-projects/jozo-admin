@@ -1,11 +1,20 @@
 import { IRoom } from "@/@types/Room";
-import roomApis from "@/apis/room.apis";
 import roomsScheduleApis, {
   ICreateRoomScheduleRequest,
 } from "@/apis/roomSchedule.api";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import useAuth from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -23,6 +32,7 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import {
   Select,
   SelectContent,
@@ -32,38 +42,25 @@ import {
 } from "@/components/ui/select";
 import { RoomStatus, RoomType } from "@/constants/enum";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import dayjs from "dayjs";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Switch } from "@/components/ui/switch";
-import { Separator } from "@/components/ui/separator";
 import { roomTypeOptions } from "@/pages/RoomsManagement/constants";
+import {
+  getRoomTypeForBooking,
+  getRoomTypeLabel,
+  isScheduleRoomTypeEditable,
+} from "@/pages/RoomSchedule/utils/scheduleRoomType";
+
 import {
   isValidMemberPhone,
   sanitizePhoneInput,
 } from "@/pages/RoomSchedule/utils/memberPhone";
 
 const PEOPLE_COUNT_LARGE_THRESHOLD = 5;
-
-const getRoomTypeForBooking = (
-  use4Mic: boolean,
-): RoomType.Medium | RoomType.Large =>
-  use4Mic ? RoomType.Large : RoomType.Medium;
-
-const getRoomTypeLabel = (type?: RoomType) => {
-  switch (type) {
-    case RoomType.Large:
-      return "Lớn";
-    case RoomType.Medium:
-      return "Vừa";
-    case RoomType.Dorm:
-      return "Dorm";
-    default:
-      return "—";
-  }
-};
 
 // Define schema using zod
 const buildScheduleSchema = (requirePeopleCount: boolean) =>
@@ -88,7 +85,7 @@ const buildScheduleSchema = (requirePeopleCount: boolean) =>
       .optional()
       .refine(
         (value) => !value || isValidMemberPhone(value),
-        "SĐT thành viên phải có 10–11 số và bắt đầu bằng 0",
+        "SĐT phải có 10–11 số và bắt đầu bằng 0",
       ),
     note: z.string().max(200).optional(),
     giftEnabled: z.boolean().optional(),
@@ -156,17 +153,14 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     parsedPeopleCount >= 1
       ? getRoomTypeForBooking(!!use4MicValue)
       : null;
-  const willChangeRoomType =
-    !!room &&
-    room.roomType !== RoomType.Dorm &&
-    !!suggestedRoomType &&
-    suggestedRoomType !== room.roomType;
 
   // Biến cờ để đánh dấu nếu người dùng đã tự chỉnh sửa End Time
   const [isEndTimeModified, setIsEndTimeModified] = useState(false);
+  const [sizeConfirmOpen, setSizeConfirmOpen] = useState(false);
+  const [pendingCreateValues, setPendingCreateValues] =
+    useState<FormValues | null>(null);
 
   const { user } = useAuth();
-  const queryClient = useQueryClient();
 
   // Load schedule khi mở modal chỉnh sửa (scheduleId có giá trị)
   const { data: scheduleData } = useQuery({
@@ -176,6 +170,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   });
 
   const schedule = scheduleData?.data?.result;
+  const canEditScheduleRoomType =
+    !!scheduleId && !!schedule && isScheduleRoomTypeEditable(schedule);
 
   useEffect(() => {
     if (scheduleId && schedule && isOpen) {
@@ -191,7 +187,10 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       setValue("note", schedule.note ?? "");
       setValue("customerPhone", schedule.customerPhone ?? "");
       setValue("giftEnabled", schedule.giftEnabled ?? false);
-      setIsEndTimeModified(true); // Giữ nguyên end từ schedule, không tự động tính lại
+      if (schedule.roomType) {
+        setValue("roomType", schedule.roomType as RoomType);
+      }
+      setIsEndTimeModified(true);
     }
   }, [scheduleId, schedule, isOpen, setValue]);
 
@@ -206,16 +205,6 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     },
     onError: (error) => {
       console.error("Error updating schedule:", error);
-    },
-  });
-
-  const { mutateAsync: updateRoom, isPending: isUpdatingRoom } = useMutation({
-    mutationFn: (updatedRoom: IRoom) => roomApis.updateRoom(updatedRoom),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["rooms"] });
-    },
-    onError: (error) => {
-      console.error("Error updating room type:", error);
     },
   });
 
@@ -340,55 +329,78 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     isEndTimeModified,
   ]);
 
+  const buildScheduleTimes = (values: FormValues) => {
+    const toISO = (dateStr: string, timeStr: string) =>
+      dayjs(`${dateStr}T${timeStr}`).toISOString();
+
+    const startDt = dayjs(toISO(values.startDate, values.startTime));
+    let endDt = dayjs(toISO(values.endDate, values.endTime));
+    let endTimeISO = endDt.toISOString();
+    if (!endDt.isAfter(startDt)) {
+      endDt = endDt.add(1, "day");
+      endTimeISO = endDt.toISOString();
+    }
+
+    return {
+      startTimeISO: startDt.toISOString(),
+      endTimeISO,
+    };
+  };
+
+  const needsMediumToLargeConfirm = (
+    values: FormValues,
+    targetRoom: IRoom,
+  ): boolean =>
+    targetRoom.roomType === RoomType.Medium &&
+    !!values.peopleCount &&
+    values.peopleCount > PEOPLE_COUNT_LARGE_THRESHOLD;
+
+  const executeCreate = async (values: FormValues) => {
+    if (!room) {
+      throw new Error("Room information is required to create schedule.");
+    }
+
+    const { startTimeISO, endTimeISO } = buildScheduleTimes(values);
+
+    let bookingRoomType = values.roomType;
+
+    if (room.roomType !== RoomType.Dorm && values.peopleCount) {
+      bookingRoomType = getRoomTypeForBooking(!!values.use4Mic);
+    }
+
+    const scheduleData: ICreateRoomScheduleRequest = {
+      roomId: room._id,
+      startTime: startTimeISO,
+      endTime: endTimeISO,
+      status: values.status,
+      note: values.note,
+      customerPhone: values.customerPhone?.trim() || undefined,
+      giftEnabled: values.giftEnabled,
+      roomType: bookingRoomType,
+    };
+    await createSchedule(scheduleData);
+  };
+
+  const handleConfirmSizeUpgrade = async () => {
+    if (!pendingCreateValues) {
+      return;
+    }
+
+    try {
+      await executeCreate(pendingCreateValues);
+    } catch (error) {
+      console.error("Error submitting schedule:", error);
+    } finally {
+      setSizeConfirmOpen(false);
+      setPendingCreateValues(null);
+    }
+  };
+
   const onSubmit = async (values: FormValues) => {
     try {
-      // Ghép date + time thành ISO (dùng startDate/endDate từ form)
-      const toISO = (dateStr: string, timeStr: string) => {
-        return dayjs(`${dateStr}T${timeStr}`).toISOString();
-      };
-
-      const startDt = dayjs(toISO(values.startDate, values.startTime));
-      let endDt = dayjs(toISO(values.endDate, values.endTime));
-      let endTimeISO = endDt.toISOString();
-      // Nếu end < start (qua 00h) thì tự động coi end là ngày hôm sau
-      if (!endDt.isAfter(startDt)) {
-        endDt = endDt.add(1, "day");
-        endTimeISO = endDt.toISOString();
-      }
-      const startTimeISO = startDt.toISOString();
-
       if (scheduleId) {
-        // Chế độ cập nhật
-        updateSchedule({
-          id: scheduleId,
-          schedule: {
-            startTime: startTimeISO,
-            endTime: endTimeISO,
-            status: values.status,
-            note: values.note,
-            customerPhone: values.customerPhone?.trim() || undefined,
-            giftEnabled: values.giftEnabled,
-          },
-        });
-      } else {
-        // Chế độ tạo mới: room phải được cung cấp
-        if (!room) {
-          throw new Error("Room information is required to create schedule.");
-        }
-
-        if (room.roomType !== RoomType.Dorm && values.peopleCount) {
-          values.roomType = getRoomTypeForBooking(!!values.use4Mic);
-        }
-
-        if (values.roomType && values.roomType !== room.roomType) {
-          await updateRoom({
-            ...room,
-            roomType: values.roomType,
-          });
-        }
-
-        const scheduleData: ICreateRoomScheduleRequest = {
-          roomId: room._id,
+        const { startTimeISO, endTimeISO } = buildScheduleTimes(values);
+        const updatePayload: Partial<ICreateRoomScheduleRequest> = {
           startTime: startTimeISO,
           endTime: endTimeISO,
           status: values.status,
@@ -396,8 +408,33 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
           customerPhone: values.customerPhone?.trim() || undefined,
           giftEnabled: values.giftEnabled,
         };
-        await createSchedule(scheduleData);
+
+        if (
+          canEditScheduleRoomType &&
+          values.roomType &&
+          values.roomType !== schedule?.roomType
+        ) {
+          updatePayload.roomType = values.roomType;
+        }
+
+        updateSchedule({
+          id: scheduleId,
+          schedule: updatePayload,
+        });
+        return;
       }
+
+      if (!room) {
+        throw new Error("Room information is required to create schedule.");
+      }
+
+      if (needsMediumToLargeConfirm(values, room)) {
+        setPendingCreateValues(values);
+        setSizeConfirmOpen(true);
+        return;
+      }
+
+      await executeCreate(values);
     } catch (error) {
       console.error("Error submitting schedule:", error);
     }
@@ -411,33 +448,36 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
-          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[480px]"
+          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[640px]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           <Form {...form}>
             <form
               onSubmit={handleSubmit(onSubmit)}
-              className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6"
+              className="p-0 pb-[env(safe-area-inset-bottom)]"
             >
               <DialogHeader className="pr-10">
-                <DialogTitle>
+                <DialogTitle className="text-lg sm:text-xl">
                   {scheduleId
                     ? "Sửa lịch"
                     : `Đặt phòng ${room?.roomName ?? ""}`}
                 </DialogTitle>
-                {!scheduleId && (
-                  <DialogDescription>
-                    {formattedDate}
-                    {room &&
-                      room.roomType !== RoomType.Dorm &&
-                      ` · hiện đang là phòng ${getRoomTypeLabel(room.roomType).toLowerCase()}`}
-                  </DialogDescription>
-                )}
+                <DialogDescription className="text-sm">
+                  {scheduleId
+                    ? "Sửa thông tin lịch."
+                    : `${formattedDate}${
+                        room && room.roomType !== RoomType.Dorm
+                          ? ` · size gốc: ${getRoomTypeLabel(
+                              room.roomType,
+                            ).toLowerCase()}`
+                          : ""
+                      }`}
+                </DialogDescription>
               </DialogHeader>
-              <div className="space-y-5 mt-4">
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Thời gian</p>
-                  <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-4 mt-5">
+                <div className="rounded-lg border bg-card p-3 space-y-3">
+                  <p className="text-sm font-semibold">Thời gian</p>
+                  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                     <FormField
                       control={control}
                       name="startDate"
@@ -447,7 +487,22 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                             Ngày bắt đầu
                           </FormLabel>
                           <FormControl>
-                            <Input type="date" {...field} />
+                            <Input type="date" className="h-11" {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={control}
+                      name="startTime"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-muted-foreground font-normal">
+                            Giờ bắt đầu
+                          </FormLabel>
+                          <FormControl>
+                            <Input type="time" className="h-11" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -464,29 +519,13 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                           <FormControl>
                             <Input
                               type="date"
+                              className="h-11"
                               {...field}
                               onChange={(e) => {
                                 field.onChange(e);
                                 setIsEndTimeModified(true);
                               }}
                             />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                  <div className="grid grid-cols-2 gap-3">
-                    <FormField
-                      control={control}
-                      name="startTime"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-muted-foreground font-normal">
-                            Giờ bắt đầu
-                          </FormLabel>
-                          <FormControl>
-                            <Input type="time" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>
@@ -503,6 +542,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                           <FormControl>
                             <Input
                               type="time"
+                              className="h-11"
                               {...field}
                               onChange={(e) => {
                                 field.onChange(e);
@@ -517,79 +557,93 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                   </div>
                 </div>
 
-                <FormField
-                  control={control}
-                  name="status"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Trạng thái</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        value={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Chọn trạng thái" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value={RoomStatus.Booked}>
-                            Booked
-                          </SelectItem>
-                          <SelectItem value={RoomStatus.Locked}>
-                            Locked
-                          </SelectItem>
-                          <SelectItem value={RoomStatus.Maintenance}>
-                            Maintenance
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <div className="rounded-lg border bg-card p-3 space-y-4">
+                  <p className="text-sm font-semibold">Trạng thái & SĐT</p>
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <FormField
+                      control={control}
+                      name="status"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-muted-foreground font-normal">
+                            Trạng thái
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Chọn trạng thái" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value={RoomStatus.Booked}>
+                                Booked
+                              </SelectItem>
+                              <SelectItem value={RoomStatus.Locked}>
+                                Locked
+                              </SelectItem>
+                              <SelectItem value={RoomStatus.Maintenance}>
+                                Maintenance
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
 
-                <FormField
-                  control={control}
-                  name="customerPhone"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>SĐT thành viên</FormLabel>
-                      <FormControl>
-                        <Input
-                          type="tel"
-                          inputMode="numeric"
-                          autoComplete="tel"
-                          placeholder="VD: 0912345678"
-                          value={field.value ?? ""}
-                          onChange={(event) =>
-                            field.onChange(sanitizePhoneInput(event.target.value))
-                          }
-                        />
-                      </FormControl>
-                      <p className="text-xs text-muted-foreground">
-                        Nhập ngay khi đặt phòng để tự nhận diện member lúc xử lý bill.
-                      </p>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                    <FormField
+                      control={control}
+                      name="customerPhone"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-muted-foreground font-normal">
+                            SĐT member
+                          </FormLabel>
+                          <FormControl>
+                            <Input
+                              type="tel"
+                              inputMode="numeric"
+                              autoComplete="tel"
+                              placeholder="VD: 0912345678"
+                              className="h-11"
+                              value={field.value ?? ""}
+                              onChange={(event) =>
+                                field.onChange(
+                                  sanitizePhoneInput(event.target.value),
+                                )
+                              }
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Nhập SĐT sớm để nhận member khi tính bill.
+                  </p>
+                </div>
 
                 {!scheduleId && room && room.roomType !== RoomType.Dorm && (
-                  <>
-                    <Separator />
+                  <div className="rounded-lg border bg-card p-3 space-y-4">
+                    <p className="text-sm font-semibold">Số khách & size</p>
                     <FormField
                       control={control}
                       name="peopleCount"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Số khách</FormLabel>
+                          <FormLabel className="text-muted-foreground font-normal">
+                            Số khách
+                          </FormLabel>
                           <FormControl>
                             <Input
                               type="number"
                               min={1}
                               placeholder="VD: 4"
-                              className="w-28"
+                              className="h-11 w-32"
                               {...field}
                               value={field.value ?? ""}
                               onChange={(event) =>
@@ -601,11 +655,9 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                               }
                             />
                           </FormControl>
-                          {willChangeRoomType && suggestedRoomType ? (
+                          {suggestedRoomType ? (
                             <p className="text-sm text-muted-foreground">
-                              Phòng đang{" "}
-                              {getRoomTypeLabel(room.roomType).toLowerCase()},
-                              sẽ chuyển sang{" "}
+                              Size:{" "}
                               {getRoomTypeLabel(
                                 suggestedRoomType,
                               ).toLowerCase()}
@@ -625,9 +677,9 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       control={control}
                       name="use4Mic"
                       render={({ field }) => (
-                        <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-2">
+                        <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-3">
                           <FormLabel className="font-normal">
-                            Sử dụng 4 mic
+                            Dùng 4 mic
                           </FormLabel>
                           <FormControl>
                             <Switch
@@ -638,24 +690,62 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                         </FormItem>
                       )}
                     />
-                  </>
+                  </div>
                 )}
 
-                {!scheduleId && room?.roomType === RoomType.Dorm && (
-                  <>
-                    <Separator />
+                {canEditScheduleRoomType && (
+                  <div className="rounded-lg border bg-card p-3">
                     <FormField
                       control={control}
                       name="roomType"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Loại phòng</FormLabel>
+                          <FormLabel className="text-sm font-semibold">
+                            Size
+                          </FormLabel>
                           <Select
                             onValueChange={field.onChange}
                             value={field.value}
                           >
                             <FormControl>
-                              <SelectTrigger>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Chọn size" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {roomTypeOptions.map((option) => (
+                                <SelectItem
+                                  value={option.value}
+                                  key={option.value}
+                                >
+                                  {option.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                )}
+
+                {!scheduleId && room?.roomType === RoomType.Dorm && (
+                  <div className="rounded-lg border bg-card p-3">
+                    <FormField
+                      control={control}
+                      name="roomType"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-sm font-semibold">
+                            Loại phòng
+                          </FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11">
                                 <SelectValue placeholder="Chọn loại phòng" />
                               </SelectTrigger>
                             </FormControl>
@@ -674,69 +764,106 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                         </FormItem>
                       )}
                     />
-                  </>
+                  </div>
                 )}
 
-                <Separator />
-
-                <FormField
-                  control={control}
-                  name="note"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Ghi chú</FormLabel>
-                      <FormControl>
-                        <Input
-                          as="textarea"
-                          maxLength={200}
-                          placeholder="VD: khách đến trễ 15p"
-                          {...field}
-                        />
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={control}
-                  name="giftEnabled"
-                  render={({ field }) => (
-                    <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-2">
-                      <FormLabel className="font-normal">
-                        Cho phép nhận quà
-                      </FormLabel>
-                      <FormControl>
-                        <Switch
-                          checked={field.value}
-                          onCheckedChange={field.onChange}
-                        />
-                      </FormControl>
-                    </FormItem>
-                  )}
-                />
+                <div className="rounded-lg border bg-card p-3 space-y-4">
+                  <p className="text-sm font-semibold">Ghi chú</p>
+                  <FormField
+                    control={control}
+                    name="note"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-muted-foreground font-normal">
+                          Ghi chú
+                        </FormLabel>
+                        <FormControl>
+                          <Textarea
+                            maxLength={200}
+                            placeholder="VD: khách đến trễ 15p"
+                            className="min-h-[88px] resize-y"
+                            {...field}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={control}
+                    name="giftEnabled"
+                    render={({ field }) => (
+                      <FormItem className="flex flex-row items-center justify-between rounded-lg border px-3 py-3">
+                        <FormLabel className="font-normal">
+                          Cho nhận quà
+                        </FormLabel>
+                        <FormControl>
+                          <Switch
+                            checked={field.value}
+                            onCheckedChange={field.onChange}
+                          />
+                        </FormControl>
+                      </FormItem>
+                    )}
+                  />
+                </div>
               </div>
 
-              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-6 border-t mt-6">
+              <DialogFooter className="flex flex-col gap-2 sm:flex-row sm:justify-end pt-5 border-t mt-6">
                 <Button
                   type="button"
                   variant="outline"
                   onClick={onClose}
-                  className="w-full sm:w-auto"
+                  className="h-11 w-full sm:w-auto sm:min-w-[120px]"
                 >
                   Huỷ
                 </Button>
                 <Button
                   type="submit"
-                  loading={isCreating || isUpdating || isUpdatingRoom}
-                  className="w-full sm:w-auto"
+                  loading={isCreating || isUpdating}
+                  className="h-11 w-full sm:w-auto sm:min-w-[140px]"
                 >
-                  {scheduleId ? "Lưu" : "Tạo booking"}
+                  {scheduleId ? "Lưu" : "Đặt phòng"}
                 </Button>
               </DialogFooter>
             </form>
           </Form>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog
+        open={sizeConfirmOpen}
+        onOpenChange={(open) => {
+          setSizeConfirmOpen(open);
+          if (!open) {
+            setPendingCreateValues(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Xác nhận size phòng</AlertDialogTitle>
+            <AlertDialogDescription>
+              Phòng {room?.roomName ?? ""} là size{" "}
+              {getRoomTypeLabel(RoomType.Medium).toLowerCase()}, bạn có chắc
+              muốn tạo với size {getRoomTypeLabel(RoomType.Large).toLowerCase()}
+              ?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCreating}>Huỷ</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => {
+                event.preventDefault();
+                void handleConfirmSizeUpgrade();
+              }}
+              disabled={isCreating}
+            >
+              {isCreating ? "Đang tạo..." : "Xác nhận"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 };

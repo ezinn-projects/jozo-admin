@@ -50,6 +50,8 @@ interface IRoomSchedule {
   giftEnabled?: boolean;
   // Free hour promotion
   applyFreeHourPromo?: boolean;
+  /** Size khách đặt / đang sử dụng (snapshot, khác room.roomType vật lý) */
+  roomType?: RoomType;
 }
 
 export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };

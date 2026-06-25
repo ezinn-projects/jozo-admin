@@ -29,6 +29,8 @@ import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
 import ScheduleMemberSection from "./ScheduleMemberSection";
+import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
+import { getRoomTypeLabel } from "../utils/scheduleRoomType";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
@@ -46,6 +48,9 @@ import {
   Globe,
   UserCheck,
   Building,
+  Clock,
+  Pencil,
+  ArrowRightLeft,
 } from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
@@ -102,16 +107,6 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     ? parseUTCToLocal(schedule.endTime)
     : eventStart.add(120, "minute");
 
-  // Gift info (API trả về gift object, khác với giftEnabled)
-  const giftInfo = (schedule as unknown as { gift?: any }).gift;
-  const hasGift = !!giftInfo;
-  const giftStatus = giftInfo?.status;
-  const isGiftClaimed = giftStatus === "claimed";
-  const giftItems =
-    giftInfo?.type === "snacks_drinks" && Array.isArray(giftInfo?.items)
-      ? giftInfo.items
-      : [];
-
   // State cho thời gian điều chỉnh
   const [adjustedStartDate, setAdjustedStartDate] = React.useState<string>("");
   const [adjustedEndDate, setAdjustedEndDate] = React.useState<string>("");
@@ -138,7 +133,6 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const member = useScheduleMemberPhone({
     scheduleId: schedule._id,
     initialPhone: schedule.customerPhone || "",
-    initialGiftEnabled: schedule.giftEnabled,
     isOpen,
     refetchSchedules,
   });
@@ -356,43 +350,20 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
   const rooms = (roomsData?.data?.result || []) as IRoom[];
+  const currentRoom = rooms.find((room) => room._id === schedule.roomId);
   const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
 
-  // Hàm lấy thông tin source và màu sắc
+  // Nhãn + icon cho nguồn booking (giữ tông màu trung tính, không tô màu nền)
   const getSourceInfo = (source?: string) => {
     switch (source) {
       case "customer":
-        return {
-          label: "Khách hàng online",
-          icon: Globe,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          borderColor: "border-green-200",
-        };
+        return { label: "Khách đặt online", icon: Globe };
       case "admin":
-        return {
-          label: "Admin đặt",
-          icon: UserCheck,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-          borderColor: "border-blue-200",
-        };
+        return { label: "Admin đặt", icon: UserCheck };
       case "walk-in":
-        return {
-          label: "Walk-in",
-          icon: Building,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
-          borderColor: "border-purple-200",
-        };
+        return { label: "Khách vãng lai", icon: Building };
       default:
-        return {
-          label: "Đặt bởi Hệ thống",
-          icon: User,
-          color: "text-gray-600",
-          bgColor: "bg-gray-50",
-          borderColor: "border-gray-200",
-        };
+        return { label: "Hệ thống", icon: User };
     }
   };
 
@@ -540,7 +511,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       onClose();
       toast({
         title: "Success",
-        description: "Đã đổi phòng thành công",
+        description:
+          "Đã đổi phòng thành công. Queue nhạc đã được chuyển sang phòng mới.",
       });
     },
     onError: () => {
@@ -690,12 +662,32 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       >
         <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
           <DialogHeader className="pr-10">
-            <DialogTitle>Xử lý booking</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Clock className="w-5 h-5 text-muted-foreground" />
+              Xử lý booking
+            </DialogTitle>
             <DialogDescription>
-              Kiểm tra thông tin thành viên, điều chỉnh giờ hoặc chuyển trạng
-              thái phiên.
+              Xác nhận thông tin khách, kiểm tra giờ rồi mở phiên hoặc hủy
+              booking.
             </DialogDescription>
           </DialogHeader>
+
+          {/* Tóm tắt nhanh: giờ dự kiến + nguồn booking */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <span>
+                Giờ dự kiến: <strong>{eventStart.format("HH:mm")}</strong> –{" "}
+                <strong>{eventEnd.format("HH:mm")}</strong>
+              </span>
+            </div>
+            <Badge variant="secondary" className="gap-1 font-normal">
+              {React.createElement(getSourceInfo(schedule.source).icon, {
+                className: "w-3.5 h-3.5",
+              })}
+              {getSourceInfo(schedule.source).label}
+            </Badge>
+          </div>
 
           <ScheduleMemberSection
             className="mt-4"
@@ -707,21 +699,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             hasSavedValidPhone={member.hasSavedValidPhone}
             isSavingPhone={member.isSavingPhone}
             onSavePhone={member.savePhone}
-            isGiftEnabled={member.isGiftEnabled}
-            onGiftEnabledChange={member.updateGiftEnabled}
-            isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
-            hasClaimedGift={hasGift && isGiftClaimed}
-            giftDetail={
-              hasGift
-                ? {
-                    name: giftInfo?.name,
-                    status: giftStatus,
-                    type: giftInfo?.type,
-                    discountPercentage: giftInfo?.discountPercentage,
-                    items: giftItems,
-                  }
-                : null
-            }
+            showGiftToggle={false}
             customerName={schedule.customerName}
             customerEmail={schedule.customerEmail}
             memberInfo={member.memberInfo}
@@ -735,117 +713,83 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             isServingGift={member.isServingGift}
           />
 
-          <div className="space-y-2 mt-4">
-            <p>
-              <span className="font-medium">Start:</span>{" "}
-              {eventStart.format("HH:mm")}
-            </p>
-            <p>
-              <span className="font-medium">End:</span>{" "}
-              {eventEnd.format("HH:mm")}
-            </p>
-            <div>
-              <span className="font-medium">Note:</span>
-              {isEditingNote ? (
-                <div className="mt-2 space-y-2">
-                  <Input
-                    value={noteValue}
-                    onChange={(e) => setNoteValue(e.target.value)}
-                    placeholder="Nhập ghi chú..."
-                    className="w-full"
-                  />
-                  <div className="flex gap-2">
-                    <Button
-                      size="sm"
-                      onClick={handleSaveNote}
-                      disabled={isUpdatingNote}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      {isUpdatingNote ? "Đang lưu..." : "Lưu"}
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleCancelEditNote}
-                      disabled={isUpdatingNote}
-                    >
-                      Hủy
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-1 flex items-start gap-2">
-                  <p className="flex-1 break-words">
-                    {currentSchedule.note || "Chưa có ghi chú"}
-                  </p>
+          <ScheduleRoomTypeSection
+            className="mt-4"
+            schedule={schedule}
+            physicalRoomType={currentRoom?.roomType}
+            onUpdated={refetchSchedules}
+          />
+
+          {/* Ghi chú */}
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Ghi chú</h3>
+              {!isEditingNote && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-muted-foreground"
+                  onClick={handleEditNote}
+                  disabled={isUpdatingNote}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
+                  {currentSchedule.note ? "Sửa" : "Thêm"}
+                </Button>
+              )}
+            </div>
+            {isEditingNote ? (
+              <div className="space-y-2">
+                <Input
+                  value={noteValue}
+                  onChange={(e) => setNoteValue(e.target.value)}
+                  placeholder="Nhập ghi chú..."
+                  className="w-full"
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveNote}
+                    loading={isUpdatingNote}
+                  >
+                    Lưu
+                  </Button>
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={handleEditNote}
+                    onClick={handleCancelEditNote}
                     disabled={isUpdatingNote}
                   >
-                    Chỉnh sửa
+                    Hủy
                   </Button>
                 </div>
-              )}
-            </div>
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground break-words">
+                {currentSchedule.note || "Chưa có ghi chú"}
+              </p>
+            )}
           </div>
 
-          {/* Thông tin nguồn booking */}
-          {schedule.source === "customer" && (
-            <div className="mt-4">
-              <h3 className="font-semibold mb-2 flex items-center gap-2">
-                {React.createElement(getSourceInfo(schedule.source).icon, {
-                  className: `w-4 h-4 ${getSourceInfo(schedule.source).color}`,
-                })}
-                Nguồn booking
-              </h3>
-              <div
-                className={`${
-                  getSourceInfo(schedule.source).bgColor
-                } p-3 rounded-lg border ${
-                  getSourceInfo(schedule.source).borderColor
-                }`}
-              >
-                <Badge
-                  variant="outline"
-                  className={`${getSourceInfo(schedule.source).color} ${
-                    getSourceInfo(schedule.source).borderColor
-                  }`}
-                >
-                  {getSourceInfo(schedule.source).label}
-                </Badge>
-              </div>
-            </div>
-          )}
-
-          {/* Đổi phòng */}
+          {/* Thông tin nâng cấp phòng (nếu có) */}
           {schedule.upgraded && schedule.originalRoomType && (
-            <div className="mt-4">
-              <h3 className="font-semibold mb-2 flex items-center gap-2">
-                <ArrowUpRight className="w-4 h-4 text-orange-500" />
-                Thông tin nâng cấp phòng
-              </h3>
-              <div className="bg-orange-50 p-3 rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Badge
-                    variant="outline"
-                    className="text-orange-600 border-orange-200"
-                  >
-                    Đã nâng cấp
-                  </Badge>
-                  <span className="text-sm">
-                    <span className="font-medium">Phòng gốc:</span>{" "}
-                    {schedule.originalRoomType}
-                  </span>
-                </div>
-              </div>
-            </div>
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+              Đã nâng cấp từ phòng gốc:{" "}
+              <span className="font-medium text-foreground">
+                {schedule.originalRoomType}
+              </span>
+            </p>
           )}
 
           {/* Đổi phòng */}
-          <div className="mt-4 space-y-2">
-            <h3 className="font-semibold">Đổi phòng</h3>
+          <div className="mt-4 space-y-2 border-t pt-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+              Đổi phòng
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              Queue nhạc sẽ tự chuyển theo khi đổi phòng.
+            </p>
             <div className="space-y-2">
               <Select
                 value={targetRoomId}
@@ -864,7 +808,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 <SelectContent>
                   {availableRooms.map((room) => (
                     <SelectItem key={String(room._id)} value={String(room._id)}>
-                      {room.roomName} - {room.roomType}
+                      {room.roomName} - {getRoomTypeLabel(room.roomType)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -888,10 +832,13 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </div>
           </div>
 
-          {/* Hiển thị thông tin đã đặt snacks và drinks */}
+          {/* Đồ ăn & nước đã đặt */}
           {hasOrders && (
-            <div className="mt-4 space-y-2">
-              <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
+            <div className="mt-4 space-y-2 border-t pt-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-muted-foreground" />
+                Đồ ăn & nước đã đặt
+              </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 {/* Drinks */}
                 {orderDetailData?.items?.drinks &&
@@ -900,7 +847,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm">
                           <Coffee className="w-4 h-4" />
-                          Drinks
+                          Nước uống
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-0">
@@ -962,7 +909,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                       <CardHeader className="pb-2">
                         <CardTitle className="flex items-center gap-2 text-sm">
                           <Utensils className="w-4 h-4" />
-                          Snacks
+                          Đồ ăn
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="pt-0">
@@ -1020,86 +967,99 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </div>
           )}
 
-          {/* Phần điều chỉnh ngày & thời gian */}
-          <div className="mt-4 space-y-3">
-            <h3 className="font-semibold">Adjust Date & Time</h3>
+          {/* Điều chỉnh ngày & giờ */}
+          <div className="mt-4 space-y-3 border-t pt-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              Điều chỉnh ngày & giờ
+            </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div className="space-y-1">
-                <label htmlFor="adjustedStartDate" className="text-sm">
-                  Start Date:
+                <label
+                  htmlFor="adjustedStartDate"
+                  className="text-xs text-muted-foreground"
+                >
+                  Ngày bắt đầu
                 </label>
                 <input
                   id="adjustedStartDate"
                   type="date"
                   value={adjustedStartDate}
                   onChange={(e) => setAdjustedStartDate(e.target.value)}
-                  className="border rounded p-1 w-full"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="adjustedEndDate" className="text-sm">
-                  End Date:
-                </label>
-                <input
-                  id="adjustedEndDate"
-                  type="date"
-                  value={adjustedEndDate}
-                  onChange={(e) => setAdjustedEndDate(e.target.value)}
-                  className="border rounded p-1 w-full"
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label htmlFor="adjustedStartTime" className="text-sm">
-                  Start Time:
+                <label
+                  htmlFor="adjustedStartTime"
+                  className="text-xs text-muted-foreground"
+                >
+                  Giờ bắt đầu
                 </label>
                 <input
                   id="adjustedStartTime"
                   type="time"
                   value={adjustedStartTime}
                   onChange={(e) => setAdjustedStartTime(e.target.value)}
-                  className="border rounded p-1 w-full"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
               <div className="space-y-1">
-                <label htmlFor="adjustedEndTime" className="text-sm">
-                  End Time:
+                <label
+                  htmlFor="adjustedEndDate"
+                  className="text-xs text-muted-foreground"
+                >
+                  Ngày kết thúc
+                </label>
+                <input
+                  id="adjustedEndDate"
+                  type="date"
+                  value={adjustedEndDate}
+                  onChange={(e) => setAdjustedEndDate(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="adjustedEndTime"
+                  className="text-xs text-muted-foreground"
+                >
+                  Giờ kết thúc
                 </label>
                 <input
                   id="adjustedEndTime"
                   type="time"
                   value={adjustedEndTime}
                   onChange={(e) => setAdjustedEndTime(e.target.value)}
-                  className="border rounded p-1 w-full"
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
               </div>
             </div>
             <Button
-              variant="default"
+              variant="secondary"
+              size="sm"
               onClick={handleUpdateTime}
               loading={isPending}
             >
-              Update Time
+              Cập nhật giờ
             </Button>
           </div>
 
-          <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:justify-end sm:gap-2 pt-6 border-t mt-6">
+          <div className="mt-6 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-2">
             <Button
               variant="outline"
               onClick={() => setIsMenuModalOpen(true)}
-              className="w-full sm:w-auto"
+              className="h-11 justify-center"
             >
-              Order Snacks & Drinks
+              <Utensils className="w-4 h-4 mr-2" />
+              Đặt đồ ăn / uống
             </Button>
-
             <Button
-              variant="default"
               onClick={() => {
                 handleUpdate(RoomStatus.InUse);
               }}
               loading={isPending}
-              className="w-full sm:w-auto"
+              className="h-11"
             >
               Bắt đầu sử dụng
               {adjustedStartTime && (
@@ -1114,15 +1074,11 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 handleUpdate(RoomStatus.Cancelled);
               }}
               loading={isPending}
-              className="w-full sm:w-auto"
+              className="h-11"
             >
               Hủy booking
             </Button>
-            <Button
-              variant="outline"
-              onClick={onClose}
-              className="w-full sm:w-auto"
-            >
+            <Button variant="ghost" onClick={onClose} className="h-11">
               Đóng
             </Button>
           </div>

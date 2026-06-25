@@ -40,6 +40,7 @@ import {
   useTurnOffAllRooms,
 } from "@/hooks/room-schedule";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsStaff } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import {
   getCoffeeSessionDisplayEnd,
@@ -54,7 +55,6 @@ import {
   CircleXIcon,
   CupSoda,
   DoorOpen,
-  EditIcon,
   Gamepad2,
   Gift,
   ShoppingCart,
@@ -64,7 +64,6 @@ import CoffeeBookedModal from "./CoffeeBookedModal";
 import CoffeeCreateSessionModal from "./CoffeeCreateSessionModal";
 import CoffeeInUseModal from "./CoffeeInUseModal";
 import CoffeeNewOrderLineItemsModal from "./CoffeeNewOrderLineItemsModal";
-import EditRoomTypeModal from "./EditRoomTypeModal";
 import ExtendSessionModal from "./ExtendSessionModal";
 import MobileTimelineView from "./MobileTimelineView";
 import ProcessBookedModal from "./ProcessBookedModal";
@@ -128,7 +127,6 @@ type Modal =
   | "extend"
   | "foodDrink"
   | "bill"
-  | "editRoomType"
   | "orderDetails"
   | "giftDetails"
   | "coffeeCreate"
@@ -206,6 +204,7 @@ const getTimelineNowMarker = (viewDate: Dayjs, now: Dayjs) => {
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isStaff = useIsStaff();
   const {
     supportNotifications,
     orderNotifications,
@@ -248,7 +247,6 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null,
   );
-  const [roomForEdit, setRoomForEdit] = useState<IRoom | null>(null);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [orderRoomId, setOrderRoomId] = useState<string>("");
   const [giftData, setGiftData] = useState<{
@@ -552,7 +550,6 @@ const RoomTimelineTable: React.FC = () => {
     setLockedSchedule(null);
     setBookedSchedule(null);
     setInUseSchedule(null);
-    setRoomForEdit(null);
     setOrderData(null);
     setOrderRoomId("");
     setGiftData(null);
@@ -877,11 +874,6 @@ const RoomTimelineTable: React.FC = () => {
     });
   };
 
-  const handleEditRoomType = (room: IRoom) => {
-    setRoomForEdit(room);
-    setModal("editRoomType");
-  };
-
   return (
     <div className="!p-4 w-full space-y-6">
       <PageHeader
@@ -963,7 +955,6 @@ const RoomTimelineTable: React.FC = () => {
               onResolveRequest={handleResolveRequest}
               onOrderClick={handleOrderClick}
               onGiftClick={handleGiftClick}
-              onEditRoomType={handleEditRoomType}
             />
           ) : (
             /* Desktop View - Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */
@@ -1112,15 +1103,6 @@ const RoomTimelineTable: React.FC = () => {
                           <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
                             {getRoomTypeLabel(room.roomType)}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditRoomType(room);
-                            }}
-                            className="text-gray-400 hover:text-blue-600 transition-colors"
-                          >
-                            <EditIcon className="h-3 w-3" />
-                          </button>
                         </div>
                         <div className="flex items-center gap-2">
                           {hasNotification && (
@@ -1219,7 +1201,15 @@ const RoomTimelineTable: React.FC = () => {
                             />
                           );
                         })}
-                        {roomSchedules?.map((schedule) => {
+                        {roomSchedules
+                          ?.filter((schedule) => {
+                            if (!isStaff) return true;
+                            const status = schedule.status.toLowerCase();
+                            return (
+                              status !== "finished" && status !== "completed"
+                            );
+                          })
+                          .map((schedule) => {
                           const { left, width, bgColor } =
                             getMarkerStyle(schedule);
                           // const isDragging =
@@ -1875,13 +1865,6 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           schedule={inUseSchedule}
           refetchSchedules={refetch}
-        />
-      )}
-      {modal === "editRoomType" && (
-        <EditRoomTypeModal
-          isOpen={true}
-          onClose={closeModal}
-          room={roomForEdit}
         />
       )}
       {modal === "orderDetails" && orderData && (

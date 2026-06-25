@@ -14,11 +14,14 @@ import dayjs from "dayjs";
 import { IRoomSchedule } from "@/@types/Room";
 import { RoomStatus } from "@/constants/enum";
 import { AxiosError } from "axios";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import FoodDrinkModal from "@/components/modules/RoomSchedule/FoodDrinkModal";
 import ExtendSessionModal from "./ExtendSessionModal";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
 import ScheduleMemberSection from "./ScheduleMemberSection";
+import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
+import roomApis from "@/apis/room.apis";
+import { IRoom } from "@/@types/Room";
 import { Clock, Lock, UtensilsCrossed } from "lucide-react";
 
 interface ProcessLockedModalProps {
@@ -45,6 +48,17 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
     isOpen,
     refetchSchedules,
   });
+
+  const { data: roomsData } = useQuery({
+    queryKey: ["rooms"],
+    queryFn: () => roomApis.getRooms(),
+    staleTime: 5 * 60 * 1000,
+    enabled: isOpen,
+  });
+
+  const currentRoom = roomsData?.data?.result?.find(
+    (room: IRoom) => room._id === schedule.roomId,
+  );
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>
@@ -147,6 +161,13 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
               giftItemsById={member.giftItemsById}
               onServeGift={member.serveStreakGift}
               isServingGift={member.isServingGift}
+            />
+
+            <ScheduleRoomTypeSection
+              className="mt-4"
+              schedule={schedule}
+              physicalRoomType={currentRoom?.roomType}
+              onUpdated={refetchSchedules}
             />
 
             <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
