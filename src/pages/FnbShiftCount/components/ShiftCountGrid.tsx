@@ -1,47 +1,90 @@
-import { Fragment, useCallback, useMemo, useRef, type KeyboardEvent } from "react";
+import type { IShiftMeta, ShiftNo } from "@/apis/fnbShiftCount.apis";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type KeyboardEvent,
+} from "react";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import dayjs from "@/lib/dayjs";
 import { cn } from "@/lib/utils";
-import type { FnbShiftCountFormItem } from "../types";
+import { Loader2, Lock, LockOpen } from "lucide-react";
+import type { FnbShiftCountFormItem, ShiftCountField } from "../types";
 import {
   CATEGORY_LABELS,
   CATEGORY_ORDER,
+  SHIFT_LABELS,
+  SHIFT_NUMBERS,
   formatVariance,
   isShortageVariance,
   parseCountInput,
-  previewPhysicalSold,
-  previewVariance,
 } from "../utils";
+
+const SAVE_DEBOUNCE_MS = 1000;
+
+type DayField = "totalStockIn" | "note";
 
 interface ShiftCountGridProps {
   items: FnbShiftCountFormItem[];
-  note: string;
-  editable: boolean;
+  shifts?: Record<ShiftNo, IShiftMeta>;
+  dayItemsEditable: boolean;
   search: string;
   isLoading?: boolean;
-  onItemsChange: (items: FnbShiftCountFormItem[]) => void;
-  onNoteChange: (note: string) => void;
+  savingCellKey?: string | null;
+  lockingShiftNo?: ShiftNo | null;
+  onShiftCellSave: (
+    itemId: string,
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+    value: number,
+  ) => void;
+  onDayFieldSave: (
+    itemId: string,
+    field: DayField,
+    value: number | string,
+  ) => void;
+  onLockShift?: (shiftNo: ShiftNo) => void;
+  onUnlockShift?: (shiftNo: ShiftNo) => void;
 }
 
-type CountField = "openingCount" | "midShiftAddition" | "closingCount";
+type NavigableField =
+  | { type: "shift"; shiftNo: ShiftNo; field: ShiftCountField }
+  | { type: "day"; field: DayField };
 
-const COUNT_COLUMN_LABELS: Record<CountField, string> = {
-  openingCount: "Đầu ca",
-  closingCount: "Kết ca",
-  midShiftAddition: "Thêm giữa ca",
+const inputRefKey = (
+  itemId: string,
+  nav: NavigableField,
+) => {
+  if (nav.type === "shift") {
+    return `${itemId}-s${nav.shiftNo}-${nav.field}`;
+  }
+  return `${itemId}-day-${nav.field}`;
 };
 
-/** Thứ tự cột nhập trên bảng (trước các cột tính toán, trừ thêm giữa ca ở cuối) */
-const PRIMARY_COUNT_COLUMNS = ["openingCount", "closingCount"] as const satisfies readonly CountField[];
+const NAV_ORDER: NavigableField[] = [
+  ...SHIFT_NUMBERS.flatMap((shiftNo) => [
+    { type: "shift" as const, shiftNo, field: "openingCount" as const },
+    { type: "shift" as const, shiftNo, field: "closingCount" as const },
+  ]),
+  { type: "day", field: "totalStockIn" },
+  { type: "day", field: "note" },
+];
 
-/** Thứ tự Enter giữa các ô nhập */
-const INPUT_NAV_ORDER = ["openingCount", "closingCount", "midShiftAddition"] as const satisfies readonly CountField[];
-
-/** Thứ tự trái/phải trên cùng một dòng */
-const ARROW_COLUMN_ORDER = INPUT_NAV_ORDER;
-
-const inputRefKey = (itemId: string, field: CountField) => `${itemId}-${field}`;
+const navEquals = (a: NavigableField, b: NavigableField) => {
+  if (a.type !== b.type) return false;
+  if (a.type === "day") return b.type === "day" && a.field === b.field;
+  return b.type === "shift" && a.shiftNo === b.shiftNo && a.field === b.field;
+};
 
 const shouldNavigateHorizontally = (
   input: HTMLInputElement,
@@ -56,14 +99,81 @@ const shouldNavigateHorizontally = (
 
 const ShiftCountGrid = ({
   items,
-  note,
-  editable,
+  shifts,
+  dayItemsEditable,
   search,
   isLoading,
-  onItemsChange,
-  onNoteChange,
+  savingCellKey,
+  lockingShiftNo,
+  onShiftCellSave,
+  onDayFieldSave,
+  onLockShift,
+  onUnlockShift,
 }: ShiftCountGridProps) => {
   const inputRefs = useRef<Record<string, HTMLInputElement | null>>({});
+  const debounceTimersRef = useRef<Record<string, ReturnType<typeof setTimeout>>>(
+    {},
+  );
+  const draftValuesRef = useRef<Record<string, string>>({});
+  const itemsRef = useRef(items);
+  const shiftsRef = useRef(shifts);
+  const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+
+  itemsRef.current = items;
+  draftValuesRef.current = draftValues;
+  shiftsRef.current = shifts;
+
+  useEffect(() => {
+    const timers = debounceTimersRef.current;
+    return () => {
+      Object.values(timers).forEach(clearTimeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    setDraftValues((prev) => {
+      if (Object.keys(prev).length === 0) return prev;
+
+      const next = { ...prev };
+      let changed = false;
+
+      for (const item of items) {
+        for (const shiftNo of SHIFT_NUMBERS) {
+          for (const field of ["openingCount", "closingCount"] as const) {
+            const key = inputRefKey(item.itemId, {
+              type: "shift",
+              shiftNo,
+              field,
+            });
+            if (!(key in next)) continue;
+            const parsed = parseCountInput(next[key]);
+            const saved = item.shifts[shiftNo][field];
+            if (parsed === saved) {
+              delete next[key];
+              changed = true;
+            }
+          }
+        }
+
+        for (const field of ["totalStockIn", "note"] as const) {
+          const key = inputRefKey(item.itemId, { type: "day", field });
+          if (!(key in next)) continue;
+          if (field === "totalStockIn") {
+            const parsed = parseCountInput(next[key]);
+            if (parsed === item.totalStockIn) {
+              delete next[key];
+              changed = true;
+            }
+          } else if (next[key].trim() === item.note) {
+            delete next[key];
+            changed = true;
+          }
+        }
+      }
+
+      return changed ? next : prev;
+    });
+  }, [items]);
 
   const filteredItems = useMemo(() => {
     const keyword = search.trim().toLowerCase();
@@ -81,77 +191,183 @@ const ShiftCountGrid = ({
     })).filter((group) => group.items.length > 0);
   }, [filteredItems]);
 
-  const updateItem = useCallback(
-    (
-      itemId: string,
-      field: CountField,
-      value: number | "",
-    ) => {
-      onItemsChange(
-        items.map((item) => {
-          if (item.itemId !== itemId) return item;
-          const nextItem = { ...item, [field]: value };
-          const physicalSold = previewPhysicalSold(
-            nextItem.openingCount,
-            nextItem.closingCount,
-            nextItem.midShiftAddition,
-          );
-          const variance = previewVariance(
-            nextItem.openingCount,
-            nextItem.closingCount,
-            nextItem.systemSold,
-            nextItem.midShiftAddition,
-          );
-          return {
-            ...nextItem,
-            physicalSold,
-            variance,
-          };
-        }),
-      );
-    },
-    [items, onItemsChange],
-  );
-
   const navigableRows = useMemo(
-    () =>
-      groupedItems
-        .flatMap((group) => group.items)
-        .filter((item) => !item.isParent),
+    () => groupedItems.flatMap((group) => group.items),
     [groupedItems],
   );
 
-  const focusCountInput = useCallback((itemId: string, field: CountField) => {
-    const input = inputRefs.current[inputRefKey(itemId, field)];
+  const getDraftKey = (itemId: string, nav: NavigableField) =>
+    inputRefKey(itemId, nav);
+
+  const getShiftDisplayValue = (
+    item: FnbShiftCountFormItem,
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+  ) => {
+    const key = getDraftKey(item.itemId, { type: "shift", shiftNo, field });
+    if (key in draftValues) return draftValues[key];
+    const value = item.shifts[shiftNo][field];
+    return value === "" ? "" : String(value);
+  };
+
+  const getDayDisplayValue = (
+    item: FnbShiftCountFormItem,
+    field: DayField,
+  ) => {
+    const key = getDraftKey(item.itemId, { type: "day", field });
+    if (key in draftValues) return draftValues[key];
+    if (field === "totalStockIn") {
+      return item.totalStockIn === "" ? "" : String(item.totalStockIn);
+    }
+    return item.note;
+  };
+
+  const getEffectiveOpeningCount = (
+    item: FnbShiftCountFormItem,
+    shiftNo: ShiftNo,
+    drafts: Record<string, string>,
+  ): number | "" => {
+    const openingKey = inputRefKey(item.itemId, {
+      type: "shift",
+      shiftNo,
+      field: "openingCount",
+    });
+    if (openingKey in drafts) {
+      const parsed = parseCountInput(drafts[openingKey]);
+      if (parsed !== "") return parsed;
+    }
+    return item.shifts[shiftNo].openingCount;
+  };
+
+  const scheduleDebounced = (key: string, commit: () => void) => {
+    if (debounceTimersRef.current[key]) {
+      clearTimeout(debounceTimersRef.current[key]);
+    }
+    debounceTimersRef.current[key] = setTimeout(() => {
+      delete debounceTimersRef.current[key];
+      commit();
+    }, SAVE_DEBOUNCE_MS);
+  };
+
+  const commitShiftSave = (
+    itemId: string,
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+  ) => {
+    const key = inputRefKey(itemId, { type: "shift", shiftNo, field });
+    const raw = draftValuesRef.current[key];
+    if (raw === undefined) return;
+
+    const shiftMeta = shiftsRef.current?.[shiftNo];
+    if (shiftMeta?.locked || shiftMeta?.editable === false) return;
+
+    const item = itemsRef.current.find((row) => row.itemId === itemId);
+    if (!item) return;
+
+    const parsed = parseCountInput(raw);
+    if (parsed === "") return;
+
+    if (
+      field === "closingCount" &&
+      getEffectiveOpeningCount(item, shiftNo, draftValuesRef.current) === ""
+    ) {
+      return;
+    }
+
+    const saved = item.shifts[shiftNo][field];
+    if (saved === parsed) return;
+
+    onShiftCellSave(itemId, shiftNo, field, parsed);
+  };
+
+  const commitDaySave = (itemId: string, field: DayField) => {
+    const key = inputRefKey(itemId, { type: "day", field });
+    const raw = draftValuesRef.current[key];
+    if (raw === undefined) return;
+
+    const item = itemsRef.current.find((row) => row.itemId === itemId);
+    if (!item) return;
+
+    if (field === "totalStockIn") {
+      const parsed = parseCountInput(raw);
+      if (parsed === "") {
+        if (item.totalStockIn !== "") {
+          onDayFieldSave(itemId, field, 0);
+        }
+        return;
+      }
+      if (item.totalStockIn === parsed) return;
+      onDayFieldSave(itemId, field, parsed);
+      return;
+    }
+
+    const trimmed = raw.trim();
+    if (trimmed === item.note) return;
+    onDayFieldSave(itemId, field, trimmed);
+  };
+
+  const handleShiftChange = (
+    item: FnbShiftCountFormItem,
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+    value: string,
+  ) => {
+    const key = inputRefKey(item.itemId, { type: "shift", shiftNo, field });
+    setDraftValues((prev) => ({ ...prev, [key]: value }));
+    scheduleDebounced(key, () =>
+      commitShiftSave(item.itemId, shiftNo, field),
+    );
+  };
+
+  const handleDayChange = (
+    item: FnbShiftCountFormItem,
+    field: DayField,
+    value: string,
+  ) => {
+    const key = inputRefKey(item.itemId, { type: "day", field });
+    setDraftValues((prev) => ({ ...prev, [key]: value }));
+    scheduleDebounced(key, () => commitDaySave(item.itemId, field));
+  };
+
+  const focusInput = useCallback((itemId: string, nav: NavigableField) => {
+    const input = inputRefs.current[inputRefKey(itemId, nav)];
     if (!input) return;
     input.focus();
     input.select();
   }, []);
 
   const focusNextInput = useCallback(
-    (itemId: string, field: CountField) => {
+    (itemId: string, currentNav: NavigableField) => {
       const currentIndex = navigableRows.findIndex((item) => item.itemId === itemId);
-      const columnIndex = INPUT_NAV_ORDER.indexOf(field);
+      const columnIndex = NAV_ORDER.findIndex((nav) =>
+        navEquals(nav, currentNav),
+      );
 
       if (currentIndex < 0 || columnIndex < 0) return;
 
       const nextColumnIndex = columnIndex + 1;
-      if (nextColumnIndex < INPUT_NAV_ORDER.length) {
-        focusCountInput(itemId, INPUT_NAV_ORDER[nextColumnIndex]);
+      if (nextColumnIndex < NAV_ORDER.length) {
+        focusInput(itemId, NAV_ORDER[nextColumnIndex]);
         return;
       }
 
       const nextItem = navigableRows[currentIndex + 1];
       if (!nextItem) return;
-      focusCountInput(nextItem.itemId, INPUT_NAV_ORDER[0]);
+      focusInput(nextItem.itemId, NAV_ORDER[0]);
     },
-    [focusCountInput, navigableRows],
+    [focusInput, navigableRows],
   );
 
   const focusAdjacentInput = useCallback(
-    (itemId: string, field: CountField, direction: "up" | "down" | "left" | "right") => {
+    (
+      itemId: string,
+      currentNav: NavigableField,
+      direction: "up" | "down" | "left" | "right",
+    ) => {
       const rowIndex = navigableRows.findIndex((item) => item.itemId === itemId);
-      const colIndex = ARROW_COLUMN_ORDER.indexOf(field);
+      const colIndex = NAV_ORDER.findIndex((nav) =>
+        navEquals(nav, currentNav),
+      );
       if (rowIndex < 0 || colIndex < 0) return false;
 
       let nextRow = rowIndex;
@@ -173,23 +389,23 @@ const ShiftCountGrid = ({
       }
 
       if (nextRow < 0 || nextRow >= navigableRows.length) return false;
-      if (nextCol < 0 || nextCol >= ARROW_COLUMN_ORDER.length) return false;
+      if (nextCol < 0 || nextCol >= NAV_ORDER.length) return false;
 
-      focusCountInput(navigableRows[nextRow].itemId, ARROW_COLUMN_ORDER[nextCol]);
+      focusInput(navigableRows[nextRow].itemId, NAV_ORDER[nextCol]);
       return true;
     },
-    [focusCountInput, navigableRows],
+    [focusInput, navigableRows],
   );
 
   const handleInputKeyDown = useCallback(
     (
       event: KeyboardEvent<HTMLInputElement>,
       itemId: string,
-      field: CountField,
+      nav: NavigableField,
     ) => {
       if (event.key === "Enter") {
         event.preventDefault();
-        focusNextInput(itemId, field);
+        focusNextInput(itemId, nav);
         return;
       }
 
@@ -210,53 +426,224 @@ const ShiftCountGrid = ({
         return;
       }
 
-      if (focusAdjacentInput(itemId, field, direction)) {
+      if (focusAdjacentInput(itemId, nav, direction)) {
         event.preventDefault();
       }
     },
     [focusAdjacentInput, focusNextInput],
   );
 
-  const renderCountCell = (
+  const isShiftEditable = (shiftNo: ShiftNo) =>
+    !shifts?.[shiftNo]?.locked && (shifts?.[shiftNo]?.editable ?? false);
+
+  const renderShiftCell = (
     item: FnbShiftCountFormItem,
-    field: CountField,
-    isParent: boolean,
-  ) => (
-    <td
-      key={`${item.itemId}-${field}`}
-      className={cn(
-        "border-b border-r p-0",
-        field === "midShiftAddition" && "border-r-0",
-        isParent ? "bg-muted/20" : "bg-primary/[0.03]",
-      )}
-    >
-      {isParent ? (
-        <div className="flex h-10 items-center justify-center text-muted-foreground">
-          —
-        </div>
-      ) : editable ? (
-        <Input
-          ref={(element) => {
-            inputRefs.current[inputRefKey(item.itemId, field)] = element;
-          }}
-          type="number"
-          min={0}
-          inputMode="numeric"
-          value={item[field] === "" ? "" : item[field]}
-          onChange={(event) =>
-            updateItem(item.itemId, field, parseCountInput(event.target.value))
-          }
-          onKeyDown={(event) => handleInputKeyDown(event, item.itemId, field)}
-          className="h-10 rounded-none border-0 bg-transparent text-center shadow-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary"
-          placeholder="0"
-        />
-      ) : (
-        <div className="flex h-10 items-center justify-center">
-          {item[field] === "" ? "—" : item[field]}
-        </div>
-      )}
-    </td>
-  );
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+    isLastInShift: boolean,
+  ) => {
+    const nav: NavigableField = { type: "shift", shiftNo, field };
+    const cellKey = inputRefKey(item.itemId, nav);
+    const isSaving = savingCellKey === cellKey;
+    const isLocked = shifts?.[shiftNo]?.locked;
+    const shiftEditable = isShiftEditable(shiftNo);
+    const openingMissing =
+      field === "closingCount" &&
+      getEffectiveOpeningCount(item, shiftNo, draftValues) === "";
+
+    return (
+      <td
+        key={cellKey}
+        className={cn(
+          "border-b border-r p-0",
+          isLastInShift && "border-r-primary/20",
+          isLocked ? "bg-muted/30" : "bg-primary/[0.03]",
+        )}
+      >
+        {shiftEditable && !openingMissing ? (
+          <Input
+            ref={(element) => {
+              inputRefs.current[cellKey] = element;
+            }}
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={getShiftDisplayValue(item, shiftNo, field)}
+            onChange={(event) =>
+              handleShiftChange(item, shiftNo, field, event.target.value)
+            }
+            onKeyDown={(event) => handleInputKeyDown(event, item.itemId, nav)}
+            className={cn(
+              "h-10 rounded-none border-0 bg-transparent text-center shadow-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+              isSaving && "opacity-60",
+            )}
+            placeholder="0"
+            disabled={isSaving}
+          />
+        ) : (
+          <div
+            className={cn(
+              "flex h-10 items-center justify-center text-muted-foreground",
+              openingMissing && shiftEditable && "text-xs",
+            )}
+            title={
+              isLocked
+                ? "Ca đã khóa"
+                : openingMissing && shiftEditable
+                  ? "Nhập mở ca trước khi nhập kết ca"
+                  : undefined
+            }
+          >
+            {openingMissing && shiftEditable
+              ? "—"
+              : getShiftDisplayValue(item, shiftNo, field) || "—"}
+          </div>
+        )}
+      </td>
+    );
+  };
+
+  const renderDayCell = (
+    item: FnbShiftCountFormItem,
+    field: DayField,
+    className?: string,
+  ) => {
+    const nav: NavigableField = { type: "day", field };
+    const cellKey = inputRefKey(item.itemId, nav);
+    const isSaving = savingCellKey === cellKey;
+
+    if (field === "note") {
+      return (
+        <td
+          key={cellKey}
+          className={cn("border-b border-r p-0", className)}
+        >
+          {dayItemsEditable ? (
+            <Input
+              ref={(element) => {
+                inputRefs.current[cellKey] = element;
+              }}
+              value={getDayDisplayValue(item, field)}
+              onChange={(event) =>
+                handleDayChange(item, field, event.target.value)
+              }
+              onKeyDown={(event) =>
+                handleInputKeyDown(event, item.itemId, nav)
+              }
+              className={cn(
+                "h-10 rounded-none border-0 bg-transparent px-2 shadow-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+                isSaving && "opacity-60",
+              )}
+              placeholder="Ghi chú..."
+              disabled={isSaving}
+            />
+          ) : (
+            <div className="flex h-10 items-center px-2 text-sm">
+              {item.note || "—"}
+            </div>
+          )}
+        </td>
+      );
+    }
+
+    return (
+      <td key={cellKey} className={cn("border-b border-r p-0 bg-amber-500/5", className)}>
+        {dayItemsEditable ? (
+          <Input
+            ref={(element) => {
+              inputRefs.current[cellKey] = element;
+            }}
+            type="number"
+            min={0}
+            inputMode="numeric"
+            value={getDayDisplayValue(item, field)}
+            onChange={(event) =>
+              handleDayChange(item, field, event.target.value)
+            }
+            onKeyDown={(event) => handleInputKeyDown(event, item.itemId, nav)}
+            className={cn(
+              "h-10 rounded-none border-0 bg-transparent text-center shadow-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary",
+              isSaving && "opacity-60",
+            )}
+            placeholder="0"
+            disabled={isSaving}
+          />
+        ) : (
+          <div className="flex h-10 items-center justify-center">
+            {item.totalStockIn === "" ? "—" : item.totalStockIn}
+          </div>
+        )}
+      </td>
+    );
+  };
+
+  const renderShiftLockControl = (shiftNo: ShiftNo) => {
+    const shift = shifts?.[shiftNo];
+    if (!shift) return null;
+
+    const isLocked = shift.locked;
+    const isClosed = shift.status === "closed";
+    const isProcessing = lockingShiftNo === shiftNo;
+
+    const statusText = isLocked
+      ? `Đã khóa${shift.lockedAt ? ` lúc ${dayjs(shift.lockedAt).format("HH:mm DD/MM")}` : ""}`
+      : isClosed
+        ? "Đã kết ca"
+        : "Đang mở ca";
+
+    let tooltip = statusText;
+    let icon = <Lock className="h-3.5 w-3.5" />;
+    let clickable = false;
+    let onClick: (() => void) | undefined;
+
+    if (isLocked) {
+      if (shift.canUnlock && onUnlockShift) {
+        tooltip = `${statusText} · Bấm để mở khóa`;
+        icon = <LockOpen className="h-3.5 w-3.5" />;
+        clickable = true;
+        onClick = () => onUnlockShift(shiftNo);
+      } else {
+        tooltip = statusText;
+        icon = <Lock className="h-3.5 w-3.5" />;
+      }
+    } else if (shift.canLock && onLockShift) {
+      tooltip = `${statusText} · Bấm để khóa ca`;
+      icon = <LockOpen className="h-3.5 w-3.5" />;
+      clickable = true;
+      onClick = () => onLockShift(shiftNo);
+    } else {
+      tooltip = isClosed
+        ? "Đã kết ca · Chưa đủ điều kiện khóa"
+        : "Đang mở ca · Cần nhập kết ca trước khi khóa";
+      icon = <Lock className="h-3.5 w-3.5 opacity-50" />;
+    }
+
+    return (
+      <Tooltip>
+        <TooltipTrigger asChild>
+          <button
+            type="button"
+            disabled={!clickable || isProcessing}
+            onClick={onClick}
+            className={cn(
+              "inline-flex h-6 w-6 items-center justify-center rounded transition-colors",
+              clickable
+                ? "hover:bg-background/80 cursor-pointer"
+                : "cursor-default",
+            )}
+            aria-label={tooltip}
+          >
+            {isProcessing ? (
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+            ) : (
+              icon
+            )}
+          </button>
+        </TooltipTrigger>
+        <TooltipContent>{tooltip}</TooltipContent>
+      </Tooltip>
+    );
+  };
 
   let rowNumber = 0;
 
@@ -277,37 +664,80 @@ const ShiftCountGrid = ({
   }
 
   return (
+    <TooltipProvider delayDuration={150}>
     <div className="space-y-4">
       <div className="max-h-[min(70vh,720px)] overflow-auto rounded-md border shadow-sm">
-        <table className="w-full min-w-[980px] border-collapse text-sm">
+        <table className="w-full min-w-[1280px] border-collapse text-sm">
           <thead>
             <tr className="bg-muted">
-              <th className="sticky left-0 top-0 z-30 w-12 border-b border-r bg-muted px-2 py-2 text-center font-semibold shadow-[1px_1px_0_0_hsl(var(--border))]">
+              <th
+                rowSpan={2}
+                className="sticky left-0 top-0 z-30 w-12 border-b border-r bg-muted px-2 py-2 text-center font-semibold shadow-[1px_1px_0_0_hsl(var(--border))]"
+              >
                 #
               </th>
-              <th className="sticky left-12 top-0 z-30 min-w-[220px] border-b border-r bg-muted px-3 py-2 text-left font-semibold shadow-[1px_1px_0_0_hsl(var(--border))]">
+              <th
+                rowSpan={2}
+                className="sticky left-12 top-0 z-30 min-w-[200px] border-b border-r bg-muted px-3 py-2 text-left font-semibold shadow-[1px_1px_0_0_hsl(var(--border))]"
+              >
                 Tên món
               </th>
-              {PRIMARY_COUNT_COLUMNS.map((field) => (
-                <th
-                  key={field}
-                  className="sticky top-0 z-20 min-w-[110px] border-b border-r bg-primary/10 px-2 py-2 text-center font-semibold text-primary shadow-[0_1px_0_0_hsl(var(--border))]"
-                >
-                  {COUNT_COLUMN_LABELS[field]}
-                </th>
-              ))}
-              <th className="sticky top-0 z-20 min-w-[100px] border-b border-r bg-muted px-3 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]">
-                Bán thực tế
+              {SHIFT_NUMBERS.map((shiftNo) => {
+                const isLocked = shifts?.[shiftNo]?.locked;
+                return (
+                  <th
+                    key={`group-${shiftNo}`}
+                    colSpan={2}
+                    className={cn(
+                      "sticky top-0 z-20 border-b border-r border-r-primary/20 px-2 py-1.5 font-semibold shadow-[0_1px_0_0_hsl(var(--border))]",
+                      isLocked
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-primary/10 text-primary",
+                    )}
+                  >
+                    <div className="flex items-center justify-center gap-1.5">
+                      <span>{SHIFT_LABELS[shiftNo]}</span>
+                      {renderShiftLockControl(shiftNo)}
+                    </div>
+                  </th>
+                );
+              })}
+              <th
+                rowSpan={2}
+                className="sticky top-0 z-20 min-w-[90px] border-b border-r bg-amber-500/10 px-2 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]"
+              >
+                Nhập thêm
               </th>
-              <th className="sticky top-0 z-20 min-w-[100px] border-b border-r bg-muted px-3 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]">
-                Bán hệ thống
+              <th
+                rowSpan={2}
+                className="sticky top-0 z-20 min-w-[80px] border-b border-r bg-muted px-2 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]"
+              >
+                Hệ thống
               </th>
-              <th className="sticky top-0 z-20 min-w-[110px] border-b border-r bg-muted px-3 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]">
+              <th
+                rowSpan={2}
+                className="sticky top-0 z-20 min-w-[90px] border-b border-r bg-muted px-2 py-2 text-center font-semibold shadow-[0_1px_0_0_hsl(var(--border))]"
+              >
                 Chênh lệch
               </th>
-              <th className="sticky top-0 z-20 min-w-[110px] border-b bg-primary/10 px-2 py-2 text-center font-semibold text-primary shadow-[0_1px_0_0_hsl(var(--border))]">
-                {COUNT_COLUMN_LABELS.midShiftAddition}
+              <th
+                rowSpan={2}
+                className="sticky top-0 z-20 min-w-[140px] border-b bg-muted px-2 py-2 text-left font-semibold shadow-[0_1px_0_0_hsl(var(--border))]"
+              >
+                Note
               </th>
+            </tr>
+            <tr className="bg-muted">
+              {SHIFT_NUMBERS.map((shiftNo) => (
+                <Fragment key={`sub-${shiftNo}`}>
+                  <th className="sticky top-[41px] z-20 min-w-[72px] border-b border-r bg-primary/5 px-1 py-1.5 text-center text-xs font-medium text-primary shadow-[0_1px_0_0_hsl(var(--border))]">
+                    Mở ca
+                  </th>
+                  <th className="sticky top-[41px] z-20 min-w-[72px] border-b border-r border-r-primary/20 bg-primary/5 px-1 py-1.5 text-center text-xs font-medium text-primary shadow-[0_1px_0_0_hsl(var(--border))]">
+                    Kết ca
+                  </th>
+                </Fragment>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -315,88 +745,45 @@ const ShiftCountGrid = ({
               <Fragment key={group.category}>
                 <tr className="bg-accent/40">
                   <td
-                    colSpan={8}
+                    colSpan={12}
                     className="sticky left-0 z-10 border-b px-3 py-2 text-left text-xs font-bold uppercase tracking-wide"
                   >
                     {group.label}
                   </td>
                 </tr>
                 {group.items.map((item) => {
-                  const isParent = !!item.isParent;
-                  if (!isParent) rowNumber += 1;
-
-                  const physicalSold = isParent
-                    ? undefined
-                    : item.physicalSold ??
-                      previewPhysicalSold(
-                        item.openingCount,
-                        item.closingCount,
-                        item.midShiftAddition,
-                      );
-                  const variance = isParent
-                    ? undefined
-                    : item.variance ??
-                      previewVariance(
-                        item.openingCount,
-                        item.closingCount,
-                        item.systemSold,
-                        item.midShiftAddition,
-                      );
-                  const isShortage = isShortageVariance(variance);
+                  rowNumber += 1;
+                  const isShortage = isShortageVariance(item.variance);
 
                   return (
-                    <tr
-                      key={item.itemId}
-                      className={cn(
-                        "group hover:bg-muted/30",
-                        isParent && "bg-muted/40 hover:bg-muted/50",
-                      )}
-                    >
+                    <tr key={item.itemId} className="group hover:bg-muted/30">
                       <td className="sticky left-0 z-10 border-b border-r bg-background px-2 py-0 text-center text-muted-foreground group-hover:bg-muted/30">
-                        {isParent ? "" : rowNumber}
+                        {rowNumber}
                       </td>
-                      <td
-                        className={cn(
-                          "sticky left-12 z-10 border-b border-r bg-background px-3 py-2 group-hover:bg-muted/30",
-                          isParent
-                            ? "font-semibold"
-                            : item.isVariant
-                              ? "font-medium pl-6"
-                              : "font-medium",
-                        )}
-                      >
+                      <td className="sticky left-12 z-10 border-b border-r bg-background px-3 py-2 font-medium group-hover:bg-muted/30">
                         {item.itemName}
                       </td>
-                      {PRIMARY_COUNT_COLUMNS.map((field) =>
-                        renderCountCell(item, field, isParent),
-                      )}
-                      <td className="border-b border-r px-3 py-2 text-center font-medium">
-                        {isParent || physicalSold === undefined
-                          ? "—"
-                          : physicalSold}
+                      {SHIFT_NUMBERS.map((shiftNo) => (
+                        <Fragment key={`${item.itemId}-${shiftNo}`}>
+                          {renderShiftCell(item, shiftNo, "openingCount", false)}
+                          {renderShiftCell(item, shiftNo, "closingCount", true)}
+                        </Fragment>
+                      ))}
+                      {renderDayCell(item, "totalStockIn")}
+                      <td className="border-b border-r px-2 py-2 text-center text-muted-foreground">
+                        {item.systemSold}
                       </td>
                       <td
                         className={cn(
-                          "border-b border-r px-3 py-2 text-center",
-                          !isParent && item.systemSold > 0
-                            ? "font-semibold text-foreground"
-                            : "text-muted-foreground",
+                          "border-b border-r px-2 py-2 text-center font-semibold",
+                          isShortage && "bg-destructive/15 text-destructive",
                         )}
                       >
-                        {isParent ? "—" : item.systemSold}
-                      </td>
-                      <td
-                        className={cn(
-                          "border-b border-r px-3 py-2 text-center font-semibold",
-                          isShortage &&
-                            "bg-destructive/15 text-destructive",
-                        )}
-                      >
-                        {isParent || variance === undefined
+                        {item.variance === undefined
                           ? "—"
-                          : formatVariance(variance)}
+                          : formatVariance(item.variance)}
                       </td>
-                      {renderCountCell(item, "midShiftAddition", isParent)}
+                      {renderDayCell(item, "note")}
                     </tr>
                   );
                 })}
@@ -406,24 +793,15 @@ const ShiftCountGrid = ({
         </table>
       </div>
 
-      <div className="space-y-2">
-        <label className="text-sm font-medium">Ghi chú</label>
-        <Textarea
-          value={note}
-          onChange={(event) => onNoteChange(event.target.value)}
-          placeholder="Ghi chú thêm về ca làm việc..."
-          disabled={!editable}
-          rows={3}
-        />
-      </div>
-
-      {editable && (
+      {dayItemsEditable && (
         <p className="text-xs text-muted-foreground">
-          Mẹo: Dùng phím mũi tên hoặc Enter để chuyển giữa các ô. Ô chênh lệch
-          âm (màu đỏ) nghĩa là thiếu bill trên hệ thống.
+          Mẹo: Dùng phím mũi tên hoặc Enter để chuyển giữa các ô. Dữ liệu tự
+          lưu sau khoảng 1 giây ngừng nhập. Chênh lệch âm (đỏ) = hụt tồn. Cột
+          Nhập thêm chỉ ghi nhận, không ảnh hưởng chênh lệch.
         </p>
       )}
     </div>
+    </TooltipProvider>
   );
 };
 

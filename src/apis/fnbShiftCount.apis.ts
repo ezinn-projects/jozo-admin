@@ -1,20 +1,49 @@
 import http from "@/utils/http";
 
+export type ShiftNo = 1 | 2 | 3;
 export type FnbShiftCountCategory = "drink" | "snack";
 
-export interface IFnbShiftCountLine {
+export interface IFnbShiftCountTemplateItem {
+  itemId: string;
+  name: string;
+  category: FnbShiftCountCategory;
+  currentInventory: number;
+}
+
+export interface IShiftCell {
+  openingCount?: number;
+  closingCount?: number;
+  physicalSold?: number;
+  handoverGap?: number;
+}
+
+export interface IMatrixItem {
   itemId: string;
   itemName: string;
   category: FnbShiftCountCategory;
-  openingCount?: number;
-  midShiftAddition?: number;
-  closingCount?: number;
+  shifts: Record<ShiftNo, IShiftCell>;
+  totalStockIn: number;
+  systemSold: number;
+  expectedClosing?: number;
+  latestClosing: number;
+  latestClosingShiftNo: 0 | ShiftNo;
+  hasLatestClosing: boolean;
+  variance?: number;
+  note?: string;
 }
 
-export interface IFnbShiftCountReportItem extends IFnbShiftCountLine {
-  physicalSold?: number;
-  systemSold: number;
-  variance?: number;
+export interface IShiftMeta {
+  shiftNo: ShiftNo;
+  status: "open" | "closed";
+  locked?: boolean;
+  lockedAt?: string | null;
+  editable?: boolean;
+  canLock?: boolean;
+  canUnlock?: boolean;
+  note?: string | null;
+  _id?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface IFnbShiftCountSummary {
@@ -27,57 +56,103 @@ export interface IFnbShiftCountSummary {
 }
 
 export interface IFnbShiftCountResponse {
-  _id?: string;
-  staffId: string;
-  staffName?: string;
   businessDate: string;
-  items: IFnbShiftCountReportItem[];
-  note?: string;
-  summary: IFnbShiftCountSummary;
   editable: boolean;
-  createdAt?: string;
-  updatedAt?: string;
+  shifts: Record<ShiftNo, IShiftMeta>;
+  items: IMatrixItem[];
+  summary: IFnbShiftCountSummary;
 }
 
-export interface IFnbShiftCountSaveItem {
+export interface IFnbShiftCountSaveShiftItem {
   itemId: string;
   openingCount?: number;
-  midShiftAddition?: number;
   closingCount?: number;
 }
 
-export interface IFnbShiftCountSaveBody {
-  items: IFnbShiftCountSaveItem[];
+export interface IFnbShiftCountSaveShiftBody {
+  items: IFnbShiftCountSaveShiftItem[];
   note?: string;
 }
 
+export interface IFnbShiftCountSaveDayItem {
+  itemId: string;
+  totalStockIn?: number;
+  note?: string;
+}
+
+export interface IFnbShiftCountSaveDayItemsBody {
+  items: IFnbShiftCountSaveDayItem[];
+}
+
 export interface IFnbShiftCountGetParams {
-  date: string;
-  staffId?: string;
+  date?: string;
 }
 
 export interface IFnbShiftCountHistoryParams {
   from?: string;
   to?: string;
-  staffId?: string;
+  page?: number;
+  limit?: number;
+}
+
+export interface IFnbShiftCountHistoryResult {
+  items: IFnbShiftCountResponse[];
+  total: number;
+  page: number;
+  limit: number;
 }
 
 const CONTROLLER = "/fnb-shift-counts";
 
 const fnbShiftCountApis = {
   getItemsTemplate: () =>
-    http.get<HTTPResponse<IFnbShiftCountLine[]>>(`${CONTROLLER}/items-template`),
+    http.get<HTTPResponse<IFnbShiftCountTemplateItem[]>>(
+      `${CONTROLLER}/items-template`,
+    ),
 
-  getShiftCount: (params: IFnbShiftCountGetParams) =>
+  getShiftCount: (params?: IFnbShiftCountGetParams) =>
     http.get<HTTPResponse<IFnbShiftCountResponse>>(CONTROLLER, { params }),
 
-  saveShiftCount: (params: { date: string; staffId?: string }, body: IFnbShiftCountSaveBody) =>
-    http.put<HTTPResponse<IFnbShiftCountResponse>>(CONTROLLER, body, { params }),
+  saveShift: (
+    shiftNo: ShiftNo,
+    body: IFnbShiftCountSaveShiftBody,
+    params?: IFnbShiftCountGetParams,
+  ) =>
+    http.put<HTTPResponse<IFnbShiftCountResponse>>(
+      `${CONTROLLER}/${shiftNo}`,
+      body,
+      { params },
+    ),
+
+  saveDayItems: (
+    body: IFnbShiftCountSaveDayItemsBody,
+    params?: IFnbShiftCountGetParams,
+  ) =>
+    http.put<HTTPResponse<IFnbShiftCountResponse>>(
+      `${CONTROLLER}/day-items`,
+      body,
+      { params },
+    ),
+
+  lockShift: (shiftNo: ShiftNo, params?: IFnbShiftCountGetParams) =>
+    http.post<HTTPResponse<IFnbShiftCountResponse>>(
+      `${CONTROLLER}/${shiftNo}/lock`,
+      undefined,
+      { params },
+    ),
+
+  unlockShift: (shiftNo: ShiftNo, params?: IFnbShiftCountGetParams) =>
+    http.post<HTTPResponse<IFnbShiftCountResponse>>(
+      `${CONTROLLER}/${shiftNo}/unlock`,
+      undefined,
+      { params },
+    ),
 
   getHistory: (params?: IFnbShiftCountHistoryParams) =>
-    http.get<HTTPResponse<IFnbShiftCountResponse[]>>(`${CONTROLLER}/history`, {
-      params,
-    }),
+    http.get<HTTPResponse<IFnbShiftCountHistoryResult>>(
+      `${CONTROLLER}/history`,
+      { params },
+    ),
 };
 
 export default fnbShiftCountApis;

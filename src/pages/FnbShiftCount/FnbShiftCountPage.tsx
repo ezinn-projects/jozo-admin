@@ -1,141 +1,175 @@
 import { PageHeader } from "@/components/shared";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useMenuItems } from "@/hooks/use-menu-items";
 import { useIsAdmin } from "@/hooks/usePermission";
 import dayjs from "@/lib/dayjs";
-import { ClipboardList, Loader2, Save } from "lucide-react";
+import { ClipboardList } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import ShiftCountFilters from "./components/ShiftCountFilters";
 import ShiftCountGrid from "./components/ShiftCountGrid";
 import ShiftCountHistoryTable from "./components/ShiftCountHistoryTable";
 import ShiftCountSummary from "./components/ShiftCountSummary";
-import { useFnbShiftCount } from "./hooks/useFnbShiftCount";
+import {
+  useFnbShiftCount,
+  useFnbShiftCountItemsTemplate,
+} from "./hooks/useFnbShiftCount";
 import { useFnbShiftCountHistory } from "./hooks/useFnbShiftCountHistory";
+import {
+  useFnbShiftCountLockShift,
+  useFnbShiftCountSaveDayItems,
+  useFnbShiftCountSaveShift,
+  useFnbShiftCountUnlockShift,
+} from "./hooks/useFnbShiftCountMutations";
 import { useFnbShiftCountQueryConfig } from "./hooks/useFnbShiftCountQueryConfig";
-import { useFnbShiftCountUpsert } from "./hooks/useFnbShiftCountUpsert";
-import type { FnbShiftCountFormItem } from "./types";
-import { mergeMenuWithShiftCount } from "./utils";
+import type { FnbShiftCountFormItem, ShiftCountField } from "./types";
+import type { ShiftNo } from "@/apis/fnbShiftCount.apis";
+import { formItemsFromResponse } from "./utils";
 
 const FnbShiftCountPage = () => {
   const isAdmin = useIsAdmin();
   const { queryConfig, setQueryConfig } = useFnbShiftCountQueryConfig();
   const [formItems, setFormItems] = useState<FnbShiftCountFormItem[]>([]);
-  const [note, setNote] = useState("");
-  const [isDirty, setIsDirty] = useState(false);
+  const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
+  const [lockingShiftNo, setLockingShiftNo] = useState<ShiftNo | null>(null);
 
-  const shiftCountParams = useMemo(
-    () => ({
-      date: queryConfig.date,
-      ...(isAdmin && queryConfig.staffId ? { staffId: queryConfig.staffId } : {}),
-    }),
-    [queryConfig.date, queryConfig.staffId, isAdmin],
+  const dateParams = useMemo(
+    () => ({ date: queryConfig.date }),
+    [queryConfig.date],
   );
 
   const {
     data: shiftCount,
     isLoading: isLoadingShiftCount,
     isFetching,
-  } = useFnbShiftCount(shiftCountParams);
+  } = useFnbShiftCount(dateParams);
 
-  const { menuItems, isLoading: isLoadingMenu } = useMenuItems();
-
-  const mergedItems = useMemo(
-    () => mergeMenuWithShiftCount(menuItems, shiftCount?.items),
-    [menuItems, shiftCount?.items],
-  );
+  const { data: templateItems = [], isLoading: isLoadingTemplate } =
+    useFnbShiftCountItemsTemplate();
 
   const historyParams = useMemo(
     () => ({
       ...(queryConfig.historyFrom ? { from: queryConfig.historyFrom } : {}),
       ...(queryConfig.historyTo ? { to: queryConfig.historyTo } : {}),
-      ...(queryConfig.historyStaffId
-        ? { staffId: queryConfig.historyStaffId }
-        : {}),
+      page: queryConfig.historyPage,
+      limit: queryConfig.historyLimit,
     }),
     [
       queryConfig.historyFrom,
       queryConfig.historyTo,
-      queryConfig.historyStaffId,
+      queryConfig.historyPage,
+      queryConfig.historyLimit,
     ],
   );
 
-  const { data: historyRecords = [], isLoading: isLoadingHistory } =
-    useFnbShiftCountHistory(historyParams, isAdmin && queryConfig.tab === "history");
+  const { data: historyData, isLoading: isLoadingHistory } =
+    useFnbShiftCountHistory(
+      historyParams,
+      isAdmin && queryConfig.tab === "history",
+    );
 
-  const saveMutation = useFnbShiftCountUpsert();
-  const isLoading =
-    isLoadingShiftCount || (isLoadingMenu && !shiftCount?.items?.length);
+  const saveShiftMutation = useFnbShiftCountSaveShift();
+  const saveDayItemsMutation = useFnbShiftCountSaveDayItems();
+  const lockShiftMutation = useFnbShiftCountLockShift();
+  const unlockShiftMutation = useFnbShiftCountUnlockShift();
+
+  const isLoading = isLoadingShiftCount || isLoadingTemplate;
+  const dayItemsEditable = shiftCount?.editable ?? false;
 
   useEffect(() => {
-    setIsDirty(false);
-  }, [queryConfig.date, queryConfig.staffId]);
+    if (!templateItems.length && !shiftCount?.items?.length) return;
+    const merged = formItemsFromResponse(
+      templateItems,
+      shiftCount ?? { items: [] },
+    );
+    setFormItems(merged);
+  }, [templateItems, shiftCount]);
 
-  useEffect(() => {
-    if (isDirty) return;
-    if (!shiftCount && menuItems.length === 0) return;
-    setFormItems(mergedItems);
-    setNote(shiftCount?.note ?? "");
-  }, [mergedItems, shiftCount, isDirty, menuItems.length]);
+  const handleShiftCellSave = (
+    itemId: string,
+    shiftNo: ShiftNo,
+    field: ShiftCountField,
+    value: number,
+  ) => {
+    if (!shiftCount?.shifts?.[shiftNo]?.editable) return;
 
-  const handleSave = () => {
-    if (shiftCount && !shiftCount.editable) return;
+    const cellKey = `${itemId}-s${shiftNo}-${field}`;
+    setSavingCellKey(cellKey);
 
-    saveMutation.mutate({
-      date: queryConfig.date,
-      ...(isAdmin && queryConfig.staffId ? { staffId: queryConfig.staffId } : {}),
-      body: {
-        note: note.trim() || undefined,
-        items: formItems
-          .filter((item) => !item.isParent)
-          .map((item) => ({
-          itemId: item.itemId,
-          ...(item.openingCount !== "" ? { openingCount: item.openingCount } : {}),
-          ...(item.midShiftAddition !== ""
-            ? { midShiftAddition: item.midShiftAddition }
-            : {}),
-          ...(item.closingCount !== "" ? { closingCount: item.closingCount } : {}),
-        })),
+    saveShiftMutation.mutate(
+      {
+        shiftNo,
+        date: queryConfig.date,
+        body: {
+          items: [{ itemId, [field]: value }],
+        },
       },
-    }, {
-      onSuccess: () => setIsDirty(false),
-    });
+      {
+        onSettled: () => setSavingCellKey(null),
+      },
+    );
   };
 
-  const handleViewHistoryRecord = (record: NonNullable<typeof shiftCount>) => {
+  const handleDayFieldSave = (
+    itemId: string,
+    field: "totalStockIn" | "note",
+    value: number | string,
+  ) => {
+    if (!dayItemsEditable) return;
+
+    const cellKey = `${itemId}-day-${field}`;
+    setSavingCellKey(cellKey);
+
+    saveDayItemsMutation.mutate(
+      {
+        date: queryConfig.date,
+        body: {
+          items: [
+            {
+              itemId,
+              ...(field === "totalStockIn"
+                ? { totalStockIn: value as number }
+                : { note: value as string }),
+            },
+          ],
+        },
+      },
+      {
+        onSettled: () => setSavingCellKey(null),
+      },
+    );
+  };
+
+  const handleLockShift = (shiftNo: ShiftNo) => {
+    setLockingShiftNo(shiftNo);
+    lockShiftMutation.mutate(
+      { shiftNo, date: queryConfig.date },
+      { onSettled: () => setLockingShiftNo(null) },
+    );
+  };
+
+  const handleUnlockShift = (shiftNo: ShiftNo) => {
+    setLockingShiftNo(shiftNo);
+    unlockShiftMutation.mutate(
+      { shiftNo, date: queryConfig.date },
+      { onSettled: () => setLockingShiftNo(null) },
+    );
+  };
+
+  const handleViewHistoryRecord = (
+    record: NonNullable<typeof shiftCount>,
+  ) => {
     setQueryConfig({
       tab: "entry",
       date: dayjs(record.businessDate).format("YYYY-MM-DD"),
-      staffId: record.staffId,
     });
   };
-
-  const editable = shiftCount?.editable ?? false;
-  const isSaving = saveMutation.isPending;
 
   return (
     <div className="space-y-6">
       <PageHeader
         title="Kiểm kê FNB"
-        description="Nhập đầu ca / kết ca theo ngày và đối chiếu với hệ thống bán hàng"
+        description="Nhập mở ca / kết ca theo 3 ca trong ngày và đối chiếu với hệ thống bán hàng"
         icon={ClipboardList}
-        actions={
-          queryConfig.tab === "entry" && editable ? (
-            <Button
-              type="button"
-              onClick={handleSave}
-              disabled={isSaving || isLoading}
-            >
-              {isSaving ? (
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              ) : (
-                <Save className="mr-2 h-4 w-4" />
-              )}
-              Lưu kiểm kê
-            </Button>
-          ) : null
-        }
       />
 
       <Tabs
@@ -155,32 +189,14 @@ const FnbShiftCountPage = () => {
             <CardContent>
               <ShiftCountFilters
                 date={queryConfig.date}
-                staffId={queryConfig.staffId}
                 search={queryConfig.search}
-                isAdmin={isAdmin}
                 onDateChange={(date) => setQueryConfig({ date })}
-                onStaffIdChange={(staffId) => setQueryConfig({ staffId })}
                 onSearchChange={(search) => setQueryConfig({ search })}
               />
             </CardContent>
           </Card>
 
-          <ShiftCountSummary
-            summary={shiftCount?.summary}
-            staffName={shiftCount?.staffName}
-            businessDate={
-              shiftCount?.businessDate
-                ? dayjs(shiftCount.businessDate).format("DD/MM/YYYY")
-                : dayjs(queryConfig.date, "YYYY-MM-DD").format("DD/MM/YYYY")
-            }
-            editable={editable}
-          />
-
-          {!editable && shiftCount && (
-            <p className="text-sm text-muted-foreground">
-              Bản ghi này chỉ được xem. Chỉ có thể chỉnh sửa kiểm kê trong ngày hôm nay.
-            </p>
-          )}
+          <ShiftCountSummary summary={shiftCount?.summary} />
 
           <Card>
             <CardHeader className="flex flex-row items-center justify-between pb-3">
@@ -188,27 +204,28 @@ const FnbShiftCountPage = () => {
               {isFetching && !isLoading && (
                 <span className="text-xs text-muted-foreground">Đang tải...</span>
               )}
-              {isDirty && (
+              {(saveShiftMutation.isPending ||
+                saveDayItemsMutation.isPending ||
+                lockShiftMutation.isPending ||
+                unlockShiftMutation.isPending) && (
                 <span className="text-xs font-medium text-primary">
-                  Có thay đổi chưa lưu
+                  Đang xử lý...
                 </span>
               )}
             </CardHeader>
             <CardContent>
               <ShiftCountGrid
                 items={formItems}
-                note={note}
-                editable={editable}
+                shifts={shiftCount?.shifts}
+                dayItemsEditable={dayItemsEditable}
                 search={queryConfig.search}
                 isLoading={isLoading}
-                onItemsChange={(items) => {
-                  setFormItems(items);
-                  setIsDirty(true);
-                }}
-                onNoteChange={(nextNote) => {
-                  setNote(nextNote);
-                  setIsDirty(true);
-                }}
+                savingCellKey={savingCellKey}
+                lockingShiftNo={lockingShiftNo}
+                onShiftCellSave={handleShiftCellSave}
+                onDayFieldSave={handleDayFieldSave}
+                onLockShift={handleLockShift}
+                onUnlockShift={handleUnlockShift}
               />
             </CardContent>
           </Card>
@@ -222,20 +239,20 @@ const FnbShiftCountPage = () => {
               </CardHeader>
               <CardContent>
                 <ShiftCountHistoryTable
-                  records={historyRecords}
+                  records={historyData?.items ?? []}
+                  total={historyData?.total ?? 0}
+                  page={historyData?.page ?? queryConfig.historyPage}
+                  limit={historyData?.limit ?? queryConfig.historyLimit}
                   isLoading={isLoadingHistory}
                   historyFrom={queryConfig.historyFrom}
                   historyTo={queryConfig.historyTo}
-                  historyStaffId={queryConfig.historyStaffId}
                   onHistoryFromChange={(historyFrom) =>
-                    setQueryConfig({ historyFrom })
+                    setQueryConfig({ historyFrom, historyPage: 1 })
                   }
                   onHistoryToChange={(historyTo) =>
-                    setQueryConfig({ historyTo })
+                    setQueryConfig({ historyTo, historyPage: 1 })
                   }
-                  onHistoryStaffIdChange={(historyStaffId) =>
-                    setQueryConfig({ historyStaffId })
-                  }
+                  onPageChange={(historyPage) => setQueryConfig({ historyPage })}
                   onViewRecord={handleViewHistoryRecord}
                 />
               </CardContent>

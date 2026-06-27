@@ -68,6 +68,11 @@ import ExtendSessionModal from "./ExtendSessionModal";
 import MobileTimelineView from "./MobileTimelineView";
 import ProcessBookedModal from "./ProcessBookedModal";
 import ProcessInUseModal from "./ProcessInUseModal";
+import {
+  getEffectiveScheduleRoomType,
+  getRoomTypeLabel as getScheduleRoomTypeLabel,
+  getScheduleTimelineLabel,
+} from "../utils/scheduleRoomType";
 import ProcessLockedModal from "./ProcessLockedModal";
 
 const DAY_START_HOUR = 0;
@@ -1212,6 +1217,14 @@ const RoomTimelineTable: React.FC = () => {
                           .map((schedule) => {
                           const { left, width, bgColor } =
                             getMarkerStyle(schedule);
+                          const scheduleLabel = getScheduleTimelineLabel(
+                            room.roomName,
+                            schedule,
+                            room,
+                          );
+                          const scheduleSizeLabel = getScheduleRoomTypeLabel(
+                            getEffectiveScheduleRoomType(schedule, room),
+                          );
                           // const isDragging =
                           //   dragState.isDragging &&
                           //   dragState.scheduleId === schedule._id;
@@ -1221,10 +1234,10 @@ const RoomTimelineTable: React.FC = () => {
                               type="button"
                               className={`absolute top-0 bottom-0 my-1.5 ${bgColor} opacity-80 rounded-md shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500`}
                               style={{ left, width: Math.max(width, 44) }}
-                              title={`${schedule.status} - ${dayjs(
+                              title={`${scheduleLabel} - ${dayjs(
                                 schedule.startTime,
                               ).format("HH:mm")}`}
-                              aria-label={`${room.roomName} ${schedule.status} từ ${dayjs(
+                              aria-label={`${scheduleLabel} ${schedule.status} từ ${dayjs(
                                 schedule.startTime,
                               ).format("HH:mm")}`}
                               // draggable
@@ -1251,7 +1264,7 @@ const RoomTimelineTable: React.FC = () => {
                                   {dayjs(schedule.startTime).format("HH:mm")}
                                 </span>
                                 <span className="max-w-full truncate text-xs sm:text-sm font-semibold text-white">
-                                  {room.roomName}
+                                  {scheduleLabel}
                                 </span>
                               </div>
                             </button>
@@ -1267,6 +1280,7 @@ const RoomTimelineTable: React.FC = () => {
                                   {eventElement}
                                 </TooltipTrigger>
                                 <TooltipContent>
+                                  <p>Size: {scheduleSizeLabel}</p>
                                   <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
                                   <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
                                   {schedule.note && (
@@ -1373,6 +1387,12 @@ const RoomTimelineTable: React.FC = () => {
                                       Thông tin sử dụng
                                     </p>
                                     <div className="text-sm space-y-0.5">
+                                      <p>
+                                        <span className="text-gray-500">
+                                          Size:
+                                        </span>{" "}
+                                        {scheduleSizeLabel}
+                                      </p>
                                       <p>
                                         <span className="text-gray-500">
                                           Bắt đầu:

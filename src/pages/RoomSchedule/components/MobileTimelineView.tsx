@@ -21,6 +21,11 @@ import {
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Card } from "@/components/ui/card";
+import {
+  getEffectiveScheduleRoomType,
+  getRoomTypeLabel as getScheduleRoomTypeLabel,
+  getScheduleTimelineLabel,
+} from "../utils/scheduleRoomType";
 
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
@@ -474,10 +479,18 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                           ? dayjs(schedule.endTime)
                           : eventStart.add(120, "minute");
                         const status = schedule.status.toLowerCase();
+                        const scheduleLabel = getScheduleTimelineLabel(
+                          room.roomName,
+                          schedule,
+                          room,
+                        );
+                        const scheduleSizeLabel = getScheduleRoomTypeLabel(
+                          getEffectiveScheduleRoomType(schedule, room),
+                        );
 
                         let tooltipContent = "";
                         if (status === "booked") {
-                          tooltipContent = `Bắt đầu: ${eventStart.format(
+                          tooltipContent = `Size: ${scheduleSizeLabel}\nBắt đầu: ${eventStart.format(
                             "HH:mm"
                           )}\nKết thúc: ${eventEnd.format("HH:mm")}`;
                         } else if (status === "locked") {
@@ -491,15 +504,15 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                             dayjs(schedule.startTime),
                             "minute"
                           );
-                          if (inUseDuration < 60) {
-                            tooltipContent = `Đang sử dụng ${inUseDuration} phút`;
-                          } else {
-                            const hours = Math.floor(inUseDuration / 60);
-                            const minutes = inUseDuration % 60;
-                            tooltipContent = `Đang sử dụng ${hours} giờ${
-                              minutes > 0 ? ` ${minutes} phút` : ""
-                            }`;
-                          }
+                          const durationText =
+                            inUseDuration < 60
+                              ? `${inUseDuration} phút`
+                              : `${Math.floor(inUseDuration / 60)} giờ${
+                                  inUseDuration % 60 > 0
+                                    ? ` ${inUseDuration % 60} phút`
+                                    : ""
+                                }`;
+                          tooltipContent = `Size: ${scheduleSizeLabel}\nĐang sử dụng ${durationText}`;
                         }
 
                         const eventElement = (
@@ -520,7 +533,9 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                               </div>
                               {height >= 40 && (
                                 <div className="text-xs text-white/90 truncate mt-1 leading-tight">
-                                  {schedule.customerName || schedule.status}
+                                  {status === "booked" || status === "in use"
+                                    ? scheduleLabel
+                                    : schedule.customerName || schedule.status}
                                 </div>
                               )}
                             </div>

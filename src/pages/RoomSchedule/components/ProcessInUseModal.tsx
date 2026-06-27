@@ -28,7 +28,7 @@ import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
 import { getScheduleCustomerContact } from "../utils/memberPhone";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
-import { getEffectiveScheduleRoomType, getRoomTypeLabel } from "../utils/scheduleRoomType";
+import { getRoomTypeLabel } from "../utils/scheduleRoomType";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
 import { IRoom } from "@/@types/Room";
@@ -44,7 +44,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -93,10 +92,6 @@ interface BillData {
   startTime?: string | Date;
   gift?: BillGift;
   giftDiscountAmount?: number;
-  freeHourPromotion?: {
-    freeMinutesApplied: number;
-    freeAmount: number;
-  };
 }
 
 // Interface cho bill response từ API
@@ -112,10 +107,6 @@ interface BillResponse {
   startTime?: string | Date;
   gift?: BillGift;
   giftDiscountAmount?: number;
-  freeHourPromotion?: {
-    freeMinutesApplied: number;
-    freeAmount: number;
-  };
 }
 
 interface BillResultWithNote extends BillResponse {
@@ -147,7 +138,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     useState<boolean>(false);
   const [isEditingNote, setIsEditingNote] = useState(false);
   const [noteValue, setNoteValue] = useState<string>("");
-  const [applyFreeHourPromo, setApplyFreeHourPromo] = useState<boolean>(false);
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const [customerPaidInput, setCustomerPaidInput] = useState<string>("");
@@ -164,7 +154,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     customEndTime,
     customStartTime,
     customEndDate,
-    applyFreeHourPromo,
   ] as const;
 
   const member = useScheduleMemberPhone({
@@ -184,7 +173,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
-  // Giờ kết thúc / ngày / SĐT: đồng bộ khi mở modal hoặc khi schedule đổi (không gộp applyFreeHourPromo — tránh ghi đè tick của user)
+  // Giờ kết thúc / ngày / SĐT: đồng bộ khi mở modal hoặc khi schedule đổi
   useEffect(() => {
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
@@ -194,11 +183,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomerPaidInput("");
     }
   }, [isOpen, schedule.startTime]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
-  }, [isOpen, schedule.applyFreeHourPromo]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -266,28 +250,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       toast({
         title: "Error",
         description: "Không thể cập nhật ghi chú",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const {
-    mutate: persistApplyFreeHourPromo,
-    isPending: isSavingApplyFreeHour,
-  } = useMutation({
-    mutationFn: (value: boolean) =>
-      roomsScheduleApis.updateSchedule(schedule._id, {
-        applyFreeHourPromo: value,
-      }),
-    onSuccess: () => {
-      refetchSchedules?.();
-    },
-    onError: (error) => {
-      console.error("Error updating KM 1 giờ đầu:", error);
-      setApplyFreeHourPromo(Boolean(schedule.applyFreeHourPromo));
-      toast({
-        title: "Lỗi",
-        description: "Không lưu được KM 1 giờ đầu",
         variant: "destructive",
       });
     },
@@ -605,7 +567,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         selectedPromotion || undefined,
         billDateTimePayload.actualEndTime,
         billDateTimePayload.actualStartTime,
-        applyFreeHourPromo,
       );
     },
     enabled: isOpen && !!customStartTime && !!customEndTime,
@@ -689,7 +650,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     paymentMethod = PaymentMethod.Cash,
     note,
     gift,
-    freeHourPromotion,
     giftDiscountAmount = 0,
   } = billResult;
   const items = itemsWithDetails;
@@ -926,7 +886,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         actualEndTime: billDateTimePayload.actualEndTime,
         actualStartTime: billDateTimePayload.actualStartTime,
         promotionId: selectedPromotion || undefined,
-        applyFreeHourPromotion: applyFreeHourPromo,
       }),
     onSuccess: () => {
       toast({
@@ -967,7 +926,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         }}
       >
         <DialogContent
-          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-5xl sm:w-[95vw]"
+          className="max-w-full max-h-[100dvh] overflow-x-hidden overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-5xl sm:w-[95vw]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
@@ -997,66 +956,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </TabsList>
 
               <TabsContent value="bill" className="space-y-4 mt-0">
-            <ScheduleRoomTypeSection
-              schedule={schedule}
-              physicalRoomType={room?.roomType}
-              onUpdated={handleRoomTypeUpdated}
-            />
-
-            {/* Đổi phòng */}
-            <div className="rounded-md border bg-card p-3 space-y-2">
-              <div className="flex items-center justify-between">
-                <h4 className="text-sm font-semibold">Đổi phòng</h4>
-                <span className="text-[11px] text-muted-foreground">
-                  Queue nhạc tự chuyển theo
-                </span>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-end">
-                <Select
-                  value={targetRoomId}
-                  onValueChange={setTargetRoomId}
-                  disabled={isLoadingRooms || availableRooms.length === 0}
-                >
-                  <SelectTrigger className="h-9 w-full">
-                    <SelectValue
-                      placeholder={
-                        availableRooms.length === 0
-                          ? "Không còn phòng khác"
-                          : "Chọn phòng mới"
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableRooms.map((room) => (
-                      <SelectItem
-                        key={String(room._id)}
-                        value={String(room._id)}
-                      >
-                        {room.roomName} - {getRoomTypeLabel(room.roomType)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Input
-                  value={roomChangeNote}
-                  onChange={(e) => setRoomChangeNote(e.target.value)}
-                  placeholder="Lý do đổi (nếu có)"
-                  className="h-9"
-                />
-
-                <Button
-                  variant="secondary"
-                  onClick={handleChangeRoom}
-                  loading={isChangingRoom}
-                  disabled={availableRooms.length === 0}
-                  className="h-9 w-full sm:w-auto"
-                >
-                  Chuyển phòng
-                </Button>
-              </div>
-            </div>
-
             {/* Bill Section */}
             <div className="rounded-md border bg-card text-sm">
               <div className="flex items-center justify-between border-b px-3 py-2">
@@ -1075,17 +974,16 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </span>
                     <span className="font-medium">{room?.roomName || "—"}</span>
                   </div>
-                  <div className="flex flex-col">
+                  <div className="col-span-2 flex flex-col sm:col-span-1">
                     <span className="text-[11px] text-muted-foreground">
                       Size
                     </span>
-                    <span className="font-medium">
-                      {getEffectiveScheduleRoomType(schedule, room)
-                        ? getRoomTypeLabel(
-                            getEffectiveScheduleRoomType(schedule, room),
-                          )
-                        : "—"}
-                    </span>
+                    <ScheduleRoomTypeSection
+                      variant="inline"
+                      schedule={schedule}
+                      physicalRoomType={room?.roomType}
+                      onUpdated={handleRoomTypeUpdated}
+                    />
                   </div>
                   <div className="flex flex-col">
                     <span className="text-[11px] text-muted-foreground">
@@ -1183,7 +1081,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     <span className="hidden w-20 shrink-0 text-right sm:block">
                       Đơn giá
                     </span>
-                    <span className="w-24 shrink-0 text-right">Thành tiền</span>
+                    <span className="shrink-0 whitespace-nowrap text-right">
+                      Thành tiền
+                    </span>
                   </div>
 
                   {items.length === 0 ? (
@@ -1237,7 +1137,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                             <span className="hidden w-20 shrink-0 text-right text-muted-foreground sm:block">
                               {formatVnd(item.price)}
                             </span>
-                            <span className="w-24 shrink-0 text-right font-medium">
+                            <span className="shrink-0 whitespace-nowrap pl-1 text-right font-medium">
                               {formatVnd(item.price * item.quantity)}
                             </span>
                           </div>
@@ -1293,25 +1193,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <Checkbox
-                      id="apply-free-hour-promo"
-                      checked={applyFreeHourPromo}
-                      disabled={isSavingApplyFreeHour}
-                      onCheckedChange={(checked) => {
-                        const next = checked === true;
-                        setApplyFreeHourPromo(next);
-                        persistApplyFreeHourPromo(next);
-                      }}
-                    />
-                    <Label
-                      htmlFor="apply-free-hour-promo"
-                      className="cursor-pointer text-sm font-normal"
-                    >
-                      Áp dụng khuyến mãi 1 giờ đầu tiên
-                    </Label>
                   </div>
 
                   {gift && (
@@ -1375,50 +1256,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     </div>
                   )}
 
-                  {/* Free Hour Promotion */}
-                  {applyFreeHourPromo &&
-                    freeHourPromotion &&
-                    freeHourPromotion.freeAmount > 0 && (
-                      <div className="flex justify-between">
-                        <span className="text-muted-foreground">
-                          {(() => {
-                            // Tính khung giờ đầu tiên từ giờ bắt đầu + 60 phút
-                            const startTime = customStartTime
-                              ? dayjs(schedule.startTime)
-                                  .set(
-                                    "hour",
-                                    parseInt(customStartTime.split(":")[0]),
-                                  )
-                                  .set(
-                                    "minute",
-                                    parseInt(customStartTime.split(":")[1]),
-                                  )
-                                  .set("second", 0)
-                              : dayjs(schedule.startTime);
-                            const endTime = startTime.add(60, "minute");
-                            const timeRange = `${startTime.format(
-                              "HH:mm",
-                            )} - ${endTime.format("HH:mm")}`;
-                            return `KM 1 giờ đầu (${timeRange})`;
-                          })()}
-                        </span>
-                        <span className="ml-2 text-right font-medium text-emerald-600">
-                          -{formatVnd(freeHourPromotion.freeAmount)}
-                        </span>
-                      </div>
-                    )}
-
                   {/* Tính toán giá gốc */}
                   {(() => {
-                    // totalAmount từ API đã là tổng sau khi trừ free hour và promotion
-                    const freeHourDiscount = applyFreeHourPromo
-                      ? freeHourPromotion?.freeAmount || 0
-                      : 0;
-
-                    // Tính tổng gốc từ items hoặc từ roomTotal + fnbTotal
                     let originalTotal = (roomTotal || 0) + (fnbTotal || 0);
 
-                    // Nếu không có roomTotal/fnbTotal, tính từ items
                     if (originalTotal === 0 && items && items.length > 0) {
                       originalTotal = items.reduce(
                         (sum, item) => sum + item.price * item.quantity,
@@ -1426,20 +1267,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       );
                     }
 
-                    // Nếu vẫn không có, tính từ totalAmount + freeAmount (vì totalAmount đã trừ freeAmount)
                     if (originalTotal === 0 && totalAmount) {
-                      originalTotal = totalAmount + freeHourDiscount;
+                      originalTotal = totalAmount;
                     }
 
-                    // Tổng sau khi trừ free hour
-                    const afterFreeHourTotal = Math.max(
-                      0,
-                      originalTotal - freeHourDiscount,
-                    );
-
-                    // Tính promotion discount (nếu có) dựa trên tổng sau khi trừ free hour
                     const promotionDiscountAmount = appliedPromotion
-                      ? (afterFreeHourTotal *
+                      ? (originalTotal *
                           (appliedPromotion.discountPercentage || 0)) /
                         100
                       : 0;
@@ -1604,6 +1437,60 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                     )}
                   </div>
                 </div>
+              </div>
+            </div>
+
+            {/* Đổi phòng */}
+            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold">Đổi phòng</h3>
+                <span className="text-[11px] text-muted-foreground">
+                  Queue nhạc tự chuyển theo
+                </span>
+              </div>
+              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-end">
+                  <Select
+                    value={targetRoomId}
+                    onValueChange={setTargetRoomId}
+                    disabled={isLoadingRooms || availableRooms.length === 0}
+                  >
+                    <SelectTrigger className="h-9 w-full">
+                      <SelectValue
+                        placeholder={
+                          availableRooms.length === 0
+                            ? "Không còn phòng khác"
+                            : "Chọn phòng mới"
+                        }
+                      />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableRooms.map((room) => (
+                        <SelectItem
+                          key={String(room._id)}
+                          value={String(room._id)}
+                        >
+                          {room.roomName} - {getRoomTypeLabel(room.roomType)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Input
+                    value={roomChangeNote}
+                    onChange={(e) => setRoomChangeNote(e.target.value)}
+                    placeholder="Lý do đổi (nếu có)"
+                    className="h-9"
+                  />
+
+                  <Button
+                    variant="secondary"
+                    onClick={handleChangeRoom}
+                    loading={isChangingRoom}
+                    disabled={availableRooms.length === 0}
+                    className="h-9 w-full sm:w-auto"
+                  >
+                    Chuyển phòng
+                </Button>
               </div>
             </div>
               </TabsContent>

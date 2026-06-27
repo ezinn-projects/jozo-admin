@@ -1,34 +1,38 @@
 import type {
-  IFnbShiftCountLine,
-  IFnbShiftCountReportItem,
   IFnbShiftCountResponse,
+  IFnbShiftCountTemplateItem,
+  IMatrixItem,
+  ShiftNo,
 } from "@/apis/fnbShiftCount.apis";
 
 export type FnbShiftCountTab = "entry" | "history";
+
+export type ShiftCountField = "openingCount" | "closingCount";
+
+export interface ShiftCountCellValue {
+  openingCount: number | "";
+  closingCount: number | "";
+}
 
 export interface FnbShiftCountFormItem {
   itemId: string;
   itemName: string;
   category: "drink" | "snack";
-  /** Món cha chỉ để nhóm variant — không nhập đầu ca / kết ca */
-  isParent?: boolean;
-  /** Biến thể của món cha — hiển thị thụt vào dưới parent */
-  isVariant?: boolean;
-  openingCount: number | "";
-  midShiftAddition: number | "";
-  closingCount: number | "";
-  physicalSold?: number;
+  currentInventory?: number;
+  shifts: Record<ShiftNo, ShiftCountCellValue>;
+  totalStockIn: number | "";
   systemSold: number;
+  expectedClosing?: number;
+  latestClosing?: number;
+  latestClosingShiftNo?: 0 | ShiftNo;
+  hasLatestClosing?: boolean;
   variance?: number;
-}
-
-export interface FnbShiftCountFormValues {
   note: string;
-  items: FnbShiftCountFormItem[];
 }
 
 export type {
-  IFnbShiftCountLine,
-  IFnbShiftCountReportItem,
   IFnbShiftCountResponse,
+  IFnbShiftCountTemplateItem,
+  IMatrixItem,
+  ShiftNo,
 };

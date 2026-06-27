@@ -32,3 +32,22 @@ export const getRoomTypeForBooking = (
   use4Mic: boolean,
 ): RoomType.Medium | RoomType.Large =>
   use4Mic ? RoomType.Large : RoomType.Medium;
+
+export const getScheduleTimelineLabel = (
+  roomName: string,
+  schedule: Pick<IRoomSchedule, "roomType" | "status">,
+  room?: Pick<IRoom, "roomType"> | null,
+): string => {
+  const status = schedule.status?.toLowerCase();
+  if (status !== "booked" && status !== "in use") {
+    return roomName;
+  }
+
+  const effectiveType = getEffectiveScheduleRoomType(schedule, room);
+  const sizeLabel = getRoomTypeLabel(effectiveType).toLowerCase();
+  if (!effectiveType || sizeLabel === "—") {
+    return roomName;
+  }
+
+  return `${roomName} - ${sizeLabel}`;
+};

@@ -12,6 +12,6 @@ export const useFnbShiftCountHistory = (
     queryKey: fnbShiftCountQueryKey.history(params),
     queryFn: () => fnbShiftCountApis.getHistory(params),
     enabled,
-    select: (response) => response.data.result ?? [],
+    select: (response) => response.data.result,
   });
 };

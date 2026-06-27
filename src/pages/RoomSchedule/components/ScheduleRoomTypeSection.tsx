@@ -26,6 +26,7 @@ interface ScheduleRoomTypeSectionProps {
   canEdit?: boolean;
   onUpdated?: () => void;
   className?: string;
+  variant?: "default" | "inline";
 }
 
 const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
@@ -34,6 +35,7 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
   canEdit,
   onUpdated,
   className,
+  variant = "default",
 }) => {
   const effectiveRoomType = getEffectiveScheduleRoomType(
     schedule,
@@ -71,6 +73,68 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
   });
 
   const hasTypeChanged = selectedType !== effectiveRoomType;
+  const isInline = variant === "inline";
+
+  const physicalTypeHint =
+    physicalRoomType && physicalRoomType !== effectiveRoomType ? (
+      <p
+        className={
+          isInline
+            ? "text-[11px] text-muted-foreground"
+            : "text-xs text-muted-foreground"
+        }
+      >
+        {isInline ? "Gốc: " : "Size gốc: "}
+        {getRoomTypeLabel(physicalRoomType).toLowerCase()}
+        {!isInline && "."}
+      </p>
+    ) : null;
+
+  if (isInline) {
+    return (
+      <div className={className}>
+        {editable ? (
+          <div className="space-y-1">
+            <div className="flex items-center gap-1">
+              <Select
+                value={selectedType}
+                onValueChange={(value) => setSelectedType(value as RoomType)}
+              >
+                <SelectTrigger className="h-9 min-w-0 flex-1">
+                  <SelectValue placeholder="Chọn size" />
+                </SelectTrigger>
+                <SelectContent>
+                  {roomTypeOptions.map((option) => (
+                    <SelectItem value={option.value} key={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={() => updateRoomType(selectedType)}
+                loading={isPending}
+                disabled={!hasTypeChanged}
+                className="h-9 shrink-0 px-2"
+              >
+                Lưu
+              </Button>
+            </div>
+            {physicalTypeHint}
+          </div>
+        ) : (
+          <p className="font-medium">
+            {getRoomTypeLabel(effectiveRoomType)}
+            {physicalRoomType &&
+              physicalRoomType !== effectiveRoomType &&
+              ` (gốc: ${getRoomTypeLabel(physicalRoomType).toLowerCase()})`}
+          </p>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className={className}>
@@ -95,11 +159,7 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
               </SelectContent>
             </Select>
           </div>
-          {physicalRoomType && physicalRoomType !== effectiveRoomType && (
-            <p className="text-xs text-muted-foreground">
-              Size gốc: {getRoomTypeLabel(physicalRoomType).toLowerCase()}.
-            </p>
-          )}
+          {physicalTypeHint}
           <Button
             variant="secondary"
             size="sm"

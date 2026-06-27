@@ -5,17 +5,30 @@ import fnbShiftCountApis, {
 import { useQuery } from "@tanstack/react-query";
 
 export const fnbShiftCountQueryKey = {
-  detail: (params: IFnbShiftCountGetParams) =>
-    ["fnbShiftCount", params.date, params.staffId ?? "self"] as const,
+  detail: (date?: string) => ["fnbShiftCount", date ?? "today"] as const,
+  template: () => ["fnbShiftCountTemplate"] as const,
   history: (params: IFnbShiftCountHistoryParams) =>
     ["fnbShiftCountHistory", params] as const,
 };
 
-export const useFnbShiftCount = (params: IFnbShiftCountGetParams, enabled = true) => {
+export const useFnbShiftCount = (
+  params?: IFnbShiftCountGetParams,
+  enabled = true,
+) => {
   return useQuery({
-    queryKey: fnbShiftCountQueryKey.detail(params),
+    queryKey: fnbShiftCountQueryKey.detail(params?.date),
     queryFn: () => fnbShiftCountApis.getShiftCount(params),
-    enabled: enabled && !!params.date,
+    enabled,
     select: (response) => response.data.result,
+  });
+};
+
+export const useFnbShiftCountItemsTemplate = (enabled = true) => {
+  return useQuery({
+    queryKey: fnbShiftCountQueryKey.template(),
+    queryFn: () => fnbShiftCountApis.getItemsTemplate(),
+    enabled,
+    staleTime: 5 * 60 * 1000,
+    select: (response) => response.data.result ?? [],
   });
 };

@@ -5,13 +5,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import {
   Table,
@@ -21,41 +14,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Role } from "@/constants/enum";
-import { useUsers } from "@/hooks/use-users";
+import type { IFnbShiftCountResponse } from "@/apis/fnbShiftCount.apis";
 import dayjs from "@/lib/dayjs";
 import { cn } from "@/lib/utils";
-import type { IFnbShiftCountResponse } from "@/apis/fnbShiftCount.apis";
-import { Calendar } from "lucide-react";
+import { Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { format } from "date-fns";
 import { vi } from "date-fns/locale";
 
-const STAFF_ALL = "__all__";
-
 interface ShiftCountHistoryTableProps {
   records: IFnbShiftCountResponse[];
+  total: number;
+  page: number;
+  limit: number;
   isLoading?: boolean;
   historyFrom: string;
   historyTo: string;
-  historyStaffId: string;
   onHistoryFromChange: (value: string) => void;
   onHistoryToChange: (value: string) => void;
-  onHistoryStaffIdChange: (value: string) => void;
+  onPageChange: (page: number) => void;
   onViewRecord: (record: IFnbShiftCountResponse) => void;
 }
 
 const ShiftCountHistoryTable = ({
   records,
+  total,
+  page,
+  limit,
   isLoading,
   historyFrom,
   historyTo,
-  historyStaffId,
   onHistoryFromChange,
   onHistoryToChange,
-  onHistoryStaffIdChange,
+  onPageChange,
   onViewRecord,
 }: ShiftCountHistoryTableProps) => {
-  const { users, isLoadingUsers } = useUsers({ role: Role.Staff, limit: 1000 });
+  const totalPages = Math.max(1, Math.ceil(total / limit));
 
   const renderDatePicker = (
     label: string,
@@ -106,28 +99,6 @@ const ShiftCountHistoryTable = ({
       <div className="flex flex-wrap items-end gap-4">
         {renderDatePicker("Từ ngày", historyFrom, onHistoryFromChange)}
         {renderDatePicker("Đến ngày", historyTo, onHistoryToChange)}
-        <div className="flex w-[220px] flex-col gap-2">
-          <label className="text-sm font-medium">Nhân viên</label>
-          <Select
-            value={historyStaffId || STAFF_ALL}
-            onValueChange={(value) =>
-              onHistoryStaffIdChange(value === STAFF_ALL ? "" : value)
-            }
-            disabled={isLoadingUsers}
-          >
-            <SelectTrigger className="h-9">
-              <SelectValue placeholder="Tất cả nhân viên" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={STAFF_ALL}>Tất cả nhân viên</SelectItem>
-              {users.map((user) => (
-                <SelectItem key={user._id} value={user._id}>
-                  {user.name || user.full_name || user.email}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
       </div>
 
       {isLoading ? (
@@ -135,60 +106,89 @@ const ShiftCountHistoryTable = ({
           <Spinner className="h-8 w-8" />
         </div>
       ) : (
-        <div className="overflow-auto rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Ngày</TableHead>
-                <TableHead>Nhân viên</TableHead>
-                <TableHead className="text-center">Món thiếu bill</TableHead>
-                <TableHead>Cập nhật lúc</TableHead>
-                <TableHead className="text-right">Thao tác</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {records.length === 0 ? (
+        <>
+          <div className="overflow-auto rounded-md border">
+            <Table>
+              <TableHeader>
                 <TableRow>
-                  <TableCell colSpan={5} className="py-10 text-center text-muted-foreground">
-                    Không có bản ghi kiểm kê trong khoảng thời gian này.
-                  </TableCell>
+                  <TableHead>Ngày</TableHead>
+                  <TableHead className="text-center">Món hụt</TableHead>
+                  <TableHead>Trạng thái</TableHead>
+                  <TableHead className="text-right">Thao tác</TableHead>
                 </TableRow>
-              ) : (
-                records.map((record) => (
-                  <TableRow key={`${record._id ?? record.businessDate}-${record.staffId}`}>
-                    <TableCell className="font-medium">
-                      {dayjs(record.businessDate).format("DD/MM/YYYY")}
-                    </TableCell>
-                    <TableCell>{record.staffName || record.staffId}</TableCell>
+              </TableHeader>
+              <TableBody>
+                {records.length === 0 ? (
+                  <TableRow>
                     <TableCell
-                      className={cn(
-                        "text-center font-semibold",
-                        record.summary.shortageCount > 0 && "text-destructive",
-                      )}
+                      colSpan={4}
+                      className="py-10 text-center text-muted-foreground"
                     >
-                      {record.summary.shortageCount}
-                    </TableCell>
-                    <TableCell>
-                      {record.updatedAt
-                        ? dayjs(record.updatedAt).format("DD/MM/YYYY HH:mm")
-                        : "—"}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onViewRecord(record)}
-                      >
-                        Xem chi tiết
-                      </Button>
+                      Không có bản ghi kiểm kê trong khoảng thời gian này.
                     </TableCell>
                   </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                ) : (
+                  records.map((record) => (
+                    <TableRow key={record.businessDate}>
+                      <TableCell className="font-medium">
+                        {dayjs(record.businessDate).format("DD/MM/YYYY")}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          "text-center font-semibold",
+                          record.summary.shortageCount > 0 && "text-destructive",
+                        )}
+                      >
+                        {record.summary.shortageCount}
+                      </TableCell>
+                      <TableCell>
+                        {record.editable ? "Có thể sửa" : "Chỉ xem"}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => onViewRecord(record)}
+                        >
+                          Xem chi tiết
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </div>
+
+          {total > 0 && (
+            <div className="flex items-center justify-between">
+              <p className="text-sm text-muted-foreground">
+                Trang {page}/{totalPages} · {total} ngày
+              </p>
+              <div className="flex gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => onPageChange(page - 1)}
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => onPageChange(page + 1)}
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
