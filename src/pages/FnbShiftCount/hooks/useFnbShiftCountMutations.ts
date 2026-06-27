@@ -14,12 +14,16 @@ const updateShiftCountCache = (
   date: string | undefined,
   result: IFnbShiftCountResponse,
 ) => {
-  queryClient.setQueryData(
+  type ShiftCountQueryData = Awaited<
+    ReturnType<typeof fnbShiftCountApis.getShiftCount>
+  >;
+
+  queryClient.setQueryData<ShiftCountQueryData>(
     fnbShiftCountQueryKey.detail(date),
-    (
-      old: Awaited<ReturnType<typeof fnbShiftCountApis.getShiftCount>> | undefined,
-    ) => {
-      if (!old) return old;
+    (old) => {
+      if (!old) {
+        return { data: { result } } as ShiftCountQueryData;
+      }
       return {
         ...old,
         data: {
@@ -29,9 +33,6 @@ const updateShiftCountCache = (
       };
     },
   );
-  queryClient.invalidateQueries({
-    queryKey: ["fnbShiftCountHistory"],
-  });
 };
 
 export const useFnbShiftCountSaveShift = () => {

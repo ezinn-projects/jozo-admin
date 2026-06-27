@@ -117,6 +117,30 @@ export const CATEGORY_LABELS: Record<string, string> = {
 
 export const CATEGORY_ORDER = ["drink", "snack"] as const;
 
+export const groupFormItemsByCategory = (
+  items: FnbShiftCountFormItem[],
+): Array<{
+  category: (typeof CATEGORY_ORDER)[number];
+  label: string;
+  items: FnbShiftCountFormItem[];
+}> => {
+  const groups = new Map<(typeof CATEGORY_ORDER)[number], FnbShiftCountFormItem[]>();
+
+  for (const item of items) {
+    const list = groups.get(item.category) ?? [];
+    list.push(item);
+    groups.set(item.category, list);
+  }
+
+  return CATEGORY_ORDER.filter((category) => groups.has(category)).map(
+    (category) => ({
+      category,
+      label: CATEGORY_LABELS[category],
+      items: groups.get(category)!,
+    }),
+  );
+};
+
 export const SHIFT_LABELS: Record<ShiftNo, string> = {
   1: "Ca 1",
   2: "Ca 2",

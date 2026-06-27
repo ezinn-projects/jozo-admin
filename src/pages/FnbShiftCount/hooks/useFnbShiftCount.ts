@@ -20,6 +20,10 @@ export const useFnbShiftCount = (
     queryFn: () => fnbShiftCountApis.getShiftCount(params),
     enabled,
     select: (response) => response.data.result,
+    // Dữ liệu ngày được cập nhật qua setQueryData sau mỗi lần lưu — không refetch GET.
+    staleTime: Infinity,
+    refetchOnWindowFocus: false,
+    refetchOnReconnect: false,
   });
 };
 

@@ -1,6 +1,7 @@
 import type { IShiftMeta, ShiftNo } from "@/apis/fnbShiftCount.apis";
 import {
   Fragment,
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -21,11 +22,10 @@ import { cn } from "@/lib/utils";
 import { Loader2, Lock, LockOpen } from "lucide-react";
 import type { FnbShiftCountFormItem, ShiftCountField } from "../types";
 import {
-  CATEGORY_LABELS,
-  CATEGORY_ORDER,
   SHIFT_LABELS,
   SHIFT_NUMBERS,
   formatVariance,
+  groupFormItemsByCategory,
   isShortageVariance,
   parseCountInput,
 } from "../utils";
@@ -40,21 +40,20 @@ interface ShiftCountGridProps {
   dayItemsEditable: boolean;
   search: string;
   isLoading?: boolean;
-  savingCellKey?: string | null;
   lockingShiftNo?: ShiftNo | null;
   onShiftCellSave: (
     itemId: string,
     shiftNo: ShiftNo,
     field: ShiftCountField,
     value: number,
-  ) => void;
+  ) => void | Promise<void>;
   onDayFieldSave: (
     itemId: string,
     field: DayField,
     value: number | string,
-  ) => void;
-  onLockShift?: (shiftNo: ShiftNo) => void;
-  onUnlockShift?: (shiftNo: ShiftNo) => void;
+  ) => void | Promise<void>;
+  onLockShift?: (shiftNo: ShiftNo) => void | Promise<void>;
+  onUnlockShift?: (shiftNo: ShiftNo) => void | Promise<void>;
 }
 
 type NavigableField =
@@ -103,7 +102,6 @@ const ShiftCountGrid = ({
   dayItemsEditable,
   search,
   isLoading,
-  savingCellKey,
   lockingShiftNo,
   onShiftCellSave,
   onDayFieldSave,
@@ -117,11 +115,16 @@ const ShiftCountGrid = ({
   const draftValuesRef = useRef<Record<string, string>>({});
   const itemsRef = useRef(items);
   const shiftsRef = useRef(shifts);
+  const onShiftCellSaveRef = useRef(onShiftCellSave);
+  const onDayFieldSaveRef = useRef(onDayFieldSave);
   const [draftValues, setDraftValues] = useState<Record<string, string>>({});
+  const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
 
   itemsRef.current = items;
   draftValuesRef.current = draftValues;
   shiftsRef.current = shifts;
+  onShiftCellSaveRef.current = onShiftCellSave;
+  onDayFieldSaveRef.current = onDayFieldSave;
 
   useEffect(() => {
     const timers = debounceTimersRef.current;
@@ -183,13 +186,10 @@ const ShiftCountGrid = ({
     );
   }, [items, search]);
 
-  const groupedItems = useMemo(() => {
-    return CATEGORY_ORDER.map((category) => ({
-      category,
-      label: CATEGORY_LABELS[category],
-      items: filteredItems.filter((item) => item.category === category),
-    })).filter((group) => group.items.length > 0);
-  }, [filteredItems]);
+  const groupedItems = useMemo(
+    () => groupFormItemsByCategory(filteredItems),
+    [filteredItems],
+  );
 
   const navigableRows = useMemo(
     () => groupedItems.flatMap((group) => group.items),
@@ -249,6 +249,18 @@ const ShiftCountGrid = ({
     }, SAVE_DEBOUNCE_MS);
   };
 
+  const runSavingCell = async (
+    cellKey: string,
+    save: () => void | Promise<void>,
+  ) => {
+    setSavingCellKey(cellKey);
+    try {
+      await save();
+    } finally {
+      setSavingCellKey((current) => (current === cellKey ? null : current));
+    }
+  };
+
   const commitShiftSave = (
     itemId: string,
     shiftNo: ShiftNo,
@@ -277,7 +289,9 @@ const ShiftCountGrid = ({
     const saved = item.shifts[shiftNo][field];
     if (saved === parsed) return;
 
-    onShiftCellSave(itemId, shiftNo, field, parsed);
+    void runSavingCell(key, () =>
+      onShiftCellSaveRef.current(itemId, shiftNo, field, parsed),
+    );
   };
 
   const commitDaySave = (itemId: string, field: DayField) => {
@@ -292,18 +306,24 @@ const ShiftCountGrid = ({
       const parsed = parseCountInput(raw);
       if (parsed === "") {
         if (item.totalStockIn !== "") {
-          onDayFieldSave(itemId, field, 0);
+          void runSavingCell(key, () =>
+            onDayFieldSaveRef.current(itemId, field, 0),
+          );
         }
         return;
       }
       if (item.totalStockIn === parsed) return;
-      onDayFieldSave(itemId, field, parsed);
+      void runSavingCell(key, () =>
+        onDayFieldSaveRef.current(itemId, field, parsed),
+      );
       return;
     }
 
     const trimmed = raw.trim();
     if (trimmed === item.note) return;
-    onDayFieldSave(itemId, field, trimmed);
+    void runSavingCell(key, () =>
+      onDayFieldSaveRef.current(itemId, field, trimmed),
+    );
   };
 
   const handleShiftChange = (
@@ -478,7 +498,6 @@ const ShiftCountGrid = ({
               isSaving && "opacity-60",
             )}
             placeholder="0"
-            disabled={isSaving}
           />
         ) : (
           <div
@@ -535,7 +554,6 @@ const ShiftCountGrid = ({
                 isSaving && "opacity-60",
               )}
               placeholder="Ghi chú..."
-              disabled={isSaving}
             />
           ) : (
             <div className="flex h-10 items-center px-2 text-sm">
@@ -566,7 +584,6 @@ const ShiftCountGrid = ({
               isSaving && "opacity-60",
             )}
             placeholder="0"
-            disabled={isSaving}
           />
         ) : (
           <div className="flex h-10 items-center justify-center">
@@ -601,7 +618,9 @@ const ShiftCountGrid = ({
         tooltip = `${statusText} · Bấm để mở khóa`;
         icon = <LockOpen className="h-3.5 w-3.5" />;
         clickable = true;
-        onClick = () => onUnlockShift(shiftNo);
+        onClick = () => {
+          void onUnlockShift(shiftNo);
+        };
       } else {
         tooltip = statusText;
         icon = <Lock className="h-3.5 w-3.5" />;
@@ -610,7 +629,9 @@ const ShiftCountGrid = ({
       tooltip = `${statusText} · Bấm để khóa ca`;
       icon = <LockOpen className="h-3.5 w-3.5" />;
       clickable = true;
-      onClick = () => onLockShift(shiftNo);
+      onClick = () => {
+        void onLockShift(shiftNo);
+      };
     } else {
       tooltip = isClosed
         ? "Đã kết ca · Chưa đủ điều kiện khóa"
@@ -796,8 +817,7 @@ const ShiftCountGrid = ({
       {dayItemsEditable && (
         <p className="text-xs text-muted-foreground">
           Mẹo: Dùng phím mũi tên hoặc Enter để chuyển giữa các ô. Dữ liệu tự
-          lưu sau khoảng 1 giây ngừng nhập. Chênh lệch âm (đỏ) = hụt tồn. Cột
-          Nhập thêm chỉ ghi nhận, không ảnh hưởng chênh lệch.
+          lưu sau khoảng 1 giây ngừng nhập. Chênh lệch âm (đỏ) = hụt tồn.
         </p>
       )}
     </div>
@@ -805,4 +825,4 @@ const ShiftCountGrid = ({
   );
 };
 
-export default ShiftCountGrid;
+export default memo(ShiftCountGrid);

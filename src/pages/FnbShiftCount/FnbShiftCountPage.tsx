@@ -4,7 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useIsAdmin } from "@/hooks/usePermission";
 import dayjs from "@/lib/dayjs";
 import { ClipboardList } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import ShiftCountFilters from "./components/ShiftCountFilters";
 import ShiftCountGrid from "./components/ShiftCountGrid";
 import ShiftCountHistoryTable from "./components/ShiftCountHistoryTable";
@@ -21,15 +21,14 @@ import {
   useFnbShiftCountUnlockShift,
 } from "./hooks/useFnbShiftCountMutations";
 import { useFnbShiftCountQueryConfig } from "./hooks/useFnbShiftCountQueryConfig";
-import type { FnbShiftCountFormItem, ShiftCountField } from "./types";
+import type { ShiftCountField } from "./types";
 import type { ShiftNo } from "@/apis/fnbShiftCount.apis";
 import { formItemsFromResponse } from "./utils";
 
 const FnbShiftCountPage = () => {
   const isAdmin = useIsAdmin();
   const { queryConfig, setQueryConfig } = useFnbShiftCountQueryConfig();
-  const [formItems, setFormItems] = useState<FnbShiftCountFormItem[]>([]);
-  const [savingCellKey, setSavingCellKey] = useState<string | null>(null);
+  const isEntryTab = queryConfig.tab === "entry";
   const [lockingShiftNo, setLockingShiftNo] = useState<ShiftNo | null>(null);
 
   const dateParams = useMemo(
@@ -37,14 +36,13 @@ const FnbShiftCountPage = () => {
     [queryConfig.date],
   );
 
-  const {
-    data: shiftCount,
-    isLoading: isLoadingShiftCount,
-    isFetching,
-  } = useFnbShiftCount(dateParams);
+  const { data: shiftCount, isLoading: isLoadingShiftCount } = useFnbShiftCount(
+    dateParams,
+    isEntryTab,
+  );
 
   const { data: templateItems = [], isLoading: isLoadingTemplate } =
-    useFnbShiftCountItemsTemplate();
+    useFnbShiftCountItemsTemplate(isEntryTab);
 
   const historyParams = useMemo(
     () => ({
@@ -67,60 +65,51 @@ const FnbShiftCountPage = () => {
       isAdmin && queryConfig.tab === "history",
     );
 
-  const saveShiftMutation = useFnbShiftCountSaveShift();
-  const saveDayItemsMutation = useFnbShiftCountSaveDayItems();
-  const lockShiftMutation = useFnbShiftCountLockShift();
-  const unlockShiftMutation = useFnbShiftCountUnlockShift();
+  const { mutateAsync: saveShift } = useFnbShiftCountSaveShift();
+  const { mutateAsync: saveDayItems } = useFnbShiftCountSaveDayItems();
+  const { mutateAsync: lockShift } = useFnbShiftCountLockShift();
+  const { mutateAsync: unlockShift } = useFnbShiftCountUnlockShift();
+
+  const formItems = useMemo(() => {
+    if (!templateItems.length && !shiftCount?.items?.length) return [];
+    return formItemsFromResponse(
+      templateItems,
+      shiftCount ?? { items: [] },
+    );
+  }, [templateItems, shiftCount]);
 
   const isLoading = isLoadingShiftCount || isLoadingTemplate;
   const dayItemsEditable = shiftCount?.editable ?? false;
 
-  useEffect(() => {
-    if (!templateItems.length && !shiftCount?.items?.length) return;
-    const merged = formItemsFromResponse(
-      templateItems,
-      shiftCount ?? { items: [] },
-    );
-    setFormItems(merged);
-  }, [templateItems, shiftCount]);
+  const handleShiftCellSave = useCallback(
+    async (
+      itemId: string,
+      shiftNo: ShiftNo,
+      field: ShiftCountField,
+      value: number,
+    ) => {
+      if (!shiftCount?.shifts?.[shiftNo]?.editable) return;
 
-  const handleShiftCellSave = (
-    itemId: string,
-    shiftNo: ShiftNo,
-    field: ShiftCountField,
-    value: number,
-  ) => {
-    if (!shiftCount?.shifts?.[shiftNo]?.editable) return;
-
-    const cellKey = `${itemId}-s${shiftNo}-${field}`;
-    setSavingCellKey(cellKey);
-
-    saveShiftMutation.mutate(
-      {
+      await saveShift({
         shiftNo,
         date: queryConfig.date,
         body: {
           items: [{ itemId, [field]: value }],
         },
-      },
-      {
-        onSettled: () => setSavingCellKey(null),
-      },
-    );
-  };
+      });
+    },
+    [queryConfig.date, saveShift, shiftCount?.shifts],
+  );
 
-  const handleDayFieldSave = (
-    itemId: string,
-    field: "totalStockIn" | "note",
-    value: number | string,
-  ) => {
-    if (!dayItemsEditable) return;
+  const handleDayFieldSave = useCallback(
+    async (
+      itemId: string,
+      field: "totalStockIn" | "note",
+      value: number | string,
+    ) => {
+      if (!dayItemsEditable) return;
 
-    const cellKey = `${itemId}-day-${field}`;
-    setSavingCellKey(cellKey);
-
-    saveDayItemsMutation.mutate(
-      {
+      await saveDayItems({
         date: queryConfig.date,
         body: {
           items: [
@@ -132,42 +121,49 @@ const FnbShiftCountPage = () => {
             },
           ],
         },
-      },
-      {
-        onSettled: () => setSavingCellKey(null),
-      },
-    );
-  };
+      });
+    },
+    [dayItemsEditable, queryConfig.date, saveDayItems],
+  );
 
-  const handleLockShift = (shiftNo: ShiftNo) => {
-    setLockingShiftNo(shiftNo);
-    lockShiftMutation.mutate(
-      { shiftNo, date: queryConfig.date },
-      { onSettled: () => setLockingShiftNo(null) },
-    );
-  };
+  const handleLockShift = useCallback(
+    async (shiftNo: ShiftNo) => {
+      setLockingShiftNo(shiftNo);
+      try {
+        await lockShift({ shiftNo, date: queryConfig.date });
+      } finally {
+        setLockingShiftNo(null);
+      }
+    },
+    [lockShift, queryConfig.date],
+  );
 
-  const handleUnlockShift = (shiftNo: ShiftNo) => {
-    setLockingShiftNo(shiftNo);
-    unlockShiftMutation.mutate(
-      { shiftNo, date: queryConfig.date },
-      { onSettled: () => setLockingShiftNo(null) },
-    );
-  };
+  const handleUnlockShift = useCallback(
+    async (shiftNo: ShiftNo) => {
+      setLockingShiftNo(shiftNo);
+      try {
+        await unlockShift({ shiftNo, date: queryConfig.date });
+      } finally {
+        setLockingShiftNo(null);
+      }
+    },
+    [queryConfig.date, unlockShift],
+  );
 
-  const handleViewHistoryRecord = (
-    record: NonNullable<typeof shiftCount>,
-  ) => {
-    setQueryConfig({
-      tab: "entry",
-      date: dayjs(record.businessDate).format("YYYY-MM-DD"),
-    });
-  };
+  const handleViewHistoryRecord = useCallback(
+    (record: NonNullable<typeof shiftCount>) => {
+      setQueryConfig({
+        tab: "entry",
+        date: dayjs(record.businessDate).format("YYYY-MM-DD"),
+      });
+    },
+    [setQueryConfig],
+  );
 
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Kiểm kê FNB"
+        title="Kiểm kê số lượng tồn"
         description="Nhập mở ca / kết ca theo 3 ca trong ngày và đối chiếu với hệ thống bán hàng"
         icon={ClipboardList}
       />
@@ -199,19 +195,8 @@ const FnbShiftCountPage = () => {
           <ShiftCountSummary summary={shiftCount?.summary} />
 
           <Card>
-            <CardHeader className="flex flex-row items-center justify-between pb-3">
+            <CardHeader className="pb-3">
               <CardTitle className="text-base">Bảng kiểm kê</CardTitle>
-              {isFetching && !isLoading && (
-                <span className="text-xs text-muted-foreground">Đang tải...</span>
-              )}
-              {(saveShiftMutation.isPending ||
-                saveDayItemsMutation.isPending ||
-                lockShiftMutation.isPending ||
-                unlockShiftMutation.isPending) && (
-                <span className="text-xs font-medium text-primary">
-                  Đang xử lý...
-                </span>
-              )}
             </CardHeader>
             <CardContent>
               <ShiftCountGrid
@@ -220,7 +205,6 @@ const FnbShiftCountPage = () => {
                 dayItemsEditable={dayItemsEditable}
                 search={queryConfig.search}
                 isLoading={isLoading}
-                savingCellKey={savingCellKey}
                 lockingShiftNo={lockingShiftNo}
                 onShiftCellSave={handleShiftCellSave}
                 onDayFieldSave={handleDayFieldSave}
@@ -252,7 +236,9 @@ const FnbShiftCountPage = () => {
                   onHistoryToChange={(historyTo) =>
                     setQueryConfig({ historyTo, historyPage: 1 })
                   }
-                  onPageChange={(historyPage) => setQueryConfig({ historyPage })}
+                  onPageChange={(historyPage) =>
+                    setQueryConfig({ historyPage })
+                  }
                   onViewRecord={handleViewHistoryRecord}
                 />
               </CardContent>
