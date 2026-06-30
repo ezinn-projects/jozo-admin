@@ -28,6 +28,8 @@ const normalize = (value: string) =>
     .replace(/đ/g, "d")
     .replace(/Đ/g, "d");
 
+const isItemActive = (item?: FnBMenuItem | null) => item?.isActive !== false;
+
 const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
   menuItems,
   order,
@@ -39,14 +41,26 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
   const [selectedCategory, setSelectedCategory] = React.useState("all");
 
   const groupedItems = React.useMemo(() => {
+    const parentById: Record<string, FnBMenuItem> = {};
+    menuItems.forEach((item) => {
+      if (!item.parentId && item._id) {
+        parentById[item._id] = item;
+      }
+    });
+
     const parents: FnBMenuItem[] = [];
     const childrenMap: Record<string, FnBMenuItem[]> = {};
 
     menuItems.forEach((item) => {
       if (!item.parentId) {
-        parents.push(item);
+        if (isItemActive(item)) {
+          parents.push(item);
+        }
         return;
       }
+
+      const parent = parentById[item.parentId];
+      if (!parent || !isItemActive(parent) || !isItemActive(item)) return;
 
       if (!childrenMap[item.parentId]) {
         childrenMap[item.parentId] = [];
@@ -55,7 +69,13 @@ const CoffeeOrderEditor: React.FC<CoffeeOrderEditorProps> = ({
       childrenMap[item.parentId].push(item);
     });
 
-    return { parents, childrenMap };
+    return {
+      parents: parents.filter((parent) => {
+        if (!parent.hasVariant) return true;
+        return (childrenMap[parent._id || ""] || []).length > 0;
+      }),
+      childrenMap,
+    };
   }, [menuItems]);
 
   const filteredParentItems = React.useMemo(() => {

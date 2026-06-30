@@ -26,6 +26,7 @@ interface MenuItem {
   hasVariant: boolean;
   price: number;
   image: string;
+  isActive?: boolean;
   category: string;
   inventory: {
     quantity: number;
@@ -61,6 +62,8 @@ interface MenuItemsModalProps {
 }
 
 const isParentMenuItem = (item: MenuItem) => !item.parentId;
+
+const isItemActive = (item?: MenuItem | null) => item?.isActive !== false;
 
 const parseNestedVariants = (parent: MenuItem): MenuItem[] => {
   if (!parent.variants) return [];
@@ -137,6 +140,13 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     const categories: Record<string, MenuItem[]> = {};
 
     menuItems.forEach((item) => {
+      if (!isItemActive(item)) return;
+
+      const parent = item.parentId
+        ? menuItems.find((candidate) => candidate._id === item.parentId)
+        : null;
+      if (parent && !isItemActive(parent)) return;
+
       const category = item.category || "other";
       if (!categories[category]) {
         categories[category] = [];
@@ -153,20 +163,26 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     const childrenMap: Record<string, MenuItem[]> = {};
     const itemById: Record<string, MenuItem> = {};
 
+    menuItems.forEach((item) => {
+      itemById[item._id] = item;
+    });
+
     const addChild = (parentId: string, child: MenuItem) => {
+      const parent = itemById[parentId];
+      if (!parent || !isItemActive(parent) || !isItemActive(child)) return;
+
       if (!childrenMap[parentId]) childrenMap[parentId] = [];
       if (!childrenMap[parentId].some((existing) => existing._id === child._id)) {
         childrenMap[parentId].push(child);
       }
-      itemById[child._id] = child;
     };
 
     menuItems.forEach((item) => {
-      itemById[item._id] = item;
-
       if (isParentMenuItem(item)) {
-        parents.push(item);
-        parseNestedVariants(item).forEach((variant) => addChild(item._id, variant));
+        if (isItemActive(item)) {
+          parents.push(item);
+          parseNestedVariants(item).forEach((variant) => addChild(item._id, variant));
+        }
         return;
       }
 
@@ -175,7 +191,14 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
       }
     });
 
-    return { parents, childrenMap, itemById };
+    return {
+      parents: parents.filter((parent) => {
+        if (!parent.hasVariant) return true;
+        return (childrenMap[parent._id] || []).length > 0;
+      }),
+      childrenMap,
+      itemById,
+    };
   }, [menuItems]);
 
   const findMenuItem = (key: string) => groupedItems.itemById[key];

@@ -26,7 +26,12 @@ import {
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { FnBCategory } from "@/constants/enum";
-import { FnBMenuItem } from "@/hooks/use-menu-items";
+import {
+  FnBMenuItem,
+  menuItemsQueryKeys,
+  normalizeMenuItemApiResponse,
+  upsertMenuItemInListCache,
+} from "@/hooks/use-menu-items";
 import { useToast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
@@ -48,6 +53,7 @@ const variantSchema = z.object({
   name: z.string().min(1, "Tên variant là bắt buộc"),
   price: z.number().min(0, "Giá phải lớn hơn hoặc bằng 0"),
   image: z.string().optional().nullable(),
+  isActive: z.boolean().optional(),
   inventory: z
     .object({
       quantity: z
@@ -104,6 +110,7 @@ const formSchema = z.object({
   }),
   parentId: z.string().optional().nullable(),
   hasVariant: z.boolean(),
+  isActive: z.boolean().optional(),
   price: z.number().min(0, "Giá phải lớn hơn hoặc bằng 0"),
   image: z.string().optional().nullable(),
   inventory: z
@@ -162,6 +169,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
       category: FnBCategory.SNACK,
       parentId: null,
       hasVariant: false,
+      isActive: true,
       price: 0,
       image: "",
       inventory: {
@@ -192,6 +200,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
           name: variant.name || "",
           price: variant.price || 0,
           image: variant.image || "",
+          isActive: variant.isActive ?? true,
           inventory: {
             quantity: variant.inventory?.quantity || 0,
             minStock: variant.inventory?.minStock || 0,
@@ -228,6 +237,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         category: detail.category || FnBCategory.SNACK,
         parentId: detail.parentId || null,
         hasVariant: detail.hasVariant || false,
+        isActive: detail.isActive ?? true,
         price: detail.price || 0,
         image: detail.image || "",
         inventory: {
@@ -283,6 +293,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
       name: "",
       price: form.getValues("price") || 0,
       image: "",
+      isActive: true,
       inventory: {
         quantity: 0,
         minStock: 0,
@@ -453,6 +464,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         "hasVariant",
         data.hasVariant?.toString() || "false"
       );
+      submitFormData.append("isActive", (data.isActive ?? true).toString());
       submitFormData.append(
         "quantity",
         data.inventory?.quantity?.toString() || "0"
@@ -497,6 +509,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
               name: variant.name,
               price: variant.price,
               image: variantImage,
+              isActive: variant.isActive ?? true,
               inventory: {
                 ...variant.inventory,
               },
@@ -525,10 +538,24 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         JSON.stringify(data.customizationOverrides || [])
       );
 
-      if (isEdit && item?._id) {
-        await fnbMenuApis.updateMenuItem(item._id, submitFormData);
-      } else {
-        await fnbMenuApis.createMenuItem(submitFormData);
+      const response =
+        isEdit && item?._id
+          ? await fnbMenuApis.updateMenuItem(item._id, submitFormData)
+          : await fnbMenuApis.createMenuItem(submitFormData);
+
+      const savedItem = normalizeMenuItemApiResponse(response.data);
+      if (savedItem) {
+        upsertMenuItemInListCache(queryClient, savedItem);
+        if (savedItem._id) {
+          queryClient.setQueryData(
+            menuItemsQueryKeys.detail(savedItem._id),
+            savedItem,
+          );
+          queryClient.setQueryData(
+            menuItemsQueryKeys.legacyDetail(savedItem._id),
+            { data: { result: savedItem } },
+          );
+        }
       }
 
       toast({
@@ -537,16 +564,6 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
           ? "Cập nhật menu item thành công"
           : "Tạo menu item thành công",
       });
-
-      // Invalidate queries để refetch danh sách
-      await queryClient.invalidateQueries({ queryKey: ["menuItems"] });
-
-      // Nếu đang edit, cũng invalidate query chi tiết
-      if (isEdit && item?._id) {
-        await queryClient.invalidateQueries({
-          queryKey: ["menuItem", item._id],
-        });
-      }
 
       onSuccess?.();
       handleClose();
@@ -568,6 +585,7 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
       category: FnBCategory.SNACK,
       parentId: null,
       hasVariant: false,
+      isActive: true,
       price: 0,
       image: "",
       inventory: {
@@ -708,6 +726,17 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
                 <Label htmlFor="hasVariant">Có variants</Label>
               </div>
 
+              <div className="flex items-center gap-2">
+                <Switch
+                  id="isActive"
+                  checked={form.watch("isActive") ?? true}
+                  onCheckedChange={(checked) =>
+                    form.setValue("isActive", checked)
+                  }
+                />
+                <Label htmlFor="isActive">Đang bán</Label>
+              </div>
+
               {/* Hình ảnh chính */}
               <div className="space-y-2">
                 <Label>Hình ảnh</Label>
@@ -738,21 +767,51 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
                   </Button>
                 </div>
 
-                {fields.map((field, index) => (
+                {fields.map((field, index) => {
+                  const parentInactive = !(form.watch("isActive") ?? true);
+                  const variantActive =
+                    form.watch(`variants.${index}.isActive`) ?? true;
+
+                  return (
                   <div
                     key={field.id}
                     className="rounded-lg border p-4 space-y-4"
                   >
-                    <div className="flex items-center justify-between">
+                    <div className="flex items-center justify-between gap-3">
                       <h4 className="font-medium">Variant {index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => removeVariant(index)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2">
+                          <Switch
+                            id={`variant-isActive-${index}`}
+                            checked={variantActive}
+                            disabled={parentInactive}
+                            onCheckedChange={(checked) =>
+                              form.setValue(
+                                `variants.${index}.isActive`,
+                                checked,
+                              )
+                            }
+                          />
+                          <Label
+                            htmlFor={`variant-isActive-${index}`}
+                            className="text-sm font-normal"
+                          >
+                            {parentInactive
+                              ? "Bị chặn"
+                              : variantActive
+                                ? "Đang bán"
+                                : "Tạm tắt"}
+                          </Label>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => removeVariant(index)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
@@ -860,7 +919,8 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
                       </div>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             )}
 

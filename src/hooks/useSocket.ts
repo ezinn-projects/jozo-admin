@@ -5,6 +5,7 @@ import useAuth from "./useAuth";
 import { INotification } from "@/@types/Notification";
 import { Gift } from "@/@types/Gift";
 import { IBookingSocketData } from "@/@types/Booking";
+import { IRoomScheduleChangedSocketPayload } from "@/@types/Room";
 import {
   ICoffeeOrderSocketPayload,
   IOrderBatchStatusChangedSocketPayload,
@@ -203,6 +204,18 @@ export const useSocket = () => {
     socketRef.current?.off("booking_notification", callback);
   };
 
+  const onScheduleChanged = (
+    callback: (data: IRoomScheduleChangedSocketPayload) => void,
+  ) => {
+    socketRef.current?.on("schedule_changed", callback);
+  };
+
+  const offScheduleChanged = (
+    callback: (data: IRoomScheduleChangedSocketPayload) => void,
+  ) => {
+    socketRef.current?.off("schedule_changed", callback);
+  };
+
   // Employee Schedule Events
   const onNewScheduleRegistration = (
     callback: (data: {
@@ -374,6 +387,8 @@ export const useSocket = () => {
     offOrderSupportRequested,
     onNewBooking,
     offNewBooking,
+    onScheduleChanged,
+    offScheduleChanged,
     onNewScheduleRegistration,
     offNewScheduleRegistration,
     onScheduleStatusUpdated,

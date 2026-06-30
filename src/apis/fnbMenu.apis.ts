@@ -72,6 +72,11 @@ const fnbMenuApis = {
       },
     }),
 
+  updateMenuItemActive: (id: string, isActive: boolean) =>
+    http.put<HTTPResponse<FnBMenuItem | null>>(`/fnb-menu-item/${id}`, {
+      isActive,
+    }),
+
   cleanupMenuItems: (dryRun: boolean) =>
     http.post<HTTPResponse<FnBMenuItemCleanupResult>>(
       "/fnb-menu-item/cleanup",

@@ -61,6 +61,7 @@ interface MenuItem {
   hasVariant: boolean;
   price: number;
   image: string;
+  isActive?: boolean;
   category: string;
   inventory: {
     quantity: number;
