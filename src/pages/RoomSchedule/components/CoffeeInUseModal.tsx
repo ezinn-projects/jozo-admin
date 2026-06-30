@@ -26,6 +26,9 @@ import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 import { useRoomEvents } from "@/context/RoomEventsContext";
 import CoffeeOrderEditor from "@/pages/RoomSchedule/components/CoffeeOrderEditor";
+import CoffeeOrderLineItemEditorDialog, {
+  type CoffeeOrderLineItemEditorTarget,
+} from "@/pages/RoomSchedule/components/CoffeeOrderLineItemEditorDialog";
 import { mergeAggregatedIntoDetail } from "@/utils/coffeeSessionOrderBatch";
 import {
   formatSelectionPrice,
@@ -124,6 +127,8 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
     React.useState(false);
   const [draftOrder, setDraftOrder] =
     React.useState<ICoffeeSessionOrder>(EMPTY_ORDER);
+  const [editingLineTarget, setEditingLineTarget] =
+    React.useState<CoffeeOrderLineItemEditorTarget | null>(null);
   const sessionDetailQuery = useQuery({
     queryKey: ["coffeeSession", session?._id],
     queryFn: async () => {
@@ -180,6 +185,7 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
   React.useEffect(() => {
     if (!isOpen) {
       setIsOrderEditorExpanded(false);
+      setEditingLineTarget(null);
       return;
     }
 
@@ -781,10 +787,11 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                                   menuItemsQuery.data || [],
                                   customizationTemplatesQuery.data || [],
                                 );
+                              const canEditLine = batch.status === "pending";
                               return (
                                 <div
                                   key={item.lineId}
-                                  className="flex justify-between gap-2 text-sm"
+                                  className="flex items-start justify-between gap-2 text-sm"
                                 >
                                   <div className="min-w-0">
                                     <p className="truncate font-medium">
@@ -815,9 +822,27 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
                                       </p>
                                     ) : null}
                                   </div>
-                                  <span className="shrink-0 font-medium">
-                                    ×{item.quantity}
-                                  </span>
+                                  <div className="flex shrink-0 flex-col items-end gap-2">
+                                    <span className="font-medium">
+                                      ×{item.quantity}
+                                    </span>
+                                    {canEditLine ? (
+                                      <Button
+                                        type="button"
+                                        size="sm"
+                                        variant="outline"
+                                        disabled={!sessionDetail?._id}
+                                        onClick={() =>
+                                          setEditingLineTarget({
+                                            batchId: batch.batchId,
+                                            lineItem: item,
+                                          })
+                                        }
+                                      >
+                                        Chỉnh
+                                      </Button>
+                                    ) : null}
+                                  </div>
                                 </div>
                               );
                             })}
@@ -936,6 +961,16 @@ const CoffeeInUseModal: React.FC<CoffeeInUseModalProps> = ({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <CoffeeOrderLineItemEditorDialog
+        isOpen={!!editingLineTarget}
+        onClose={() => setEditingLineTarget(null)}
+        target={editingLineTarget}
+        coffeeSessionId={sessionDetail?._id}
+        menuItems={menuItemsQuery.data ?? []}
+        templates={customizationTemplatesQuery.data ?? []}
+        updatedBy={user?._id}
+      />
     </>
   );
 };

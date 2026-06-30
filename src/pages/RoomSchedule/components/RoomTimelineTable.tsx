@@ -40,6 +40,7 @@ import {
   useTurnOffAllRooms,
 } from "@/hooks/room-schedule";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { useIsStaff } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import {
   getCoffeeSessionDisplayEnd,
@@ -54,7 +55,6 @@ import {
   CircleXIcon,
   CupSoda,
   DoorOpen,
-  EditIcon,
   Gamepad2,
   Gift,
   ShoppingCart,
@@ -64,11 +64,15 @@ import CoffeeBookedModal from "./CoffeeBookedModal";
 import CoffeeCreateSessionModal from "./CoffeeCreateSessionModal";
 import CoffeeInUseModal from "./CoffeeInUseModal";
 import CoffeeNewOrderLineItemsModal from "./CoffeeNewOrderLineItemsModal";
-import EditRoomTypeModal from "./EditRoomTypeModal";
 import ExtendSessionModal from "./ExtendSessionModal";
 import MobileTimelineView from "./MobileTimelineView";
 import ProcessBookedModal from "./ProcessBookedModal";
 import ProcessInUseModal from "./ProcessInUseModal";
+import {
+  getEffectiveScheduleRoomType,
+  getRoomTypeLabel as getScheduleRoomTypeLabel,
+  getScheduleTimelineLabel,
+} from "../utils/scheduleRoomType";
 import ProcessLockedModal from "./ProcessLockedModal";
 
 const DAY_START_HOUR = 0;
@@ -128,7 +132,6 @@ type Modal =
   | "extend"
   | "foodDrink"
   | "bill"
-  | "editRoomType"
   | "orderDetails"
   | "giftDetails"
   | "coffeeCreate"
@@ -206,6 +209,7 @@ const getTimelineNowMarker = (viewDate: Dayjs, now: Dayjs) => {
 const RoomTimelineTable: React.FC = () => {
   const { toast } = useToast();
   const isMobile = useIsMobile();
+  const isStaff = useIsStaff();
   const {
     supportNotifications,
     orderNotifications,
@@ -248,7 +252,6 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null,
   );
-  const [roomForEdit, setRoomForEdit] = useState<IRoom | null>(null);
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [orderRoomId, setOrderRoomId] = useState<string>("");
   const [giftData, setGiftData] = useState<{
@@ -552,7 +555,6 @@ const RoomTimelineTable: React.FC = () => {
     setLockedSchedule(null);
     setBookedSchedule(null);
     setInUseSchedule(null);
-    setRoomForEdit(null);
     setOrderData(null);
     setOrderRoomId("");
     setGiftData(null);
@@ -877,11 +879,6 @@ const RoomTimelineTable: React.FC = () => {
     });
   };
 
-  const handleEditRoomType = (room: IRoom) => {
-    setRoomForEdit(room);
-    setModal("editRoomType");
-  };
-
   return (
     <div className="!p-4 w-full space-y-6">
       <PageHeader
@@ -963,7 +960,6 @@ const RoomTimelineTable: React.FC = () => {
               onResolveRequest={handleResolveRequest}
               onOrderClick={handleOrderClick}
               onGiftClick={handleGiftClick}
-              onEditRoomType={handleEditRoomType}
             />
           ) : (
             /* Desktop View - Container cho phép scroll ngang, thêm onScroll để bắt sự kiện scroll */
@@ -1112,15 +1108,6 @@ const RoomTimelineTable: React.FC = () => {
                           <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
                             {getRoomTypeLabel(room.roomType)}
                           </span>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleEditRoomType(room);
-                            }}
-                            className="text-gray-400 hover:text-blue-600 transition-colors"
-                          >
-                            <EditIcon className="h-3 w-3" />
-                          </button>
                         </div>
                         <div className="flex items-center gap-2">
                           {hasNotification && (
@@ -1219,18 +1206,38 @@ const RoomTimelineTable: React.FC = () => {
                             />
                           );
                         })}
-                        {roomSchedules?.map((schedule) => {
+                        {roomSchedules
+                          ?.filter((schedule) => {
+                            if (!isStaff) return true;
+                            const status = schedule.status.toLowerCase();
+                            return (
+                              status !== "finished" && status !== "completed"
+                            );
+                          })
+                          .map((schedule) => {
                           const { left, width, bgColor } =
                             getMarkerStyle(schedule);
+                          const scheduleLabel = getScheduleTimelineLabel(
+                            room.roomName,
+                            schedule,
+                            room,
+                          );
+                          const scheduleSizeLabel = getScheduleRoomTypeLabel(
+                            getEffectiveScheduleRoomType(schedule, room),
+                          );
                           // const isDragging =
                           //   dragState.isDragging &&
                           //   dragState.scheduleId === schedule._id;
                           const eventElement = (
-                            <div
+                            <button
                               key={schedule._id}
-                              className={`absolute top-0 bottom-0 my-2 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md`}
-                              style={{ left, width }}
-                              title={`${schedule.status} - ${dayjs(
+                              type="button"
+                              className={`absolute top-0 bottom-0 my-1.5 ${bgColor} opacity-80 rounded-md shadow-sm hover:opacity-100 transition-all duration-200 hover:shadow-md cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-offset-1 focus-visible:ring-blue-500`}
+                              style={{ left, width: Math.max(width, 44) }}
+                              title={`${scheduleLabel} - ${dayjs(
+                                schedule.startTime,
+                              ).format("HH:mm")}`}
+                              aria-label={`${scheduleLabel} ${schedule.status} từ ${dayjs(
                                 schedule.startTime,
                               ).format("HH:mm")}`}
                               // draggable
@@ -1252,15 +1259,15 @@ const RoomTimelineTable: React.FC = () => {
                               }}
                             >
                               {/* Hiển thị thời gian trong schedule block */}
-                              <div className="relative flex h-full items-center justify-center px-1">
-                                <span className="absolute left-1 top-0.5 text-xs text-white font-medium">
+                              <div className="relative flex h-full min-h-9 items-center justify-center px-1.5">
+                                <span className="absolute left-1 top-0.5 text-[11px] text-white font-medium leading-none">
                                   {dayjs(schedule.startTime).format("HH:mm")}
                                 </span>
-                                <span className="max-w-full truncate text-sm font-semibold text-white">
-                                  {room.roomName}
+                                <span className="max-w-full truncate text-xs sm:text-sm font-semibold text-white">
+                                  {scheduleLabel}
                                 </span>
                               </div>
-                            </div>
+                            </button>
                           );
                           if (schedule.status.toLowerCase() === "booked") {
                             const eventStart = dayjs(schedule.startTime);
@@ -1273,6 +1280,7 @@ const RoomTimelineTable: React.FC = () => {
                                   {eventElement}
                                 </TooltipTrigger>
                                 <TooltipContent>
+                                  <p>Size: {scheduleSizeLabel}</p>
                                   <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
                                   <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
                                   {schedule.note && (
@@ -1379,6 +1387,12 @@ const RoomTimelineTable: React.FC = () => {
                                       Thông tin sử dụng
                                     </p>
                                     <div className="text-sm space-y-0.5">
+                                      <p>
+                                        <span className="text-gray-500">
+                                          Size:
+                                        </span>{" "}
+                                        {scheduleSizeLabel}
+                                      </p>
                                       <p>
                                         <span className="text-gray-500">
                                           Bắt đầu:
@@ -1871,13 +1885,6 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           schedule={inUseSchedule}
           refetchSchedules={refetch}
-        />
-      )}
-      {modal === "editRoomType" && (
-        <EditRoomTypeModal
-          isOpen={true}
-          onClose={closeModal}
-          room={roomForEdit}
         />
       )}
       {modal === "orderDetails" && orderData && (

@@ -26,6 +26,7 @@ interface MenuItem {
   hasVariant: boolean;
   price: number;
   image: string;
+  isActive?: boolean;
   category: string;
   inventory: {
     quantity: number;
@@ -37,7 +38,7 @@ interface MenuItem {
   updatedAt: string;
   existingImage?: string;
   quantity?: string;
-  variants?: string; // JSON string của variants
+  variants?: MenuItem[] | string;
   customizationGroups?: {
     groupKey: string;
     label: string;
@@ -59,6 +60,38 @@ interface MenuItemsModalProps {
   scheduleId?: string; // Thêm prop cho schedule ID
   createdBy?: string; // Thêm prop cho user ID
 }
+
+const isParentMenuItem = (item: MenuItem) => !item.parentId;
+
+const isItemActive = (item?: MenuItem | null) => item?.isActive !== false;
+
+const parseNestedVariants = (parent: MenuItem): MenuItem[] => {
+  if (!parent.variants) return [];
+
+  const rawVariants = Array.isArray(parent.variants)
+    ? parent.variants
+    : (() => {
+        try {
+          const parsed = JSON.parse(parent.variants);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
+  return rawVariants.map((variant) => ({
+    ...variant,
+    parentId: variant.parentId || parent._id,
+    category: variant.category || parent.category,
+    hasVariant: false,
+    inventory: {
+      quantity: variant.inventory?.quantity ?? 0,
+      minStock: variant.inventory?.minStock,
+      maxStock: variant.inventory?.maxStock,
+      lastUpdated: variant.inventory?.lastUpdated,
+    },
+  }));
+};
 
 const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
   isOpen,
@@ -107,6 +140,13 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     const categories: Record<string, MenuItem[]> = {};
 
     menuItems.forEach((item) => {
+      if (!isItemActive(item)) return;
+
+      const parent = item.parentId
+        ? menuItems.find((candidate) => candidate._id === item.parentId)
+        : null;
+      if (parent && !isItemActive(parent)) return;
+
       const category = item.category || "other";
       if (!categories[category]) {
         categories[category] = [];
@@ -117,20 +157,51 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
     return categories;
   }, [menuItems]);
 
-  // Group các item con vào parent
+  // Group các item con vào parent (hỗ trợ cả flat parentId và nested variants[])
   const groupedItems = React.useMemo(() => {
     const parents: MenuItem[] = [];
     const childrenMap: Record<string, MenuItem[]> = {};
+    const itemById: Record<string, MenuItem> = {};
+
     menuItems.forEach((item) => {
-      if (!item.parentId) {
-        parents.push(item);
-      } else {
-        if (!childrenMap[item.parentId]) childrenMap[item.parentId] = [];
-        childrenMap[item.parentId].push(item);
+      itemById[item._id] = item;
+    });
+
+    const addChild = (parentId: string, child: MenuItem) => {
+      const parent = itemById[parentId];
+      if (!parent || !isItemActive(parent) || !isItemActive(child)) return;
+
+      if (!childrenMap[parentId]) childrenMap[parentId] = [];
+      if (!childrenMap[parentId].some((existing) => existing._id === child._id)) {
+        childrenMap[parentId].push(child);
+      }
+    };
+
+    menuItems.forEach((item) => {
+      if (isParentMenuItem(item)) {
+        if (isItemActive(item)) {
+          parents.push(item);
+          parseNestedVariants(item).forEach((variant) => addChild(item._id, variant));
+        }
+        return;
+      }
+
+      if (item.parentId) {
+        addChild(item.parentId, item);
       }
     });
-    return { parents, childrenMap };
+
+    return {
+      parents: parents.filter((parent) => {
+        if (!parent.hasVariant) return true;
+        return (childrenMap[parent._id] || []).length > 0;
+      }),
+      childrenMap,
+      itemById,
+    };
   }, [menuItems]);
+
+  const findMenuItem = (key: string) => groupedItems.itemById[key];
 
   // Hàm normalize tiếng Việt không dấu và lower case
   const normalize = (str: string) =>
@@ -277,25 +348,49 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
       { queryKey: ["menuItems"] },
       (old: { data?: { result?: MenuItem[] } } | undefined) => {
         if (!old?.data?.result) return old;
+
+        const updateItemInventory = (item: MenuItem): MenuItem => {
+          if (item._id === key) {
+            return {
+              ...item,
+              inventory: {
+                ...item.inventory,
+                quantity: Math.max(
+                  0,
+                  (item.inventory?.quantity || 0) - quantityDiff
+                ),
+              },
+            };
+          }
+
+          if (!item.variants) return item;
+
+          const nestedVariants = parseNestedVariants(item);
+          if (nestedVariants.length === 0) return item;
+
+          const updatedVariants = nestedVariants.map((variant) =>
+            variant._id === key
+              ? {
+                  ...variant,
+                  inventory: {
+                    ...variant.inventory,
+                    quantity: Math.max(
+                      0,
+                      (variant.inventory?.quantity || 0) - quantityDiff
+                    ),
+                  },
+                }
+              : variant
+          );
+
+          return { ...item, variants: updatedVariants };
+        };
+
         return {
           ...old,
           data: {
             ...old.data,
-            result: old.data.result.map((item: MenuItem) => {
-              if (item._id === key) {
-                return {
-                  ...item,
-                  inventory: {
-                    ...item.inventory,
-                    quantity: Math.max(
-                      0,
-                      (item.inventory?.quantity || 0) - quantityDiff
-                    ),
-                  },
-                };
-              }
-              return item;
-            }),
+            result: old.data.result.map(updateItemInventory),
           },
         };
       }
@@ -426,7 +521,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   // Xử lý khi thay đổi số lượng qua input
   const handleQuantityChange = (key: string, newValue: number) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
 
     const currentValue = quantities[key] || 0;
@@ -447,14 +542,14 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   // Hàm handle cho nút + (thêm 1)
   const handleAddOne = (key: string) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
     addMutation.mutate({ key, quantity: 1, category: item.category });
   };
 
   // Hàm handle cho nút - (giảm 1)
   const handleRemoveOne = (key: string) => {
-    const item = menuItems.find((i) => i._id === key);
+    const item = findMenuItem(key);
     if (!item) return;
     removeMutation.mutate({ key, quantity: 1, category: item.category });
   };
@@ -693,7 +788,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-7xl max-h-[94vh] sm:max-h-[92vh] overflow-hidden flex flex-col gap-4 p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-2xl">
             Danh Sách Đồ Ăn & Đồ Uống
@@ -709,10 +804,10 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col h-full">
-          <div className="flex flex-row gap-4 h-full">
+        <div className="flex flex-col flex-1 min-h-0">
+          <div className="flex flex-row gap-4 flex-1 min-h-0">
             {/* Bên trái: menu */}
-            <div className="flex-1 flex flex-col">
+            <div className="flex-1 flex flex-col min-h-0">
               {/* Search và Filter */}
               <div className="mb-6 space-y-4">
                 <div className="relative">
@@ -744,7 +839,7 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
                 </Tabs>
               </div>
               {/* Content */}
-              <div className="flex-1 overflow-y-auto">
+              <div className="flex-1 min-h-0 overflow-y-auto pr-1">
                 <div className="space-y-4">
                   {filteredParentItems.length === 0 ? (
                     <div className="text-center py-8">

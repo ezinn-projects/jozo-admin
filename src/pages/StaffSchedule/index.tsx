@@ -21,6 +21,7 @@ import { EmployeeScheduleStatus, Role, ShiftType } from "@/constants/enum";
 import PATHS from "@/constants/paths";
 import { useStaffSchedules, ViewMode } from "@/hooks/use-staff-schedules";
 import { useToast } from "@/hooks/use-toast";
+import { useIsAdmin } from "@/hooks/usePermission";
 import { useUsers } from "@/hooks/use-users";
 import { useSocket } from "@/hooks/useSocket";
 import { cn } from "@/lib/utils";
@@ -31,6 +32,10 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Calendar } from "@/components/ui/calendar";
 import StaffScheduleDetailModal from "./components/StaffScheduleDetailModal";
+import StaffScheduleShiftFilter, {
+  getVisibleShifts,
+  type ShiftFilter,
+} from "./components/StaffScheduleShiftFilter";
 
 const StaffSchedulePage = () => {
   const navigate = useNavigate();
@@ -43,47 +48,44 @@ const StaffSchedulePage = () => {
   const [selectedSchedule, setSelectedSchedule] =
     useState<IEmployeeSchedule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all");
   const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
   const [initialShift, setInitialShift] = useState<ShiftType | undefined>(
-    undefined
+    undefined,
   );
 
   const { users, isLoadingUsers } = useUsers();
+  const isAdmin = useIsAdmin();
 
-  // Array mapping for day names in Vietnamese
   const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
   const { toast } = useToast();
   const { onNewScheduleRegistration, offNewScheduleRegistration } = useSocket();
 
-  // Calculate startDate and endDate based on viewMode and currentDate
   const { startDate, endDate, dates } = useMemo(() => {
     let start: Dayjs;
     let end: Dayjs;
     const dateList: Dayjs[] = [];
 
-    if (viewMode === "week") {
-      // Get Monday of the week (dayjs defaults Sunday as start of week, so Monday = day 1)
-      const dayOfWeek = currentDate.day(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    if (viewMode === "day") {
+      start = currentDate.startOf("day");
+      end = currentDate.startOf("day");
+      dateList.push(currentDate);
+    } else if (viewMode === "week") {
+      const dayOfWeek = currentDate.day();
       if (dayOfWeek === 0) {
-        // If Sunday, go back to Monday of previous week
         start = currentDate.subtract(6, "day");
       } else {
-        // Calculate days to subtract to get to Monday (day 1)
-        const daysToSubtract = dayOfWeek - 1;
-        start = currentDate.subtract(daysToSubtract, "day");
+        start = currentDate.subtract(dayOfWeek - 1, "day");
       }
       end = start.add(6, "day");
 
-      // Create list of 7 days
       for (let i = 0; i < 7; i++) {
         dateList.push(start.add(i, "day"));
       }
     } else {
-      // Month view
       start = currentDate.startOf("month");
       end = currentDate.endOf("month");
 
-      // Create list of all days in the month
       const daysInMonth = currentDate.daysInMonth();
       for (let i = 0; i < daysInMonth; i++) {
         dateList.push(start.add(i, "day"));
@@ -93,13 +95,20 @@ const StaffSchedulePage = () => {
     return { startDate: start, endDate: end, dates: dateList };
   }, [viewMode, currentDate]);
 
+  const visibleShifts = useMemo(
+    () => getVisibleShifts(shiftFilter),
+    [shiftFilter],
+  );
+
   const {
     data: schedules = [],
     isLoading: isLoadingSchedules,
     refetch,
-  } = useStaffSchedules(startDate, endDate, viewMode);
+  } = useStaffSchedules(startDate, endDate, viewMode, {
+    filterType: viewMode === "day" ? "day" : undefined,
+    date: viewMode === "day" ? currentDate : undefined,
+  });
 
-  // Socket listener for new schedule registration
   useEffect(() => {
     const handleNewScheduleRegistration = (data: {
       userId: string;
@@ -111,9 +120,6 @@ const StaffSchedulePage = () => {
       }>;
       message: string;
     }) => {
-      console.log("Có nhân viên đăng ký ca mới:", data);
-
-      // Show toast notification
       toast({
         title: "Đăng ký ca mới",
         description:
@@ -123,8 +129,6 @@ const StaffSchedulePage = () => {
           } ca làm việc`,
         duration: 5000,
       });
-
-      // Refetch schedules to update the table
       refetch();
     };
 
@@ -135,17 +139,15 @@ const StaffSchedulePage = () => {
     };
   }, [onNewScheduleRegistration, offNewScheduleRegistration, refetch, toast]);
 
-  // Filter only staff with role "staff"
   const staffList = users.filter((user: User) => user.role === Role.Staff);
 
-  // Filter staff by search term
   const filteredStaff = staffList.filter(
     (user: User) =>
       (user.name || user.full_name || "")
         .toLowerCase()
         .includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.phone_number.includes(searchTerm)
+      user.phone_number.includes(searchTerm),
   );
 
   const getUserName = (user: User) => {
@@ -178,29 +180,26 @@ const StaffSchedulePage = () => {
     const mode = schedule.salaryResolution?.mode
       ? `\nResolution: ${sourceLabelMap[schedule.salaryResolution.mode] || schedule.salaryResolution.mode}`
       : "";
-    const specials =
-      schedule.salaryResolution?.specialBusinessDates?.length
-        ? `\nNgày đặc biệt: ${schedule.salaryResolution.specialBusinessDates.join(", ")}`
-        : "";
+    const specials = schedule.salaryResolution?.specialBusinessDates?.length
+      ? `\nNgày đặc biệt: ${schedule.salaryResolution.specialBusinessDates.join(", ")}`
+      : "";
 
     return `\nNguồn lương: ${sourceLabelMap[schedule.salarySource || ""] || schedule.salarySource || "—"}${mode}${specials}`;
   };
 
-  // Group schedules by userId, date and shift
   const scheduleMap = useMemo(() => {
     const map = new Map<string, IEmployeeSchedule>();
     if (Array.isArray(schedules)) {
       schedules.forEach((schedule) => {
-        // Use shift if available, otherwise use shiftType, normalize old keys
         const shift = schedule.shift || schedule.shiftType;
         const normalizedShift =
           shift === "evening" || shift === "afternoon"
             ? ShiftType.Afternoon
             : shift === "morning"
-            ? ShiftType.Morning
-            : shift === "all"
-            ? ShiftType.All
-            : shift;
+              ? ShiftType.Morning
+              : shift === "all"
+                ? ShiftType.All
+                : shift;
         const key = `${schedule.userId}-${schedule.date}-${normalizedShift}`;
         map.set(key, schedule);
       });
@@ -208,32 +207,29 @@ const StaffSchedulePage = () => {
     return map;
   }, [schedules]);
 
-  // Get status of a shift
   const getScheduleStatus = (
     userId: string,
     date: Dayjs,
-    shift: ShiftType
+    shift: ShiftType,
   ): IEmployeeSchedule | null => {
     const key = `${userId}-${date.format("YYYY-MM-DD")}-${shift}`;
     return scheduleMap.get(key) || null;
   };
 
-  // Check if date is in the past
   const isPastDate = (date: Dayjs): boolean => {
     const today = dayjs().startOf("day");
     return date.startOf("day").isBefore(today);
   };
 
-  // Get color by status
   const getStatusColor = (
     status: EmployeeScheduleStatus | null,
-    isPast: boolean
+    isPast: boolean,
+    canInteract: boolean,
   ): string => {
-    if (isPast) {
+    if (isPast && !canInteract) {
       if (!status) {
         return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
       }
-      // For past dates with status, keep the status color but make it more muted
       switch (status) {
         case EmployeeScheduleStatus.Approved:
           return "bg-blue-500 opacity-60 cursor-not-allowed";
@@ -250,6 +246,29 @@ const StaffSchedulePage = () => {
           return "bg-yellow-400 opacity-60 cursor-not-allowed";
         default:
           return "bg-gray-50 border border-gray-200 border-dashed opacity-50 cursor-not-allowed";
+      }
+    }
+
+    if (isPast && canInteract) {
+      if (!status) {
+        return "bg-amber-50 border border-amber-300 border-dashed hover:bg-amber-100 hover:border-amber-400";
+      }
+      switch (status) {
+        case EmployeeScheduleStatus.Approved:
+          return "bg-blue-500 opacity-75 hover:bg-blue-600";
+        case EmployeeScheduleStatus.Completed:
+          return "bg-emerald-500 opacity-75 hover:bg-emerald-600";
+        case EmployeeScheduleStatus.InProgress:
+          return "bg-purple-500 opacity-75 hover:bg-purple-600";
+        case EmployeeScheduleStatus.Rejected:
+        case EmployeeScheduleStatus.Cancelled:
+          return "bg-red-500 opacity-75 hover:bg-red-600";
+        case EmployeeScheduleStatus.Absent:
+          return "bg-gray-400 opacity-75 hover:bg-gray-500";
+        case EmployeeScheduleStatus.Pending:
+          return "bg-yellow-400 opacity-75 hover:bg-yellow-500";
+        default:
+          return "bg-amber-50 border border-amber-300 border-dashed hover:bg-amber-100 hover:border-amber-400";
       }
     }
 
@@ -276,7 +295,6 @@ const StaffSchedulePage = () => {
   };
 
   const handleStaffClick = (userId: string) => {
-    // Navigate to staff earnings detail page
     navigate(PATHS.STAFF_EARNINGS_DETAIL.replace(":userId", userId));
   };
 
@@ -294,14 +312,12 @@ const StaffSchedulePage = () => {
     userId: string,
     staffName: string,
     date: Dayjs,
-    shift: ShiftType
+    shift: ShiftType,
   ) => {
     if (schedule) {
-      // If schedule exists, open detail modal
       setSelectedSchedule(schedule);
       setIsDetailModalOpen(true);
     } else {
-      // If no schedule, open registration modal with date and shift pre-filled
       setSelectedUserId(userId);
       setSelectedStaffName(staffName);
       setInitialDate(date.toDate());
@@ -317,7 +333,9 @@ const StaffSchedulePage = () => {
   };
 
   const handlePrevious = () => {
-    if (viewMode === "week") {
+    if (viewMode === "day") {
+      setCurrentDate(currentDate.subtract(1, "day"));
+    } else if (viewMode === "week") {
       setCurrentDate(currentDate.subtract(1, "week"));
     } else {
       setCurrentDate(currentDate.subtract(1, "month"));
@@ -325,7 +343,9 @@ const StaffSchedulePage = () => {
   };
 
   const handleNext = () => {
-    if (viewMode === "week") {
+    if (viewMode === "day") {
+      setCurrentDate(currentDate.add(1, "day"));
+    } else if (viewMode === "week") {
       setCurrentDate(currentDate.add(1, "week"));
     } else {
       setCurrentDate(currentDate.add(1, "month"));
@@ -353,20 +373,20 @@ const StaffSchedulePage = () => {
         className="mb-6"
       />
 
-      {/* Controls */}
       <div className="mb-6 flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
-        <div className="flex items-center gap-4">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
           <Tabs
             value={viewMode}
             onValueChange={(value) => setViewMode(value as ViewMode)}
           >
             <TabsList>
+              <TabsTrigger value="day">Ngày</TabsTrigger>
               <TabsTrigger value="week">Week</TabsTrigger>
               <TabsTrigger value="month">Month</TabsTrigger>
             </TabsList>
           </Tabs>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <Button variant="outline" size="icon" onClick={handlePrevious}>
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -377,11 +397,13 @@ const StaffSchedulePage = () => {
                   className="w-[200px] justify-start text-left font-normal"
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
-                  {viewMode === "week"
-                    ? `${startDate.format("DD/MM")} - ${endDate.format(
-                        "DD/MM/YYYY"
-                      )}`
-                    : currentDate.format("MM/YYYY")}
+                  {viewMode === "day"
+                    ? currentDate.format("DD/MM/YYYY")
+                    : viewMode === "week"
+                      ? `${startDate.format("DD/MM")} - ${endDate.format(
+                          "DD/MM/YYYY",
+                        )}`
+                      : currentDate.format("MM/YYYY")}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -404,7 +426,6 @@ const StaffSchedulePage = () => {
           </div>
         </div>
 
-        {/* Search Bar */}
         <div className="relative w-full sm:w-auto">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
@@ -416,7 +437,12 @@ const StaffSchedulePage = () => {
         </div>
       </div>
 
-      {/* Table */}
+      <StaffScheduleShiftFilter
+        value={shiftFilter}
+        onChange={setShiftFilter}
+        className="mb-4 max-w-xl"
+      />
+
       <div className="border rounded-md overflow-auto">
         <Table>
           <TableHeader>
@@ -430,7 +456,7 @@ const StaffSchedulePage = () => {
               {dates.map((date) => (
                 <TableHead
                   key={date.format("YYYY-MM-DD")}
-                  colSpan={3}
+                  colSpan={visibleShifts.length}
                   className="text-center"
                 >
                   <div className="flex flex-col">
@@ -447,15 +473,14 @@ const StaffSchedulePage = () => {
             <TableRow>
               {dates.map((date) => (
                 <React.Fragment key={date.format("YYYY-MM-DD")}>
-                  <TableHead className="min-w-[80px] text-center text-xs">
-                    Shift 1
-                  </TableHead>
-                  <TableHead className="min-w-[80px] text-center text-xs">
-                    Shift 2
-                  </TableHead>
-                  <TableHead className="min-w-[80px] text-center text-xs">
-                    Shift 3
-                  </TableHead>
+                  {visibleShifts.map((shift) => (
+                    <TableHead
+                      key={`${date.format("YYYY-MM-DD")}-${shift.type}`}
+                      className="min-w-[80px] text-center text-xs"
+                    >
+                      {shift.label}
+                    </TableHead>
+                  ))}
                 </React.Fragment>
               ))}
             </TableRow>
@@ -464,7 +489,7 @@ const StaffSchedulePage = () => {
             {filteredStaff.length === 0 ? (
               <TableRow>
                 <TableCell
-                  colSpan={dates.length * 3 + 1}
+                  colSpan={dates.length * visibleShifts.length + 1}
                   className="text-center py-8 text-gray-500"
                 >
                   {searchTerm ? "No staff found" : "No staff available"}
@@ -478,7 +503,7 @@ const StaffSchedulePage = () => {
                     <TableCell
                       className={cn(
                         "min-w-[250px] sticky left-0 bg-white z-10 font-medium",
-                        "cursor-pointer hover:text-blue-600 hover:underline py-6"
+                        "cursor-pointer hover:text-blue-600 hover:underline py-6",
                       )}
                       onClick={() => handleStaffClick(user._id)}
                     >
@@ -486,122 +511,55 @@ const StaffSchedulePage = () => {
                     </TableCell>
                     {dates.map((date) => {
                       const isPast = isPastDate(date);
-                      const morningSchedule = getScheduleStatus(
-                        user._id,
-                        date,
-                        ShiftType.Morning
-                      );
-                      const morningStatus = morningSchedule?.status || null;
-                      const morningCanClick = morningSchedule || !isPast;
-
-                      const afternoonSchedule = getScheduleStatus(
-                        user._id,
-                        date,
-                        ShiftType.Afternoon
-                      );
-                      const afternoonStatus = afternoonSchedule?.status || null;
-                      const afternoonCanClick = afternoonSchedule || !isPast;
-
-                      const allSchedule = getScheduleStatus(
-                        user._id,
-                        date,
-                        ShiftType.All
-                      );
-                      const allStatus = allSchedule?.status || null;
-                      const allCanClick = allSchedule || !isPast;
-
-                      const morningTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
-Ca: Shift 1
-Trạng thái: ${morningSchedule ? morningStatus || "Không có" : "Chưa đăng ký"}${
-                        morningSchedule?.note
-                          ? `\nGhi chú: ${morningSchedule.note}`
-                          : ""
-                      }${getSalarySnapshotTooltip(morningSchedule)}${getSalarySourceTooltip(morningSchedule)}`;
-
-                      const afternoonTooltip = `Ngày: ${date.format(
-                        "DD/MM/YYYY"
-                      )}
-Ca: Shift 2
-Trạng thái: ${
-                        afternoonSchedule
-                          ? afternoonStatus || "Không có"
-                          : "Chưa đăng ký"
-                      }${
-                        afternoonSchedule?.note
-                          ? `\nGhi chú: ${afternoonSchedule.note}`
-                          : ""
-                      }${getSalarySnapshotTooltip(afternoonSchedule)}${getSalarySourceTooltip(afternoonSchedule)}`;
-
-                      const allTooltip = `Ngày: ${date.format("DD/MM/YYYY")}
-Ca: Shift 3
-Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
-                        allSchedule?.note ? `\nGhi chú: ${allSchedule.note}` : ""
-                      }${getSalarySnapshotTooltip(allSchedule)}${getSalarySourceTooltip(allSchedule)}`;
+                      const canInteractPast = isAdmin;
 
                       return (
                         <React.Fragment key={date.format("YYYY-MM-DD")}>
-                          <TableCell
-                            className={cn(
-                              "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
-                              getStatusColor(morningStatus, isPast),
-                              morningCanClick &&
-                                "cursor-pointer transition-colors"
-                            )}
-                            title={morningTooltip}
-                            onClick={
-                              morningCanClick
-                                ? () =>
-                                    handleCellClick(
-                                      morningSchedule,
-                                      user._id,
-                                      userName,
-                                      date,
-                                      ShiftType.Morning
-                                    )
-                                : undefined
-                            }
-                          />
-                          <TableCell
-                            className={cn(
-                              "px-2 py-6 text-center min-w-[80px] border-r border-gray-300",
-                              getStatusColor(afternoonStatus, isPast),
-                              afternoonCanClick &&
-                                "cursor-pointer transition-colors"
-                            )}
-                            title={afternoonTooltip}
-                            onClick={
-                              afternoonCanClick
-                                ? () =>
-                                    handleCellClick(
-                                      afternoonSchedule,
-                                      user._id,
-                                      userName,
-                                      date,
-                                      ShiftType.Afternoon
-                                    )
-                                : undefined
-                            }
-                          />
-                          <TableCell
-                            className={cn(
-                              "px-2 py-6 text-center min-w-[80px]",
-                              getStatusColor(allStatus, isPast),
-                              allCanClick && "cursor-pointer transition-colors"
-                            )}
-                            title={allTooltip}
-                            onClick={
-                              allCanClick
-                                ? () =>
-                                    handleCellClick(
-                                      allSchedule,
-                                      user._id,
-                                      userName,
-                                      date,
-                                      ShiftType.All
-                                    )
-                                : undefined
-                            }
-                          />
+                          {visibleShifts.map((shiftDef, shiftIndex) => {
+                            const schedule = getScheduleStatus(
+                              user._id,
+                              date,
+                              shiftDef.type,
+                            );
+                            const status = schedule?.status || null;
+                            const canClick =
+                              !!schedule || !isPast || canInteractPast;
+                            const isLastShift =
+                              shiftIndex === visibleShifts.length - 1;
+                            const tooltip = `Ngày: ${date.format("DD/MM/YYYY")}
+Ca: ${shiftDef.label}
+Trạng thái: ${schedule ? status || "Không có" : "Chưa đăng ký"}${
+                              schedule?.note
+                                ? `\nGhi chú: ${schedule.note}`
+                                : ""
+                            }${getSalarySnapshotTooltip(schedule)}${getSalarySourceTooltip(schedule)}`;
+
+                            return (
+                              <TableCell
+                                key={`${date.format("YYYY-MM-DD")}-${shiftDef.type}`}
+                                className={cn(
+                                  "px-2 py-6 text-center min-w-[80px]",
+                                  !isLastShift && "border-r border-gray-300",
+                                  getStatusColor(status, isPast, canClick),
+                                  canClick &&
+                                    "cursor-pointer transition-colors",
+                                )}
+                                title={tooltip}
+                                onClick={
+                                  canClick
+                                    ? () =>
+                                        handleCellClick(
+                                          schedule,
+                                          user._id,
+                                          userName,
+                                          date,
+                                          shiftDef.type,
+                                        )
+                                    : undefined
+                                }
+                              />
+                            );
+                          })}
                         </React.Fragment>
                       );
                     })}
@@ -613,7 +571,6 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
         </Table>
       </div>
 
-      {/* Registration Modal */}
       {selectedUserId && (
         <StaffScheduleRegistrationModal
           isOpen={isModalOpen}
@@ -623,10 +580,10 @@ Trạng thái: ${allSchedule ? allStatus || "Không có" : "Chưa đăng ký"}${
           refetchSchedules={refetch}
           initialDate={initialDate}
           initialShift={initialShift}
+          allowPastDates={isAdmin}
         />
       )}
 
-      {/* Detail Modal */}
       <StaffScheduleDetailModal
         isOpen={isDetailModalOpen}
         onClose={handleCloseDetailModal}

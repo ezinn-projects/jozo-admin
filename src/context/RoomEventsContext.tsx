@@ -12,8 +12,13 @@ import { Gift as GiftType } from "@/@types/Gift";
 import { IBookingSocketData } from "@/@types/Booking";
 import { OrderData } from "@/pages/RoomSchedule/components/RoomTimelineTable";
 import { useToast } from "@/hooks/use-toast";
-import dayjs from "dayjs";
+import {
+  applyScheduleChangedToCache,
+  getRoomSchedulesQueryKey,
+} from "@/hooks/room-schedule";
+import { IRoomSchedule, IRoomScheduleChangedSocketPayload } from "@/@types/Room";
 import { useQueryClient } from "@tanstack/react-query";
+import { parseUTCToLocal } from "@/lib/dayjs";
 import {
   COFFEE_ORDER_BOARD_GAME_AUDIO_URLS,
   COFFEE_SUPPORT_BOARD_GAME_AUDIO_URLS,
@@ -166,6 +171,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offNewOrderNotification,
     onNewBooking,
     offNewBooking,
+    onScheduleChanged,
+    offScheduleChanged,
     onGiftClaimed,
     offGiftClaimed,
     onOrderNew,
@@ -750,30 +757,6 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
 
       if (!bookingData || !roomId) return;
 
-      const bookingDate = dayjs(bookingData.startTime);
-
-      // Cache key giống RoomTimeline dùng
-      const queryKey = [
-        "roomSchedules",
-        bookingDate.startOf("day").toISOString(),
-      ];
-
-      // Chỉ cập nhật cache, không phụ thuộc việc đang đứng ở màn timeline hay không
-      queryClient.setQueryData(queryKey, (oldData: unknown): unknown => {
-        const old = (oldData || []) as Array<{
-          _id: string;
-        }>;
-
-        const exists = old.some((s) => s._id === bookingData.bookingId);
-        if (exists) return oldData;
-
-        // Để tránh lệ thuộc type IRoomSchedule ở đây, chỉ invalidates để RoomTimeline tự refetch
-        return oldData;
-      });
-
-      // Invalidate để RoomTimeline (hoặc nơi khác) tự refetch khi cần
-      queryClient.invalidateQueries({ queryKey: ["roomSchedules"] });
-
       const roomName = bookingData.roomName || roomId;
 
       switch (bookingData.action) {
@@ -797,9 +780,25 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       }
     };
 
+    const handleScheduleChanged = (data: IRoomScheduleChangedSocketPayload) => {
+      if (!data.schedule?._id) return;
+
+      const { action, schedule } = data;
+      const dateKey =
+        schedule.dateOfUse ??
+        parseUTCToLocal(schedule.startTime).format("YYYY-MM-DD");
+
+      queryClient.setQueryData(
+        getRoomSchedulesQueryKey(dateKey),
+        (old: IRoomSchedule[] | undefined) =>
+          applyScheduleChangedToCache(old, action, schedule),
+      );
+    };
+
     onNotification(handleNotification);
     onNewOrderNotification(handleNewOrderNotification);
     onNewBooking(handleNewBooking);
+    onScheduleChanged(handleScheduleChanged);
     onGiftClaimed(handleGiftClaimed);
     onOrderNew(handleCoffeeOrderSocket);
     onOrderCreated(handleCoffeeOrderSocket);
@@ -810,6 +809,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       offNotification(handleNotification);
       offNewOrderNotification(handleNewOrderNotification);
       offNewBooking(handleNewBooking);
+      offScheduleChanged(handleScheduleChanged);
       offGiftClaimed(handleGiftClaimed);
       offOrderNew(handleCoffeeOrderSocket);
       offOrderCreated(handleCoffeeOrderSocket);
@@ -827,6 +827,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offNewOrderNotification,
     onNewBooking,
     offNewBooking,
+    onScheduleChanged,
+    offScheduleChanged,
     onGiftClaimed,
     offGiftClaimed,
     onOrderNew,

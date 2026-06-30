@@ -6,8 +6,8 @@ import { RoomStatus, RoomType } from "./enum";
  * Options for RoomType with short, descriptive labels.
  */
 const roomTypeOptions = [
-  { value: RoomType.LARGE, label: "Large Room" },
   { value: RoomType.MEDIUM, label: "Medium Room" },
+  { value: RoomType.LARGE, label: "Large Room" },
   { value: RoomType.DORM, label: "Dorm" },
 ];
 

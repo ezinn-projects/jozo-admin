@@ -1,4 +1,5 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMemo } from "react";
+import { useMutation, useQuery, useQueryClient, QueryClient } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import {
@@ -21,6 +22,7 @@ export interface FnBMenuItem {
   hasVariant: boolean;
   price: number;
   image?: string;
+  isActive?: boolean;
   isAvailable?: boolean;
   inventory: {
     quantity: number;
@@ -82,13 +84,166 @@ interface UpdateMenuItemData extends Partial<CreateMenuItemData> {
   _id: string;
 }
 
+export const parseNestedVariants = (parent: FnBMenuItem): FnBMenuItem[] => {
+  if (!parent.variants) return [];
+
+  const rawVariants = Array.isArray(parent.variants)
+    ? parent.variants
+    : (() => {
+        try {
+          const parsed = JSON.parse(parent.variants as unknown as string);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      })();
+
+  return rawVariants.map((variant) => ({
+    ...variant,
+    parentId: variant.parentId || parent._id || null,
+    category: variant.category || parent.category,
+    hasVariant: false,
+    inventory: {
+      quantity: variant.inventory?.quantity ?? 0,
+      minStock: variant.inventory?.minStock,
+      maxStock: variant.inventory?.maxStock,
+      lastUpdated: variant.inventory?.lastUpdated ?? new Date(),
+    },
+  }));
+};
+
+export const groupMenuItemsByParent = (
+  items: FnBMenuItem[],
+): FnBMenuItem[] => {
+  const parents: FnBMenuItem[] = [];
+  const childrenMap: Record<string, FnBMenuItem[]> = {};
+
+  const addChild = (parentId: string, child: FnBMenuItem) => {
+    if (!childrenMap[parentId]) childrenMap[parentId] = [];
+    if (!childrenMap[parentId].some((existing) => existing._id === child._id)) {
+      childrenMap[parentId].push(child);
+    }
+  };
+
+  items.forEach((item) => {
+    if (item.parentId) {
+      addChild(item.parentId, item);
+      return;
+    }
+
+    parents.push(item);
+    if (item._id) {
+      parseNestedVariants(item).forEach((variant) => addChild(item._id!, variant));
+    }
+  });
+
+  return parents.map((parent) => ({
+    ...parent,
+    variants: parent._id ? childrenMap[parent._id] || [] : [],
+  }));
+};
+
 // Query keys
-const menuItemsKeys = {
+export const menuItemsQueryKeys = {
   all: ["menuItems"] as const,
-  lists: () => [...menuItemsKeys.all, "list"] as const,
-  list: (filters: string) => [...menuItemsKeys.lists(), { filters }] as const,
-  details: () => [...menuItemsKeys.all, "detail"] as const,
-  detail: (id: string) => [...menuItemsKeys.details(), id] as const,
+  lists: () => [...menuItemsQueryKeys.all, "list"] as const,
+  list: (filters: string) =>
+    [...menuItemsQueryKeys.lists(), { filters }] as const,
+  details: () => [...menuItemsQueryKeys.all, "detail"] as const,
+  detail: (id: string) => [...menuItemsQueryKeys.details(), id] as const,
+  legacyDetail: (id: string) => ["menuItem", id] as const,
+};
+
+const menuItemsKeys = menuItemsQueryKeys;
+
+export const normalizeMenuItemApiResponse = (
+  data: unknown,
+): FnBMenuItem | null => {
+  if (!data || typeof data !== "object") return null;
+
+  if ("result" in data && data.result && typeof data.result === "object") {
+    return data.result as FnBMenuItem;
+  }
+
+  return data as FnBMenuItem;
+};
+
+const isTempMenuItemId = (id?: string) => !!id?.startsWith("temp-id-");
+
+export const patchMenuItemInListCache = (
+  queryClient: QueryClient,
+  itemId: string,
+  patch: Partial<FnBMenuItem>,
+) => {
+  queryClient.setQueryData(menuItemsKeys.lists(), (old: FnBMenuItem[] = []) =>
+    old.map((item) => {
+      if (item._id === itemId) {
+        return { ...item, ...patch };
+      }
+
+      if (!item.variants?.length) {
+        return item;
+      }
+
+      let hasVariantPatch = false;
+      const nextVariants = item.variants.map((variant) => {
+        if (variant._id !== itemId) return variant;
+        hasVariantPatch = true;
+        return { ...variant, ...patch };
+      });
+
+      return hasVariantPatch ? { ...item, variants: nextVariants } : item;
+    }),
+  );
+};
+
+export const upsertMenuItemInListCache = (
+  queryClient: QueryClient,
+  savedItem: FnBMenuItem,
+) => {
+  if (!savedItem._id) return;
+
+  queryClient.setQueryData(menuItemsKeys.lists(), (old: FnBMenuItem[] = []) => {
+    const withoutTemp = old.filter((item) => !isTempMenuItemId(item._id));
+    const index = withoutTemp.findIndex((item) => item._id === savedItem._id);
+
+    if (index >= 0) {
+      const next = [...withoutTemp];
+      next[index] = { ...withoutTemp[index], ...savedItem };
+      return next;
+    }
+
+    return [...withoutTemp, savedItem];
+  });
+};
+
+export const removeMenuItemFromListCache = (
+  queryClient: QueryClient,
+  itemId: string,
+) => {
+  queryClient.setQueryData(menuItemsKeys.lists(), (old: FnBMenuItem[] = []) =>
+    old.filter((item) => item._id !== itemId),
+  );
+};
+
+export const replaceMenuItemsListCache = (
+  queryClient: QueryClient,
+  items: FnBMenuItem[],
+) => {
+  queryClient.setQueryData(menuItemsKeys.lists(), items);
+};
+
+const syncMenuItemDetailCaches = (
+  queryClient: QueryClient,
+  savedItem: FnBMenuItem,
+) => {
+  if (!savedItem._id) return;
+
+  queryClient.setQueryData(menuItemsKeys.detail(savedItem._id), savedItem);
+  queryClient.setQueryData(
+    menuItemsKeys.legacyDetail(savedItem._id),
+    { data: { result: savedItem } },
+  );
 };
 
 // API functions using fnbMenuApis
@@ -99,7 +254,11 @@ const fetchMenuItems = async (): Promise<FnBMenuItem[]> => {
 
 const createMenuItem = async (formData: FormData): Promise<FnBMenuItem> => {
   const response = await fnbMenuApis.createMenuItem(formData);
-  return response.data;
+  const savedItem = normalizeMenuItemApiResponse(response.data);
+  if (!savedItem) {
+    throw new Error("Failed to create menu item");
+  }
+  return savedItem;
 };
 
 const updateMenuItem = async ({
@@ -122,14 +281,31 @@ const updateMenuItem = async ({
   });
 
   const response = await fnbMenuApis.updateMenuItem(_id, formData);
-  if (!response.data) {
+  const savedItem = normalizeMenuItemApiResponse(response.data);
+  if (!savedItem) {
     throw new Error("Failed to update menu item");
   }
-  return response.data;
+  return savedItem;
 };
 
 const deleteMenuItem = async (itemId: string): Promise<void> => {
   await fnbMenuApis.deleteMenuItem(itemId);
+};
+
+const cleanupMenuItems = async (dryRun: boolean) => {
+  const response = await fnbMenuApis.cleanupMenuItems(dryRun);
+  return response.data;
+};
+
+const updateMenuItemActive = async ({
+  _id,
+  isActive,
+}: {
+  _id: string;
+  isActive: boolean;
+}): Promise<FnBMenuItem | null> => {
+  const response = await fnbMenuApis.updateMenuItemActive(_id, isActive);
+  return response.data.result ?? null;
 };
 
 // Hook cũ (để tương thích)
@@ -147,11 +323,22 @@ export const useMenuItems = () => {
   } = useQuery({
     queryKey: menuItemsKeys.lists(),
     queryFn: fetchMenuItems,
-    staleTime: 5 * 60 * 1000, // 5 minutes
-    gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+    staleTime: 5 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+    refetchOnWindowFocus: false,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   });
+
+  const groupedItems = useMemo(
+    () => groupMenuItemsByParent(menuItems),
+    [menuItems],
+  );
+
+  const parentItems = useMemo(
+    () => menuItems.filter((item) => item.hasVariant && !item.parentId),
+    [menuItems],
+  );
 
   // Mutation: Create menu item with optimistic updates
   const createMutation = useMutation({
@@ -188,7 +375,6 @@ export const useMenuItems = () => {
       return { previousMenuItems };
     },
     onError: (err, _newMenuItem, context) => {
-      // If the mutation fails, use the context returned from onMutate to roll back
       if (context?.previousMenuItems) {
         queryClient.setQueryData(
           menuItemsKeys.lists(),
@@ -202,11 +388,9 @@ export const useMenuItems = () => {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      // Always refetch after error or success
-      queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
-    },
-    onSuccess: () => {
+    onSuccess: (savedItem) => {
+      upsertMenuItemInListCache(queryClient, savedItem);
+      syncMenuItemDetailCaches(queryClient, savedItem);
       toast({
         title: "Thành công",
         description: "Đã tạo menu item mới",
@@ -246,13 +430,94 @@ export const useMenuItems = () => {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
-    },
-    onSuccess: () => {
+    onSuccess: (savedItem) => {
+      upsertMenuItemInListCache(queryClient, savedItem);
+      syncMenuItemDetailCaches(queryClient, savedItem);
       toast({
         title: "Thành công",
         description: "Đã cập nhật menu item",
+      });
+    },
+  });
+
+  const cleanupMutation = useMutation({
+    mutationFn: cleanupMenuItems,
+    onSuccess: async (data, dryRun) => {
+      if (!dryRun) {
+        toast({
+          title: "Thành công",
+          description: data.message,
+        });
+        const items = await fetchMenuItems();
+        replaceMenuItemsListCache(queryClient, items);
+      }
+    },
+    onError: (err: Error) => {
+      console.error("Error cleaning up menu items:", err);
+      toast({
+        title: "Lỗi",
+        description: err.message || "Không thể dọn dữ liệu menu",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const updateActiveMutation = useMutation({
+    mutationFn: updateMenuItemActive,
+    onMutate: async ({ _id, isActive }) => {
+      await queryClient.cancelQueries({ queryKey: menuItemsKeys.lists() });
+
+      const previousMenuItems = queryClient.getQueryData(menuItemsKeys.lists());
+
+      queryClient.setQueryData(
+        menuItemsKeys.lists(),
+        (old: FnBMenuItem[] = []) =>
+          old.map((item) => {
+            if (item._id === _id) {
+              return { ...item, isActive };
+            }
+
+            if (!item.variants?.length) {
+              return item;
+            }
+
+            let hasVariantPatch = false;
+            const nextVariants = item.variants.map((variant) => {
+              if (variant._id !== _id) return variant;
+              hasVariantPatch = true;
+              return { ...variant, isActive };
+            });
+
+            return hasVariantPatch ? { ...item, variants: nextVariants } : item;
+          }),
+      );
+
+      return { previousMenuItems };
+    },
+    onError: (err: Error, _variables, context) => {
+      if (context?.previousMenuItems) {
+        queryClient.setQueryData(
+          menuItemsKeys.lists(),
+          context.previousMenuItems
+        );
+      }
+      console.error("Error updating menu item active status:", err);
+      toast({
+        title: "Lỗi",
+        description: err.message || "Không thể cập nhật trạng thái menu item",
+        variant: "destructive",
+      });
+    },
+    onSuccess: (data, variables) => {
+      if (data) {
+        patchMenuItemInListCache(queryClient, variables._id, data);
+        syncMenuItemDetailCaches(queryClient, data);
+      }
+      toast({
+        title: "Thành công",
+        description: variables.isActive
+          ? "Đã bật bán menu item"
+          : "Đã tắt bán menu item",
       });
     },
   });
@@ -286,10 +551,12 @@ export const useMenuItems = () => {
         variant: "destructive",
       });
     },
-    onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
-    },
-    onSuccess: () => {
+    onSuccess: (_data, itemId) => {
+      removeMenuItemFromListCache(queryClient, itemId);
+      queryClient.removeQueries({ queryKey: menuItemsKeys.detail(itemId) });
+      queryClient.removeQueries({
+        queryKey: menuItemsKeys.legacyDetail(itemId),
+      });
       toast({
         title: "Thành công",
         description: "Đã xóa menu item",
@@ -344,39 +611,16 @@ export const useMenuItems = () => {
     });
   };
 
-  // Get parent items (items that can have variants)
-  const getParentItems = () => {
-    return menuItems.filter((item) => item.hasVariant && !item.parentId);
-  };
-
   // Get variants of a specific parent
   const getVariantsByParentId = (parentId: string) => {
     return menuItems.filter((item) => item.parentId === parentId);
   };
 
-  // Group items by parent (for display purposes)
-  const getGroupedItems = () => {
-    return menuItems.reduce((acc, item) => {
-      if (item.parentId) {
-        // This is a variant
-        const parent = acc.find((p) => p._id === item.parentId);
-        if (parent) {
-          if (!parent.variants) parent.variants = [];
-          parent.variants.push(item);
-        }
-      } else {
-        // This is a parent item
-        acc.push({ ...item, variants: [] });
-      }
-      return acc;
-    }, [] as FnBMenuItem[]);
-  };
-
   return {
     // Data
     menuItems,
-    groupedItems: getGroupedItems(),
-    parentItems: getParentItems(),
+    groupedItems,
+    parentItems,
 
     // Loading states
     isLoading,
@@ -384,6 +628,8 @@ export const useMenuItems = () => {
     isCreating: createMutation.isPending,
     isUpdating: updateMutation.isPending,
     isDeleting: deleteMutation.isPending,
+    isCleaningUp: cleanupMutation.isPending,
+    isUpdatingActive: updateActiveMutation.isPending,
 
     // Error
     error,
@@ -391,7 +637,9 @@ export const useMenuItems = () => {
     // Actions
     createMenuItem: createMenuItemWithFormData,
     updateMenuItem: updateMenuItemWithFormData,
+    updateMenuItemActive: updateActiveMutation.mutate,
     deleteMenuItem: deleteMutation.mutate,
+    cleanupMenuItems: cleanupMutation.mutateAsync,
     refetch,
 
     // Helper functions
@@ -438,20 +686,19 @@ export const useCompleteOrder = () => {
           responseData.message || "Đã thêm items vào order thành công",
       });
 
-      // Invalidate các queries liên quan đến orders và menu items
       queryClient.invalidateQueries({ queryKey: ["fnbOrders"] });
       queryClient.invalidateQueries({ queryKey: ["roomSchedule"] });
-      queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
 
-      // Cập nhật cache cho các menu items đã được cập nhật
       const result = responseData.result as ICompleteOrderResult;
-      if (result?.updatedItems) {
+      if (result?.updatedItems?.length) {
         result.updatedItems.forEach((updatedItem) => {
-          queryClient.setQueryData(
-            menuItemsKeys.detail(updatedItem._id),
-            updatedItem
-          );
+          if (!updatedItem._id) return;
+          const menuItem = updatedItem as unknown as FnBMenuItem;
+          patchMenuItemInListCache(queryClient, updatedItem._id, menuItem);
+          syncMenuItemDetailCaches(queryClient, menuItem);
         });
+      } else {
+        queryClient.invalidateQueries({ queryKey: menuItemsKeys.lists() });
       }
     },
     onError: (error: unknown) => {

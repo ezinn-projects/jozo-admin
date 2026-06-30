@@ -85,10 +85,20 @@ interface SongsCollectionResponse {
   };
 }
 
+export interface MoveMusicQueueRequest {
+  targetRoomId: string;
+}
+
 const roomsMusicApis = {
   resolveRequest: (roomId: string) =>
     http.post<HTTPResponse>(
       `${ROOMS_MUSIC_CONTROLLER}/${roomId}/solve-request`
+    ),
+  /** POST /room-music/:roomId/move-queue — chuyển queue nhạc sang phòng khác */
+  moveQueue: (roomId: string, payload: MoveMusicQueueRequest) =>
+    http.post<HTTPResponse>(
+      `${ROOM_MUSIC_CONTROLLER}/${roomId}/move-queue`,
+      payload,
     ),
   getSongsCollection: (params?: {
     page?: number;

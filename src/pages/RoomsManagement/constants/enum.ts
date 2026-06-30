@@ -6,6 +6,7 @@
  * @property {string} MEDIUM - Medium room, suitable for two people, typically with a double bed.
  */
 export enum RoomType {
+  SMALL = "small",
   LARGE = "large",
   MEDIUM = "medium",
   DORM = "dorm",

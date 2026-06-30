@@ -48,6 +48,7 @@ const PATHS = {
   MENU_ITEMS_EDIT: "/menu-items/:id/edit",
   CUSTOMIZATION_GROUP_TEMPLATES: "/customization-group-templates",
   FNB_STATS: "/fnb-stats",
+  FNB_SHIFT_COUNT: "/fnb-shift-count",
 
   // promotion management
   PROMOTION: "/promotion",

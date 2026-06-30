@@ -1,4 +1,8 @@
-import { User } from "@/@types/user";
+import {
+  ForgotPasswordRequestBody,
+  ResetPasswordRequestBody,
+  User,
+} from "@/@types/user";
 import http from "@/utils/http";
 
 type LoginRequest = {
@@ -22,6 +26,14 @@ const authorizationApis = {
     http.post<HTTPResponse<void>>("/users/logout", data),
   getMe: () => http.get<HTTPResponse<User>>("/users/get-user"),
   getUsers: () => http.get<HTTPResponse<User[]>>("/users"),
+  forgotPassword: (data: ForgotPasswordRequestBody) =>
+    http.post<HTTPResponse<void>>("/users/forgot-password", data, {
+      skipErrorToast: true,
+    }),
+  resetPassword: (data: ResetPasswordRequestBody) =>
+    http.post<HTTPResponse<void>>("/users/reset-password", data, {
+      skipErrorToast: true,
+    }),
 };
 
 export default authorizationApis;

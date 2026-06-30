@@ -45,11 +45,27 @@ interface IRoomSchedule {
   originalRoomType?: string;
   upgraded?: boolean;
   // Booking source
-  source?: "customer" | "admin" | "walk-in";
+  source?: "customer" | "admin" | "walk-in" | "staff";
+  dateOfUse?: string;
+  bookingCode?: string;
   // Gift enabled
   giftEnabled?: boolean;
   // Free hour promotion
   applyFreeHourPromo?: boolean;
+  /** Size khách đặt / đang sử dụng (snapshot, khác room.roomType vật lý) */
+  roomType?: RoomType;
 }
 
-export type { IRoom, ITimeSlot, ITimeSlotPrice, IRoomSchedule };
+interface IRoomScheduleChangedSocketPayload {
+  action: "created" | "updated" | "cancelled" | "finished";
+  schedule: IRoomSchedule;
+  roomIndex: string;
+}
+
+export type {
+  IRoom,
+  ITimeSlot,
+  ITimeSlotPrice,
+  IRoomSchedule,
+  IRoomScheduleChangedSocketPayload,
+};

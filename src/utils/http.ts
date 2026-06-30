@@ -44,12 +44,14 @@ http.interceptors.response.use(
     return response;
   },
   function (error) {
-    // Any non-2xx status runs this handler
-    toast({
-      title: "Error",
-      description: error.response?.data?.message || "An unknown error occurred",
-      variant: "destructive",
-    });
+    if (!error.config?.skipErrorToast) {
+      toast({
+        title: "Error",
+        description:
+          error.response?.data?.message || "An unknown error occurred",
+        variant: "destructive",
+      });
+    }
     return Promise.reject(error);
   },
 );

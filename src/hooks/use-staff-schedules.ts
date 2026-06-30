@@ -7,7 +7,7 @@ import staffScheduleApis, {
   SalaryView,
 } from "@/apis/staffSchedule.apis";
 
-export type ViewMode = "week" | "month";
+export type ViewMode = "day" | "week" | "month";
 
 export interface UseStaffSchedulesOptions {
   userId?: string;

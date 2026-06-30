@@ -1,23 +1,23 @@
 import {
   BarChart3,
   BedDouble,
+  Briefcase,
   Calendar,
+  ClipboardList,
   Clock,
   Coffee,
   DollarSign,
   DoorOpenIcon,
+  Gamepad2,
+  Gift,
   Home,
   Music,
   PercentIcon,
   Settings2,
+  Sparkles,
   UtensilsCrossed,
   Users,
   UserPlus,
-  Briefcase,
-  KeyRound,
-  Gift,
-  Gamepad2,
-  Sparkles,
 } from "lucide-react";
 import { Role } from "./enum";
 import PATHS from "./paths";
@@ -30,174 +30,182 @@ export type MenuItem = {
   roles?: Role[]; // Restrict visibility by role
 };
 
+const STAFF_AND_ADMIN = [Role.Admin, Role.Staff];
+const ADMIN_ONLY = [Role.Admin];
+
 const MENU_ITEMS: MenuItem[] = [
   {
     title: "Home",
     url: PATHS.HOME,
     icon: Home,
-    subItems: [], // No sub-items for Home
-    roles: [Role.Admin, Role.Staff],
+    roles: STAFF_AND_ADMIN,
   },
   {
     title: "My Schedule",
     url: PATHS.MY_SCHEDULE,
     icon: Briefcase,
-    subItems: [], // No sub-items for My Schedule
-    roles: [Role.Admin, Role.Staff],
-  },
-  {
-    title: "Rooms management",
-    url: PATHS.ROOMS,
-    icon: DoorOpenIcon,
-    subItems: [], // No sub-items for Rooms management
-    roles: [Role.Admin, Role.Staff],
-  },
-  {
-    title: "Coffee Tables",
-    url: PATHS.COFFEE_TABLES,
-    icon: Coffee,
-    subItems: [],
-    roles: [Role.Admin, Role.Staff],
-  },
-  {
-    title: "Coffee Pricing",
-    url: PATHS.COFFEE_PRICING,
-    icon: DollarSign,
-    subItems: [],
-    roles: [Role.Admin, Role.Staff],
-  },
-  {
-    title: "General management",
-    icon: Settings2,
-    roles: [Role.Admin],
-    subItems: [
-      {
-        title: "Users Management",
-        url: PATHS.USERS_MANAGEMENT,
-        icon: Users,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Staff Management",
-        url: PATHS.STAFF_MANAGEMENT,
-        icon: Users,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Staff Schedule",
-        url: PATHS.STAFF_SCHEDULE,
-        icon: Clock,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Staff salary configuration",
-        url: PATHS.STAFF_SALARY_CONFIG,
-        icon: DollarSign,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Room Types",
-        url: PATHS.ROOM_TYPES_LISTS,
-        icon: BedDouble,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Pricing",
-        url: PATHS.PRICE,
-        icon: BedDouble,
-        roles: [Role.Admin],
-      },
-      // menu fnb
-      // {
-      //   title: "Food & Beverage",
-      //   url: PATHS.FNB,
-      //   icon: AppleIcon,
-      // },
-      {
-        title: "Menu Items",
-        url: PATHS.MENU_ITEMS,
-        icon: UtensilsCrossed,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Customization Templates",
-        url: PATHS.CUSTOMIZATION_GROUP_TEMPLATES,
-        icon: UtensilsCrossed,
-        roles: [Role.Admin],
-      },
-      {
-        title: "FNB Statistics",
-        url: PATHS.FNB_STATS,
-        icon: BarChart3,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Promotion",
-        url: PATHS.PROMOTION,
-        icon: PercentIcon,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Membership",
-        url: PATHS.MEMBERSHIP_CONFIG,
-        icon: Sparkles,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Songs Collection",
-        url: PATHS.SONGS_COLLECTION,
-        icon: Music,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Recruitment",
-        url: PATHS.RECRUITMENT,
-        icon: UserPlus,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Gifts Management",
-        url: PATHS.GIFTS,
-        icon: Gift,
-        roles: [Role.Admin],
-      },
-      {
-        title: "Games Management",
-        url: PATHS.GAMES,
-        icon: Gamepad2,
-        roles: [Role.Admin],
-      },
-    ],
+    roles: STAFF_AND_ADMIN,
   },
   {
     title: "Calendar",
     url: PATHS.CALENDAR,
     icon: Calendar,
-    subItems: [], // No sub-items for Calendar
-    roles: [Role.Admin, Role.Staff],
+    roles: STAFF_AND_ADMIN,
   },
-  // {
-  //   title: "Settings",
-  //   url: PATHS.SETTINGS,
-  //   icon: Settings,
-  //   subItems: [], // No sub-items for Settings
-  //   roles: [Role.Admin, Role.Staff],
-  // },
-  // total revenue
   {
     title: "Total Revenue",
     url: PATHS.TOTAL_REVENUE,
-    icon: PercentIcon,
-    subItems: [], // No sub-items for Total Revenue
-    roles: [Role.Admin, Role.Staff],
+    icon: BarChart3,
+    roles: STAFF_AND_ADMIN,
   },
-  // change password
   {
-    title: "Change Password",
-    url: PATHS.CHANGE_PASSWORD,
-    icon: KeyRound,
-    subItems: [], // No sub-items for Change Password
-    roles: [Role.Admin, Role.Staff],
+    title: "Rooms",
+    icon: DoorOpenIcon,
+    roles: STAFF_AND_ADMIN,
+    subItems: [
+      {
+        title: "Rooms Management",
+        url: PATHS.ROOMS,
+        icon: DoorOpenIcon,
+        roles: STAFF_AND_ADMIN,
+      },
+      {
+        title: "Room Types",
+        url: PATHS.ROOM_TYPES_LISTS,
+        icon: BedDouble,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Room Pricing",
+        url: PATHS.PRICE,
+        icon: DollarSign,
+        roles: ADMIN_ONLY,
+      },
+    ],
+  },
+  {
+    title: "Food & Beverage",
+    icon: UtensilsCrossed,
+    roles: STAFF_AND_ADMIN,
+    subItems: [
+      {
+        title: "Inventory Count",
+        url: PATHS.FNB_SHIFT_COUNT,
+        icon: ClipboardList,
+        roles: STAFF_AND_ADMIN,
+      },
+      {
+        title: "Menu Catalog",
+        url: PATHS.MENU_ITEMS,
+        icon: UtensilsCrossed,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Modifier Templates",
+        url: PATHS.CUSTOMIZATION_GROUP_TEMPLATES,
+        icon: Settings2,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Analytics",
+        url: PATHS.FNB_STATS,
+        icon: BarChart3,
+        roles: ADMIN_ONLY,
+      },
+    ],
+  },
+  {
+    title: "Coffee Lounge",
+    icon: Coffee,
+    roles: ADMIN_ONLY,
+    subItems: [
+      {
+        title: "Service Stations",
+        url: PATHS.COFFEE_TABLES,
+        icon: Coffee,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Pricing",
+        url: PATHS.COFFEE_PRICING,
+        icon: DollarSign,
+        roles: ADMIN_ONLY,
+      },
+    ],
+  },
+  {
+    title: "People",
+    icon: Users,
+    roles: ADMIN_ONLY,
+    subItems: [
+      {
+        title: "Users Management",
+        url: PATHS.USERS_MANAGEMENT,
+        icon: Users,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Staff Management",
+        url: PATHS.STAFF_MANAGEMENT,
+        icon: Users,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Staff Schedule",
+        url: PATHS.STAFF_SCHEDULE,
+        icon: Clock,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Salary Configuration",
+        url: PATHS.STAFF_SALARY_CONFIG,
+        icon: DollarSign,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Recruitment",
+        url: PATHS.RECRUITMENT,
+        icon: UserPlus,
+        roles: ADMIN_ONLY,
+      },
+    ],
+  },
+  {
+    title: "Growth & Content",
+    icon: Sparkles,
+    roles: ADMIN_ONLY,
+    subItems: [
+      {
+        title: "Promotion",
+        url: PATHS.PROMOTION,
+        icon: PercentIcon,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Membership",
+        url: PATHS.MEMBERSHIP_CONFIG,
+        icon: Sparkles,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Gifts",
+        url: PATHS.GIFTS,
+        icon: Gift,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Games",
+        url: PATHS.GAMES,
+        icon: Gamepad2,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Songs Collection",
+        url: PATHS.SONGS_COLLECTION,
+        icon: Music,
+        roles: ADMIN_ONLY,
+      },
+    ],
   },
 ];
 

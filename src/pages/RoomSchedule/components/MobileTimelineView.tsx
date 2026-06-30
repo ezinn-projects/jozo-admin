@@ -4,7 +4,6 @@ import React, { useEffect, useState } from "react";
 import {
   BellIcon,
   DoorOpen,
-  EditIcon,
   Gamepad2,
   Gift,
   UtensilsCrossed,
@@ -15,12 +14,18 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { RoomType } from "@/constants/enum";
+import { useIsStaff } from "@/hooks/usePermission";
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { Card } from "@/components/ui/card";
+import {
+  getEffectiveScheduleRoomType,
+  getRoomTypeLabel as getScheduleRoomTypeLabel,
+  getScheduleTimelineLabel,
+} from "../utils/scheduleRoomType";
 
 const DAY_START_HOUR = 0;
 const DAY_END_HOUR = 24;
@@ -62,7 +67,6 @@ interface MobileTimelineViewProps {
   onResolveRequest: (roomId: string) => void;
   onOrderClick: (roomId: string) => void;
   onGiftClick?: (roomId: string) => void;
-  onEditRoomType: (room: IRoom) => void;
 }
 
 const getRoomTypeLabel = (type: RoomType) => {
@@ -201,8 +205,8 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
   onResolveRequest,
   onOrderClick,
   onGiftClick,
-  onEditRoomType,
 }) => {
+  const isStaff = useIsStaff();
   // State để cập nhật thời gian real-time
   const [currentTimeState, setCurrentTimeState] = useState(currentTime);
 
@@ -289,15 +293,6 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                     <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
                       {getRoomTypeLabel(room.roomType)}
                     </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onEditRoomType(room);
-                      }}
-                      className="text-gray-400 hover:text-blue-600 active:opacity-70 transition-colors flex-shrink-0 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center"
-                    >
-                      <EditIcon className="h-4 w-4 sm:h-5 sm:w-5" />
-                    </button>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {hasNotification && (
@@ -465,7 +460,15 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         })()}
 
                       {/* Schedule blocks */}
-                      {roomSchedules.map((schedule) => {
+                      {roomSchedules
+                        .filter((schedule) => {
+                          if (!isStaff) return true;
+                          const status = schedule.status.toLowerCase();
+                          return (
+                            status !== "finished" && status !== "completed"
+                          );
+                        })
+                        .map((schedule) => {
                         const { top, height, bgColor } = getVerticalMarkerStyle(
                           schedule,
                           currentTime,
@@ -476,10 +479,18 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                           ? dayjs(schedule.endTime)
                           : eventStart.add(120, "minute");
                         const status = schedule.status.toLowerCase();
+                        const scheduleLabel = getScheduleTimelineLabel(
+                          room.roomName,
+                          schedule,
+                          room,
+                        );
+                        const scheduleSizeLabel = getScheduleRoomTypeLabel(
+                          getEffectiveScheduleRoomType(schedule, room),
+                        );
 
                         let tooltipContent = "";
                         if (status === "booked") {
-                          tooltipContent = `Bắt đầu: ${eventStart.format(
+                          tooltipContent = `Size: ${scheduleSizeLabel}\nBắt đầu: ${eventStart.format(
                             "HH:mm"
                           )}\nKết thúc: ${eventEnd.format("HH:mm")}`;
                         } else if (status === "locked") {
@@ -493,15 +504,15 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                             dayjs(schedule.startTime),
                             "minute"
                           );
-                          if (inUseDuration < 60) {
-                            tooltipContent = `Đang sử dụng ${inUseDuration} phút`;
-                          } else {
-                            const hours = Math.floor(inUseDuration / 60);
-                            const minutes = inUseDuration % 60;
-                            tooltipContent = `Đang sử dụng ${hours} giờ${
-                              minutes > 0 ? ` ${minutes} phút` : ""
-                            }`;
-                          }
+                          const durationText =
+                            inUseDuration < 60
+                              ? `${inUseDuration} phút`
+                              : `${Math.floor(inUseDuration / 60)} giờ${
+                                  inUseDuration % 60 > 0
+                                    ? ` ${inUseDuration % 60} phút`
+                                    : ""
+                                }`;
+                          tooltipContent = `Size: ${scheduleSizeLabel}\nĐang sử dụng ${durationText}`;
                         }
 
                         const eventElement = (
@@ -522,7 +533,9 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                               </div>
                               {height >= 40 && (
                                 <div className="text-xs text-white/90 truncate mt-1 leading-tight">
-                                  {schedule.customerName || schedule.status}
+                                  {status === "booked" || status === "in use"
+                                    ? scheduleLabel
+                                    : schedule.customerName || schedule.status}
                                 </div>
                               )}
                             </div>

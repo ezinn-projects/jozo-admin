@@ -1,5 +1,5 @@
 import { PageHeader } from "@/components/shared";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, type ReactNode } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -13,7 +13,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import Typography from "@/components/ui/typography";
 import billAPis from "@/apis/bill.apis";
 import dayjs from "@/lib/dayjs";
 import type { Dayjs } from "dayjs";
@@ -182,6 +181,172 @@ type RevenueBill = IBill & {
   completedBy?: string;
   createdBy?: string;
 };
+
+const formatBillDate = (dateString: string) =>
+  dayjs.utc(dateString).tz(VN_TZ).format("DD/MM/YYYY HH:mm");
+
+const formatPaymentMethod = (method: string) =>
+  paymentMethodMap[method] || method;
+
+const StatCard = ({
+  label,
+  children,
+  accent,
+}: {
+  label: string;
+  children: ReactNode;
+  accent?: boolean;
+}) => (
+  <Card>
+    <CardHeader className="p-3 pb-1 sm:p-6 sm:pb-2">
+      <CardTitle className="text-xs font-medium text-muted-foreground sm:text-sm">
+        {label}
+      </CardTitle>
+    </CardHeader>
+    <CardContent className="p-3 pt-0 sm:p-6 sm:pt-0">
+      <p
+        className={`text-base font-semibold sm:text-2xl ${
+          accent ? "text-emerald-600" : ""
+        }`}
+      >
+        {children}
+      </p>
+    </CardContent>
+  </Card>
+);
+
+interface BillsTableSectionProps {
+  bills: RevenueBill[];
+  roomsData?: Record<string, string>;
+  isStaff: boolean;
+  onBillClick: (billId: string) => void;
+}
+
+/** Bảng hóa đơn: dạng bảng trên desktop, dạng thẻ trên mobile */
+const BillsTableSection = ({
+  bills,
+  roomsData,
+  isStaff,
+  onBillClick,
+}: BillsTableSectionProps) => (
+  <Card>
+    <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
+      <CardTitle className="text-base sm:text-lg">Chi tiết hóa đơn</CardTitle>
+    </CardHeader>
+    <CardContent className="px-3 pb-3 sm:px-6 sm:pb-6">
+      {/* Desktop: bảng */}
+      <div className="hidden rounded-md border sm:block">
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Mã hóa đơn</TableHead>
+                <TableHead>Thời gian</TableHead>
+                <TableHead>Phòng</TableHead>
+                <TableHead>PT thanh toán</TableHead>
+                <TableHead>Người hoàn tất</TableHead>
+                <TableHead>Người tạo</TableHead>
+                {!isStaff && (
+                  <TableHead className="text-right">Số tiền</TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {bills.map((bill) => (
+                <TableRow key={bill._id || "unknown"}>
+                  <TableCell className="font-medium">
+                    <button
+                      className="text-blue-600 hover:underline focus:outline-none"
+                      onClick={() => bill._id && onBillClick(bill._id)}
+                    >
+                      {bill.invoiceCode || "N/A"}
+                    </button>
+                  </TableCell>
+                  <TableCell>{formatBillDate(bill.createdAt.toString())}</TableCell>
+                  <TableCell>
+                    {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
+                  </TableCell>
+                  <TableCell>
+                    {formatPaymentMethod(bill.paymentMethod || "N/A")}
+                  </TableCell>
+                  <TableCell>{bill.completedBy || "N/A"}</TableCell>
+                  <TableCell>{bill.createdBy || "N/A"}</TableCell>
+                  {!isStaff && (
+                    <TableCell className="text-right">
+                      {formatCurrency(bill.totalAmount)} VNĐ
+                    </TableCell>
+                  )}
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+
+      {/* Mobile: thẻ */}
+      <div className="space-y-2 sm:hidden">
+        {bills.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Không có hóa đơn
+          </p>
+        ) : (
+          bills.map((bill) => (
+            <div
+              key={bill._id || "unknown"}
+              className="rounded-md border p-3 space-y-2"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <button
+                  className="font-medium text-blue-600 hover:underline focus:outline-none"
+                  onClick={() => bill._id && onBillClick(bill._id)}
+                >
+                  {bill.invoiceCode || "N/A"}
+                </button>
+                {!isStaff && (
+                  <span className="font-semibold">
+                    {formatCurrency(bill.totalAmount)} VNĐ
+                  </span>
+                )}
+              </div>
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
+                <div className="flex flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Thời gian
+                  </span>
+                  <span>{formatBillDate(bill.createdAt.toString())}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Phòng
+                  </span>
+                  <span>{roomsData?.[bill.roomId] || bill.roomId || "N/A"}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    PT thanh toán
+                  </span>
+                  <span>{formatPaymentMethod(bill.paymentMethod || "N/A")}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Người hoàn tất
+                  </span>
+                  <span>{bill.completedBy || "N/A"}</span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Người tạo
+                  </span>
+                  <span>{bill.createdBy || "N/A"}</span>
+                </div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </CardContent>
+  </Card>
+);
 
 const RevenueStatisticsPage = () => {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -388,14 +553,6 @@ const RevenueStatisticsPage = () => {
     setSelectedPaymentMethod("all");
   };
 
-  const formatBillDate = (dateString: string) => {
-    // Parse UTC date and convert to Vietnam timezone for display
-    return dayjs
-      .utc(dateString)
-      .tz("Asia/Ho_Chi_Minh")
-      .format("DD/MM/YYYY HH:mm");
-  };
-
   const sortBillsByEndTimeDesc = (bills: RevenueBill[]) => {
     return [...bills].sort((a, b) => {
       const endTimeA = dayjs(a.endTime).valueOf();
@@ -403,10 +560,6 @@ const RevenueStatisticsPage = () => {
 
       return endTimeB - endTimeA;
     });
-  };
-
-  const formatPaymentMethod = (method: string) => {
-    return paymentMethodMap[method] || method;
   };
 
   // Lọc bills theo paymentMethod
@@ -465,17 +618,20 @@ const RevenueStatisticsPage = () => {
   };
 
   return (
-    <div className="!p-4 space-y-6">
+    <div className="p-3 space-y-5 sm:p-4 sm:space-y-6">
       <PageHeader
         title="Thống kê doanh thu"
         description="Theo ngày; theo tuần (T2–CN, chọn thêm ngày kết thúc); theo kỳ tháng 6→5 (ngày 6 tháng này đến ngày 5 tháng sau, có thể chỉnh ngày kết thúc)"
         icon={TrendingUp}
       />
 
-      <div className="flex flex-wrap gap-4 mb-6 items-center">
+      <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:gap-4">
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="outline" className="min-w-[9rem]">
+            <Button
+              variant="outline"
+              className="w-full justify-start sm:w-auto sm:min-w-[9rem]"
+            >
               {activeTab === "daily" && (
                 <>
                   Ngày: {calendarDateStartVn(selectedDate).format("DD/MM/YYYY")}
@@ -505,7 +661,10 @@ const RevenueStatisticsPage = () => {
         {!isStaff && (activeTab === "weekly" || activeTab === "monthly") && (
           <Popover>
             <PopoverTrigger asChild>
-              <Button variant="outline" className="min-w-[9rem]">
+              <Button
+                variant="outline"
+                className="w-full justify-start sm:w-auto sm:min-w-[9rem]"
+              >
                 Đến: {calendarDateStartVn(selectedEndDate).format("DD/MM/YYYY")}
               </Button>
             </PopoverTrigger>
@@ -528,6 +687,7 @@ const RevenueStatisticsPage = () => {
         )}
 
         <Button
+          className="w-full sm:w-auto"
           onClick={() => {
             if (activeTab === "daily") fetchDailyRevenue();
             else if (activeTab === "weekly") fetchWeeklyRevenue();
@@ -543,13 +703,19 @@ const RevenueStatisticsPage = () => {
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <div className="flex justify-between items-center mb-6">
-          <TabsList className={isStaff ? "" : "grid grid-cols-3"}>
-            <TabsTrigger value="daily">Doanh thu ngày</TabsTrigger>
+        <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
+          <TabsList
+            className={
+              isStaff
+                ? "w-full sm:w-auto"
+                : "grid w-full grid-cols-3 sm:w-auto"
+            }
+          >
+            <TabsTrigger value="daily">Ngày</TabsTrigger>
             {!isStaff && (
               <>
-                <TabsTrigger value="weekly">Doanh thu tuần</TabsTrigger>
-                <TabsTrigger value="monthly">Doanh thu tháng</TabsTrigger>
+                <TabsTrigger value="weekly">Tuần</TabsTrigger>
+                <TabsTrigger value="monthly">Tháng</TabsTrigger>
               </>
             )}
           </TabsList>
@@ -562,7 +728,7 @@ const RevenueStatisticsPage = () => {
               value={selectedPaymentMethod}
               onValueChange={setSelectedPaymentMethod}
             >
-              <SelectTrigger className="w-[200px]">
+              <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Lọc theo PT thanh toán" />
               </SelectTrigger>
               <SelectContent>
@@ -591,114 +757,29 @@ const RevenueStatisticsPage = () => {
               const { filteredBills, totalRevenue, billCount } =
                 calculateFilteredStats(dailyRevenue.data.bills);
               return (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div
-                    className={`grid grid-cols-1 gap-4 ${
+                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
                       isStaff ? "md:grid-cols-2" : "md:grid-cols-3"
                     }`}
                   >
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Ngày
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4">
-                          {dailyRevenue.data.dateInfo.formattedDate}
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Ngày">
+                      {dailyRevenue.data.dateInfo.formattedDate}
+                    </StatCard>
                     {!isStaff && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">
-                            Tổng doanh thu
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Typography variant="h4" className="text-green-600">
-                            {formatCurrency(totalRevenue)} VNĐ
-                          </Typography>
-                        </CardContent>
-                      </Card>
+                      <StatCard label="Tổng doanh thu" accent>
+                        {formatCurrency(totalRevenue)} VNĐ
+                      </StatCard>
                     )}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Số lượng hóa đơn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4">{billCount}</Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
                   </div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Chi tiết hóa đơn</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Mã hóa đơn</TableHead>
-                              <TableHead>Thời gian</TableHead>
-                              <TableHead>Phòng</TableHead>
-                              <TableHead>PT thanh toán</TableHead>
-                              <TableHead>Người hoàn tất</TableHead>
-                              <TableHead>Người tạo</TableHead>
-                              {!isStaff && (
-                                <TableHead className="text-right">
-                                  Số tiền
-                                </TableHead>
-                              )}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredBills.map((bill) => (
-                              <TableRow key={bill._id || "unknown"}>
-                                <TableCell className="font-medium">
-                                  <button
-                                    className="text-blue-600 hover:underline focus:outline-none"
-                                    onClick={() =>
-                                      bill._id && handleBillClick(bill._id)
-                                    }
-                                  >
-                                    {bill.invoiceCode || "N/A"}
-                                  </button>
-                                </TableCell>
-                                <TableCell>
-                                  {formatBillDate(bill.createdAt.toString())}
-                                </TableCell>
-                                <TableCell>
-                                  {roomsData?.[bill.roomId] ||
-                                    bill.roomId ||
-                                    "N/A"}
-                                </TableCell>
-                                <TableCell>
-                                  {formatPaymentMethod(
-                                    bill.paymentMethod || "N/A",
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {bill.completedBy || "N/A"}
-                                </TableCell>
-                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
-                                {!isStaff && (
-                                  <TableCell className="text-right">
-                                    {formatCurrency(bill.totalAmount)} VNĐ
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <BillsTableSection
+                    bills={filteredBills}
+                    roomsData={roomsData}
+                    isStaff={isStaff}
+                    onBillClick={handleBillClick}
+                  />
                 </div>
               );
             })()
@@ -723,114 +804,29 @@ const RevenueStatisticsPage = () => {
               const { filteredBills, totalRevenue, billCount } =
                 calculateFilteredStats(weeklyRevenue.data.bills);
               return (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div
-                    className={`grid grid-cols-1 gap-4 ${
+                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
                       isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
                     }`}
                   >
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Khoảng thời gian
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h5">
-                          {weeklyRevenue.data.dateInfo.dateRange}
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Khoảng thời gian">
+                      {weeklyRevenue.data.dateInfo.dateRange}
+                    </StatCard>
                     {!isStaff && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">
-                            Tổng doanh thu
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Typography variant="h4" className="text-green-600">
-                            {formatCurrency(totalRevenue)} VNĐ
-                          </Typography>
-                        </CardContent>
-                      </Card>
+                      <StatCard label="Tổng doanh thu" accent>
+                        {formatCurrency(totalRevenue)} VNĐ
+                      </StatCard>
                     )}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Số lượng hóa đơn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4">{billCount}</Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
                   </div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Chi tiết hóa đơn</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Mã hóa đơn</TableHead>
-                              <TableHead>Thời gian</TableHead>
-                              <TableHead>Phòng</TableHead>
-                              <TableHead>PT thanh toán</TableHead>
-                              <TableHead>Người hoàn tất</TableHead>
-                              <TableHead>Người tạo</TableHead>
-                              {!isStaff && (
-                                <TableHead className="text-right">
-                                  Số tiền
-                                </TableHead>
-                              )}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredBills.map((bill) => (
-                              <TableRow key={bill._id || "unknown"}>
-                                <TableCell className="font-medium">
-                                  <button
-                                    className="text-blue-600 hover:underline focus:outline-none"
-                                    onClick={() =>
-                                      bill._id && handleBillClick(bill._id)
-                                    }
-                                  >
-                                    {bill.invoiceCode || "N/A"}
-                                  </button>
-                                </TableCell>
-                                <TableCell>
-                                  {formatBillDate(bill.createdAt.toString())}
-                                </TableCell>
-                                <TableCell>
-                                  {roomsData?.[bill.roomId] ||
-                                    bill.roomId ||
-                                    "N/A"}
-                                </TableCell>
-                                <TableCell>
-                                  {formatPaymentMethod(
-                                    bill.paymentMethod || "N/A",
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {bill.completedBy || "N/A"}
-                                </TableCell>
-                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
-                                {!isStaff && (
-                                  <TableCell className="text-right">
-                                    {formatCurrency(bill.totalAmount)} VNĐ
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <BillsTableSection
+                    bills={filteredBills}
+                    roomsData={roomsData}
+                    isStaff={isStaff}
+                    onBillClick={handleBillClick}
+                  />
                 </div>
               );
             })()
@@ -856,127 +852,33 @@ const RevenueStatisticsPage = () => {
               const { filteredBills, totalRevenue, billCount } =
                 calculateFilteredStats(monthlyRevenue.data.bills);
               return (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   <div
-                    className={`grid grid-cols-1 gap-4 ${
+                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
                       isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
                     }`}
                   >
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Kỳ / nhãn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4">
-                          {monthlyRevenue.data.dateInfo.timeRange ??
-                            `${monthlyRevenue.data.dateInfo.month} ${monthlyRevenue.data.dateInfo.year}`}
-                        </Typography>
-                      </CardContent>
-                    </Card>
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Khoảng thời gian
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h5">
-                          {monthlyRevenue.data.dateInfo.dateRange}
-                        </Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Kỳ / nhãn">
+                      {monthlyRevenue.data.dateInfo.timeRange ??
+                        `${monthlyRevenue.data.dateInfo.month} ${monthlyRevenue.data.dateInfo.year}`}
+                    </StatCard>
+                    <StatCard label="Khoảng thời gian">
+                      {monthlyRevenue.data.dateInfo.dateRange}
+                    </StatCard>
                     {!isStaff && (
-                      <Card>
-                        <CardHeader className="pb-2">
-                          <CardTitle className="text-sm font-medium">
-                            Tổng doanh thu
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                          <Typography variant="h4" className="text-green-600">
-                            {formatCurrency(totalRevenue)} VNĐ
-                          </Typography>
-                        </CardContent>
-                      </Card>
+                      <StatCard label="Tổng doanh thu" accent>
+                        {formatCurrency(totalRevenue)} VNĐ
+                      </StatCard>
                     )}
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                          Số lượng hóa đơn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <Typography variant="h4">{billCount}</Typography>
-                      </CardContent>
-                    </Card>
+                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
                   </div>
 
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Chi tiết hóa đơn</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      <div className="rounded-md border">
-                        <Table>
-                          <TableHeader>
-                            <TableRow>
-                              <TableHead>Mã hóa đơn</TableHead>
-                              <TableHead>Thời gian</TableHead>
-                              <TableHead>Phòng</TableHead>
-                              <TableHead>PT thanh toán</TableHead>
-                              <TableHead>Người hoàn tất</TableHead>
-                              <TableHead>Người tạo</TableHead>
-                              {!isStaff && (
-                                <TableHead className="text-right">
-                                  Số tiền
-                                </TableHead>
-                              )}
-                            </TableRow>
-                          </TableHeader>
-                          <TableBody>
-                            {filteredBills.map((bill) => (
-                              <TableRow key={bill._id || "unknown"}>
-                                <TableCell className="font-medium">
-                                  <button
-                                    className="text-blue-600 hover:underline focus:outline-none"
-                                    onClick={() =>
-                                      bill._id && handleBillClick(bill._id)
-                                    }
-                                  >
-                                    {bill.invoiceCode || "N/A"}
-                                  </button>
-                                </TableCell>
-                                <TableCell>
-                                  {formatBillDate(bill.createdAt.toString())}
-                                </TableCell>
-                                <TableCell>
-                                  {roomsData?.[bill.roomId] ||
-                                    bill.roomId ||
-                                    "N/A"}
-                                </TableCell>
-                                <TableCell>
-                                  {formatPaymentMethod(
-                                    bill.paymentMethod || "N/A",
-                                  )}
-                                </TableCell>
-                                <TableCell>
-                                  {bill.completedBy || "N/A"}
-                                </TableCell>
-                                <TableCell>{bill.createdBy || "N/A"}</TableCell>
-                                {!isStaff && (
-                                  <TableCell className="text-right">
-                                    {formatCurrency(bill.totalAmount)} VNĐ
-                                  </TableCell>
-                                )}
-                              </TableRow>
-                            ))}
-                          </TableBody>
-                        </Table>
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <BillsTableSection
+                    bills={filteredBills}
+                    roomsData={roomsData}
+                    isStaff={isStaff}
+                    onBillClick={handleBillClick}
+                  />
                 </div>
               );
             })()
@@ -992,99 +894,138 @@ const RevenueStatisticsPage = () => {
 
       {/* Modal chi tiết hóa đơn */}
       <Dialog open={billDetailOpen} onOpenChange={setBillDetailOpen}>
-        <DialogContent className="sm:max-w-3xl">
+        <DialogContent className="grid-cols-1 sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>
-            <DialogTitle>Chi tiết hóa đơn</DialogTitle>
-            <DialogDescription>Thông tin chi tiết về hóa đơn</DialogDescription>
+            <DialogTitle className="flex flex-wrap items-center gap-2">
+              <span>Chi tiết hóa đơn</span>
+              {billDetail?.data?.result?.invoiceCode && (
+                <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
+                  {billDetail.data.result.invoiceCode}
+                </span>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              Thông tin chi tiết về hóa đơn
+            </DialogDescription>
           </DialogHeader>
           {isLoadingBillDetail ? (
             <div className="py-6 flex justify-center">
               <Spinner />
             </div>
           ) : billDetail && billDetail.data && billDetail.data.result ? (
-            <div className="p-4 border rounded-lg bg-gradient-to-br from-purple-100 to-pink-100 font-mono text-sm">
-              <h4 className="text-center text-lg text-purple-700 font-bold mb-2">
-                🎉 Jozo Bill 🎉
-              </h4>
-
-              <div className="space-y-2 text-gray-800">
-                <div className="text-center">
-                  <p>
-                    Phòng:{" "}
-                    <span className="font-bold">
-                      {billDetail.data.result.roomName || "N/A"}
-                    </span>
-                  </p>
-                  <p>
-                    Loại phòng:{" "}
-                    <span className="font-bold">
-                      {billDetail.data.result.roomType || "N/A"}
-                    </span>
-                  </p>
-                  <p>
-                    Ngày: {billDetail.data.result.formattedCreatedAt || "N/A"}
-                  </p>
-                  <p>
-                    Mã hóa đơn: {billDetail.data.result.invoiceCode || "N/A"}
-                  </p>
+            <div className="rounded-md border text-sm">
+              {/* Thông tin chung */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3 p-3 sm:grid-cols-4">
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Phòng
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.roomName || "—"}
+                  </span>
                 </div>
-
-                <div className="border-t-2 border-dashed border-purple-400 my-2" />
-
-                <div>
-                  <p>
-                    <span className="font-bold">Khách hàng:</span>{" "}
-                    {billDetail.data.result.customerName || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-bold">Thời gian bắt đầu:</span>{" "}
-                    {billDetail.data.result.formattedStartTime || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-bold">Thời gian kết thúc:</span>{" "}
-                    {billDetail.data.result.formattedEndTime || "N/A"}
-                  </p>
-                  <p>
-                    <span className="font-bold">Thời lượng sử dụng:</span>{" "}
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Loại phòng
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.roomType || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Ngày tạo
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.formattedCreatedAt || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Khách hàng
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.customerName || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Bắt đầu
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.formattedStartTime || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Kết thúc
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.formattedEndTime || "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Thời lượng
+                  </span>
+                  <span className="break-words font-medium">
                     {billDetail.data.result.usageDuration || "0"} giờ
-                  </p>
+                  </span>
                 </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
+                    Thanh toán
+                  </span>
+                  <span className="break-words font-medium">
+                    {formatPaymentMethod(
+                      billDetail.data.result.paymentMethod || "—",
+                    )}
+                  </span>
+                </div>
+              </div>
 
-                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+              <div className="border-t" />
 
+              {/* Danh sách món */}
+              <div className="p-3">
+                <div className="flex items-center gap-2 border-b pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                  <span className="min-w-0 flex-1">Tên</span>
+                  <span className="w-10 shrink-0 text-right">SL</span>
+                  <span className="hidden w-20 shrink-0 text-right sm:block">
+                    Đơn giá
+                  </span>
+                  <span className="w-24 shrink-0 text-right">Thành tiền</span>
+                </div>
                 {billDetail.data.result.items &&
                 billDetail.data.result.items.length > 0 ? (
-                  <div>
-                    <div className="grid grid-cols-12 font-bold text-purple-600 gap-1">
-                      <span className="col-span-5">Tên</span>
-                      <span className="col-span-1 text-right">SL</span>
-                      <span className="col-span-3 text-right">Đơn Giá</span>
-                      <span className="col-span-3 text-right">Thành Tiền</span>
-                    </div>
+                  <div className="divide-y">
                     {billDetail.data.result.items.map(
                       (item: BillItem, index: number) => (
-                        <div key={index}>
-                          <div className="grid grid-cols-12 gap-1 py-1">
-                            <span className="col-span-5 truncate">
-                              {item.description}
-                            </span>
-                            <span className="col-span-1 text-right">
+                        <div key={index} className="py-2">
+                          <div className="flex items-center gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="truncate">{item.description}</p>
+                              <p className="text-[11px] text-muted-foreground sm:hidden">
+                                {formatCurrency(item.price)}/đv
+                              </p>
+                            </div>
+                            <span className="w-10 shrink-0 text-right">
                               {item.quantity}
                             </span>
-                            <span className="col-span-3 text-right">
+                            <span className="hidden w-20 shrink-0 text-right text-muted-foreground sm:block">
                               {formatCurrency(item.price)}
                             </span>
-                            <span className="col-span-3 text-right">
+                            <span className="w-24 shrink-0 text-right font-medium">
                               {formatCurrency(item.price * item.quantity)}
                             </span>
                           </div>
                           {item.discountName && item.discountPercentage ? (
-                            <div className="grid grid-cols-12 gap-1 text-xs text-green-600 italic py-1">
-                              <span className="col-span-9 pl-4">
+                            <div className="mt-0.5 flex items-center justify-between gap-2 text-[11px] text-emerald-600">
+                              <span className="min-w-0 truncate">
                                 - {item.discountName} ({item.discountPercentage}
                                 %)
                               </span>
-                              <span className="col-span-3 text-right">
+                              <span className="shrink-0">
                                 -
                                 {formatCurrency(
                                   ((item.originalPrice || item.price) *
@@ -1100,59 +1041,54 @@ const RevenueStatisticsPage = () => {
                     )}
                   </div>
                 ) : (
-                  <p className="text-center italic">
+                  <p className="py-3 text-center text-xs text-muted-foreground">
                     Không có chi tiết đơn hàng
                   </p>
                 )}
+              </div>
 
-                <div className="border-t-2 border-dashed border-purple-400 my-2" />
-
-                {billDetail.data.result.freeHourPromotion ? (
-                  <div className="border border-purple-200 rounded-lg bg-white/70 p-3 space-y-1">
-                    <p className="font-bold text-purple-700">
+              {/* Ưu đãi giờ miễn phí */}
+              {billDetail.data.result.freeHourPromotion ? (
+                <>
+                  <div className="border-t" />
+                  <div className="space-y-1 p-3">
+                    <p className="text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
                       Ưu đãi giờ miễn phí
                     </p>
-                    <div className="flex justify-between text-sm">
-                      <span>Phút miễn phí áp dụng</span>
-                      <span className="font-semibold text-green-700">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Phút miễn phí áp dụng
+                      </span>
+                      <span className="font-medium">
                         {billDetail.data.result.freeHourPromotion
                           .freeMinutesApplied || 0}{" "}
                         phút
                       </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span>Giá trị miễn phí</span>
-                      <span className="font-semibold text-green-700">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">
+                        Giá trị miễn phí
+                      </span>
+                      <span className="font-medium text-emerald-600">
+                        -
                         {formatCurrency(
                           billDetail.data.result.freeHourPromotion.freeAmount ||
                             0,
-                        )}{" "}
-                        VNĐ
+                        )}
                       </span>
                     </div>
                   </div>
-                ) : null}
+                </>
+              ) : null}
 
-                <div className="border-t-2 border-dashed border-purple-400 my-2" />
+              <div className="border-t" />
 
-                <div>
-                  <p>
-                    <span className="font-bold">Phương thức thanh toán:</span>{" "}
-                    {billDetail.data.result.paymentMethod || "N/A"}
-                  </p>
-                  <p className="text-right font-bold text-lg text-green-600">
-                    Tổng tiền:{" "}
-                    {formatCurrency(billDetail.data.result.totalAmount || 0)}{" "}
-                    VNĐ
-                  </p>
-                </div>
-
-                <div className="border-t-2 border-dashed border-purple-400 my-2" />
-
-                <div className="text-center">
-                  <p className="text-purple-700 font-bold">Jozo - Vui Hết Ý!</p>
-                  <p className="text-sm italic">Hẹn gặp lại nhé! 😉</p>
-                </div>
+              {/* Tổng tiền */}
+              <div className="flex items-center justify-between p-3 text-base font-semibold">
+                <span>Tổng tiền</span>
+                <span>
+                  {formatCurrency(billDetail.data.result.totalAmount || 0)} VNĐ
+                </span>
               </div>
             </div>
           ) : (

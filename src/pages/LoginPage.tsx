@@ -1,5 +1,5 @@
 import authorizationApis from "@/apis/authorization.apis";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Form,
   FormControl,
@@ -15,12 +15,13 @@ import PATHS from "@/constants/paths";
 import { useToast } from "@/hooks/use-toast";
 import useAuth from "@/hooks/useAuth";
 import { loginSchema } from "@/utils/schema";
+import { cn } from "@/lib/utils";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { EyeIcon, EyeOffIcon } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 
 type FormValues = {
   username: string;
@@ -143,6 +144,15 @@ export default function LoginPage() {
           <Button type="submit" className="w-full mt-4">
             Login
           </Button>
+
+          <Link
+            to={PATHS.FORGOT_PASSWORD}
+            className={cn(
+              buttonVariants({ variant: "link", className: "w-full px-0 mt-2" }),
+            )}
+          >
+            Quên mật khẩu?
+          </Link>
         </form>
       </Form>
     </div>

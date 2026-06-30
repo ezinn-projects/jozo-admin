@@ -29,13 +29,14 @@ import { toast } from "@/hooks/use-toast";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { format } from "date-fns";
-import { CalendarIcon, CircleXIcon } from "lucide-react";
+import { CalendarIcon, CircleXIcon, AlertTriangle } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { cn } from "@/lib/utils";
 import { Portal } from "@radix-ui/react-portal";
 import { ShiftType } from "@/constants/enum";
+import dayjs from "dayjs";
 
 const SHIFT_CONFIG: Record<
   ShiftType,
@@ -112,6 +113,7 @@ interface StaffScheduleRegistrationModalProps {
   refetchSchedules?: () => void;
   initialDate?: Date;
   initialShift?: ShiftType;
+  allowPastDates?: boolean;
 }
 
 const StaffScheduleRegistrationModal: React.FC<
@@ -124,6 +126,7 @@ const StaffScheduleRegistrationModal: React.FC<
   refetchSchedules,
   initialDate,
   initialShift,
+  allowPastDates = false,
 }) => {
   const [timeError, setTimeError] = useState("");
 
@@ -143,6 +146,11 @@ const StaffScheduleRegistrationModal: React.FC<
   const customStartTime = watch("customStartTime");
   const customEndTime = watch("customEndTime");
   const selectedShifts = watch("shifts");
+  const selectedDate = watch("date");
+  const isPastSelectedDate =
+    allowPastDates &&
+    !!selectedDate &&
+    dayjs(selectedDate).isBefore(dayjs(), "day");
 
   // Update form when modal opens with initial values
   useEffect(() => {
@@ -314,6 +322,16 @@ const StaffScheduleRegistrationModal: React.FC<
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            {isPastSelectedDate && (
+              <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
+                <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                <p>
+                  Bạn đang tạo ca làm trong quá khứ. Hãy kiểm tra kỹ ngày và ca
+                  trước khi đăng ký.
+                </p>
+              </div>
+            )}
+
             <FormField
               control={control}
               name="date"
@@ -356,6 +374,7 @@ const StaffScheduleRegistrationModal: React.FC<
                           selected={field.value}
                           onSelect={field.onChange}
                           disabled={(date) => {
+                            if (allowPastDates) return false;
                             const today = new Date();
                             today.setHours(0, 0, 0, 0);
                             return date < today;

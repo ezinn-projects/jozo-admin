@@ -13,15 +13,10 @@ import {
   SidebarMenuSub,
   SidebarMenuSubButton,
   SidebarMenuSubItem,
+  SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-import useAuth from "@/hooks/useAuth";
-import { useMenuItems } from "@/hooks/useMenuItems";
-import { MenuItem } from "@/constants/menuItems";
-import { ChevronRight } from "lucide-react";
-import { useLocation, Link } from "react-router-dom";
-import { LogoutButton } from "../shared/LogoutButton";
-import { cn } from "@/lib/utils";
+// import { JozoLogo } from "@/components/shared/JozoLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -30,89 +25,90 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Settings, User } from "lucide-react";
-import { useState } from "react";
+import { MenuItem } from "@/constants/menuItems";
 import PATHS from "@/constants/paths";
+import useAuth from "@/hooks/useAuth";
+import { useMenuItems } from "@/hooks/useMenuItems";
+import { cn } from "@/lib/utils";
+import { ChevronRight, Settings, User } from "lucide-react";
+import { useState } from "react";
+import { Link, useLocation } from "react-router-dom";
+import { LogoutButton } from "../shared/LogoutButton";
 
 export function AppSidebar() {
-  const { setOpenMobile, state } = useSidebar();
+  const { setOpenMobile, state, isMobile } = useSidebar();
   const location = useLocation();
   const { user } = useAuth();
   const menuItems = useMenuItems();
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
-  // Function to close sidebar on menu item click (for mobile)
-  const handleMenuItemClick = () => {
+  const closeMobileSidebar = () => {
     setOpenMobile(false);
   };
 
-  // Check if a menu item or sub-item is active
   const isActive = (url?: string) => {
     if (!url) return false;
     return location.pathname === url || location.pathname.startsWith(url + "/");
   };
 
-  // Check if a parent menu item has active children
   const hasActiveChild = (item: MenuItem) => {
-    if (!item.subItems || item.subItems.length === 0) return false;
-    return item.subItems.some((subItem) => isActive(subItem.url));
+    return item.subItems?.some((subItem) => isActive(subItem.url)) ?? false;
   };
 
-  // Toggle group open/close
   const toggleGroup = (title: string) => {
     setOpenGroups((prev) => ({ ...prev, [title]: !prev[title] }));
   };
 
-  // Group menu items
-  const mainItems = menuItems.filter(
-    (item) => !item.subItems || item.subItems.length === 0
+  const quickAccessItems = menuItems.filter(
+    (item) => !item.subItems || item.subItems.length === 0,
   );
-  const groupedItems = menuItems.filter(
-    (item) => item.subItems && item.subItems.length > 0
+  const managementGroups = menuItems.filter(
+    (item) => item.subItems && item.subItems.length > 0,
   );
+
+  const menuButtonClassName = cn(
+    "relative rounded-lg font-medium",
+    isMobile ? "h-11 text-[15px]" : "h-9",
+  );
+
+  const activeMenuButtonClassName =
+    "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground data-[active=true]:shadow-sm data-[active=true]:before:absolute data-[active=true]:before:left-0 data-[active=true]:before:h-5 data-[active=true]:before:w-1 data-[active=true]:before:rounded-r-full data-[active=true]:before:bg-sidebar-primary";
 
   return (
     <Sidebar collapsible="icon" className="border-r">
-      {/* Sidebar Header */}
-      <SidebarHeader className="border-b">
+      <SidebarHeader className="border-b px-3 py-3">
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton size="lg" asChild>
-              <Link to="/" onClick={handleMenuItemClick}>
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <span className="text-lg font-bold">J</span>
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">Jozo Admin</span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    Management System
-                  </span>
-                </div>
+            <SidebarMenuButton size="lg" asChild className="rounded-xl">
+              <Link to="/" onClick={closeMobileSidebar}>
+                Jozo admin
+                {/* <JozoLogo iconClassName="size-8 rounded-lg" /> */}
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
 
-      {/* Sidebar Content */}
-      <SidebarContent>
-        {/* Main Menu Items */}
-        {mainItems.length > 0 && (
-          <SidebarGroup>
-            <SidebarGroupLabel>Main</SidebarGroupLabel>
+      <SidebarContent className="gap-1 px-2 py-2">
+        {quickAccessItems.length > 0 && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wide">
+              Quick access
+            </SidebarGroupLabel>
             <SidebarGroupContent>
-              <SidebarMenu>
-                {mainItems.map((item: MenuItem) => (
+              <SidebarMenu className="gap-1">
+                {quickAccessItems.map((item: MenuItem) => (
                   <SidebarMenuItem key={item.title}>
                     <SidebarMenuButton
                       asChild
                       isActive={isActive(item.url)}
                       tooltip={item.title}
+                      className={cn(
+                        menuButtonClassName,
+                        activeMenuButtonClassName,
+                      )}
                     >
-                      <Link
-                        to={item.url || "#"}
-                        onClick={handleMenuItemClick}
-                      >
+                      <Link to={item.url || "#"} onClick={closeMobileSidebar}>
                         <item.icon />
                         <span>{item.title}</span>
                       </Link>
@@ -124,68 +120,85 @@ export function AppSidebar() {
           </SidebarGroup>
         )}
 
-        {/* Grouped Menu Items with Sub-items */}
-        {groupedItems.map((group: MenuItem) => {
-          const isGroupActive = isActive(group.url) || hasActiveChild(group);
-          const isOpen = openGroups[group.title] ?? isGroupActive; // Auto-expand if active
+        {quickAccessItems.length > 0 && managementGroups.length > 0 && (
+          <SidebarSeparator className="my-2" />
+        )}
 
-          return (
-            <SidebarGroup key={group.title}>
-              <SidebarGroupLabel>{group.title}</SidebarGroupLabel>
-              <SidebarGroupContent>
-                <SidebarMenu>
-                  <SidebarMenuItem>
-                    <SidebarMenuButton
-                      tooltip={group.title}
-                      isActive={isGroupActive}
-                      onClick={() => toggleGroup(group.title)}
-                    >
-                      <group.icon />
-                      <span>{group.title}</span>
-                      <ChevronRight
+        {managementGroups.length > 0 && (
+          <SidebarGroup className="p-0">
+            <SidebarGroupLabel className="px-2 text-[11px] font-semibold uppercase tracking-wide">
+              Management
+            </SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu className="gap-1">
+                {managementGroups.map((group: MenuItem) => {
+                  const isGroupActive =
+                    isActive(group.url) || hasActiveChild(group);
+                  const isOpen = openGroups[group.title] ?? isGroupActive;
+
+                  return (
+                    <SidebarMenuItem key={group.title}>
+                      <SidebarMenuButton
+                        tooltip={group.title}
+                        isActive={isGroupActive}
+                        onClick={() => toggleGroup(group.title)}
                         className={cn(
-                          "ml-auto transition-transform duration-200",
-                          isOpen && "rotate-90"
+                          menuButtonClassName,
+                          activeMenuButtonClassName,
                         )}
-                      />
-                    </SidebarMenuButton>
-                    {isOpen && (
-                      <SidebarMenuSub>
-                        {group.subItems?.map((subItem: MenuItem) => (
-                          <SidebarMenuSubItem key={subItem.title}>
-                            <SidebarMenuSubButton
-                              asChild
-                              isActive={isActive(subItem.url)}
-                            >
-                              <Link
-                                to={subItem.url || "#"}
-                                onClick={handleMenuItemClick}
+                        aria-expanded={isOpen}
+                      >
+                        <group.icon />
+                        <span>{group.title}</span>
+                        <ChevronRight
+                          className={cn(
+                            "ml-auto transition-transform duration-200",
+                            isOpen && "rotate-90",
+                          )}
+                        />
+                      </SidebarMenuButton>
+
+                      {isOpen && (
+                        <SidebarMenuSub className="mx-4 my-1 gap-1 border-sidebar-border/70 pr-0">
+                          {group.subItems?.map((subItem: MenuItem) => (
+                            <SidebarMenuSubItem key={subItem.title}>
+                              <SidebarMenuSubButton
+                                asChild
+                                isActive={isActive(subItem.url)}
+                                className={cn(
+                                  "rounded-lg",
+                                  isMobile ? "h-10 text-sm" : "h-8",
+                                )}
                               >
-                                <subItem.icon />
-                                <span>{subItem.title}</span>
-                              </Link>
-                            </SidebarMenuSubButton>
-                          </SidebarMenuSubItem>
-                        ))}
-                      </SidebarMenuSub>
-                    )}
-                  </SidebarMenuItem>
-                </SidebarMenu>
-              </SidebarGroupContent>
-            </SidebarGroup>
-          );
-        })}
+                                <Link
+                                  to={subItem.url || "#"}
+                                  onClick={closeMobileSidebar}
+                                >
+                                  <subItem.icon />
+                                  <span>{subItem.title}</span>
+                                </Link>
+                              </SidebarMenuSubButton>
+                            </SidebarMenuSubItem>
+                          ))}
+                        </SidebarMenuSub>
+                      )}
+                    </SidebarMenuItem>
+                  );
+                })}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
-      {/* Sidebar Footer */}
-      <SidebarFooter className="border-t">
+      <SidebarFooter className="border-t p-2">
         <SidebarMenu>
           <SidebarMenuItem>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <SidebarMenuButton
                   size="lg"
-                  className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+                  className="rounded-xl data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage
@@ -244,21 +257,24 @@ export function AppSidebar() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to={PATHS.PROFILE} onClick={handleMenuItemClick}>
+                  <Link to={PATHS.PROFILE} onClick={closeMobileSidebar}>
                     <User className="mr-2 h-4 w-4" />
                     <span>Profile</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link to="/change-password" onClick={handleMenuItemClick}>
+                  <Link to={PATHS.CHANGE_PASSWORD} onClick={closeMobileSidebar}>
                     <Settings className="mr-2 h-4 w-4" />
-                    <span>Settings</span>
+                    <span>Change Password</span>
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <div>
-                    <LogoutButton variant="ghost" className="w-full justify-start p-0 h-auto font-normal" />
+                    <LogoutButton
+                      variant="ghost"
+                      className="h-auto w-full justify-start p-0 font-normal"
+                    />
                   </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>

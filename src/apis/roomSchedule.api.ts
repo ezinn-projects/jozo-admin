@@ -1,5 +1,5 @@
 import { IRoomSchedule } from "@/@types/Room";
-import { RoomStatus } from "@/constants/enum";
+import { RoomStatus, RoomType } from "@/constants/enum";
 import http from "@/utils/http";
 
 // Create a new interface for creating room schedules
@@ -12,6 +12,7 @@ interface ICreateRoomScheduleRequest {
   customerPhone?: string;
   giftEnabled?: boolean;
   applyFreeHourPromo?: boolean;
+  roomType?: RoomType;
 }
 
 interface IChangeRoomRequest {
@@ -22,6 +23,7 @@ interface IChangeRoomRequest {
   newRoomId: string;
   roomChangeNote?: string;
   updatedBy?: string;
+  roomType?: RoomType;
 }
 
 const SCHEDULE_CONTROLLER = "/room-schedule";
@@ -37,6 +39,7 @@ const roomsScheduleApis = {
     id: string,
     schedule: Partial<ICreateRoomScheduleRequest & IChangeRoomRequest>
   ) => http.put<HTTPResponse>(`${SCHEDULE_CONTROLLER}/${id}`, schedule),
+  /** BE tự chuyển queue nhạc khi payload có `newRoomId` — không cần gọi move-queue riêng */
   changeRoom: (id: string, payload: IChangeRoomRequest) =>
     http.put<HTTPResponse>(`${SCHEDULE_CONTROLLER}/${id}`, payload),
   deleteSchedule: (id: string) =>

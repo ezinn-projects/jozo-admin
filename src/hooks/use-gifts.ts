@@ -1,17 +1,60 @@
+import { Gift, GiftBundleItem } from "@/@types/Gift";
 import giftApis from "@/apis/gift.apis";
 import { useToast } from "@/hooks/use-toast";
+import { useMemo } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-export const useGetAllGifts = () => {
+const GIFTS_QUERY_KEY = ["gifts"] as const;
+const GIFTS_STALE_TIME = 5 * 60 * 1000;
+
+const fetchAllGifts = async () => {
+  const response = await giftApis.listGifts();
+  return response.data.result || [];
+};
+
+export const useGetAllGifts = (options?: { enabled?: boolean }) => {
   return useQuery({
-    queryKey: ["gifts"],
-    queryFn: async () => {
-      const response = await giftApis.listGifts();
-      return response.data.result || [];
-    },
-    staleTime: 60 * 1000,
+    queryKey: GIFTS_QUERY_KEY,
+    queryFn: fetchAllGifts,
+    enabled: options?.enabled ?? true,
+    staleTime: GIFTS_STALE_TIME,
     refetchOnWindowFocus: true,
   });
+};
+
+/** Chỉ resolve items cho giftId cần hiển thị; tái dùng cache `["gifts"]` nếu có. */
+export const useGiftItemsByIds = (
+  giftIds: string[],
+  options?: { enabled?: boolean },
+) => {
+  const queryClient = useQueryClient();
+  const uniqueIds = useMemo(
+    () => [...new Set(giftIds.filter(Boolean))].sort(),
+    [giftIds],
+  );
+  const enabled = (options?.enabled ?? true) && uniqueIds.length > 0;
+
+  const { data: allGifts } = useQuery({
+    queryKey: GIFTS_QUERY_KEY,
+    queryFn: fetchAllGifts,
+    enabled,
+    staleTime: GIFTS_STALE_TIME,
+    refetchOnWindowFocus: false,
+    placeholderData: () => queryClient.getQueryData<Gift[]>(GIFTS_QUERY_KEY),
+  });
+
+  return useMemo(() => {
+    const map: Record<string, GiftBundleItem[]> = {};
+    if (!allGifts?.length || uniqueIds.length === 0) return map;
+
+    const idSet = new Set(uniqueIds);
+    for (const gift of allGifts) {
+      if (gift._id && idSet.has(gift._id) && gift.items?.length) {
+        map[gift._id] = gift.items;
+      }
+    }
+    return map;
+  }, [allGifts, uniqueIds]);
 };
 
 export const useGetGiftById = (id: string) => {

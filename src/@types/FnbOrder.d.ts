@@ -16,6 +16,7 @@ interface IFnbOrder {
 
 // Thông tin chi tiết từng item trong order
 export interface OrderDetailItem {
+  lineId?: string;
   itemId: string;
   name: string;
   price: number;

@@ -5,7 +5,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -28,6 +27,10 @@ import dayjs, {
 } from "@/lib/dayjs";
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
+import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import ScheduleMemberSection from "./ScheduleMemberSection";
+import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
+import { getRoomTypeLabel } from "../utils/scheduleRoomType";
 import fnbMenuApis from "@/apis/fnbMenu.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
@@ -41,13 +44,13 @@ import {
   Plus,
   Minus,
   User,
-  Phone,
-  Mail,
   ArrowUpRight,
   Globe,
   UserCheck,
   Building,
-  Gift,
+  Clock,
+  Pencil,
+  ArrowRightLeft,
 } from "lucide-react";
 
 // Import type MenuItem từ MenuItemsModal
@@ -58,6 +61,7 @@ interface MenuItem {
   hasVariant: boolean;
   price: number;
   image: string;
+  isActive?: boolean;
   category: string;
   inventory: {
     quantity: number;
@@ -104,16 +108,6 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     ? parseUTCToLocal(schedule.endTime)
     : eventStart.add(120, "minute");
 
-  // Gift info (API trả về gift object, khác với giftEnabled)
-  const giftInfo = (schedule as unknown as { gift?: any }).gift;
-  const hasGift = !!giftInfo;
-  const giftStatus = giftInfo?.status;
-  const isGiftClaimed = giftStatus === "claimed";
-  const giftItems =
-    giftInfo?.type === "snacks_drinks" && Array.isArray(giftInfo?.items)
-      ? giftInfo.items
-      : [];
-
   // State cho thời gian điều chỉnh
   const [adjustedStartDate, setAdjustedStartDate] = React.useState<string>("");
   const [adjustedEndDate, setAdjustedEndDate] = React.useState<string>("");
@@ -136,6 +130,13 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const [roomChangeNote, setRoomChangeNote] = React.useState<string>("");
 
   const queryClient = useQueryClient();
+
+  const member = useScheduleMemberPhone({
+    scheduleId: schedule._id,
+    initialPhone: schedule.customerPhone || "",
+    isOpen,
+    refetchSchedules,
+  });
 
   // Query danh sách phòng để đổi
   const { data: roomsData, isLoading: isLoadingRooms } = useQuery({
@@ -350,43 +351,20 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   const menuItems = (menuItemsData?.data?.result ||
     []) as unknown as MenuItem[];
   const rooms = (roomsData?.data?.result || []) as IRoom[];
+  const currentRoom = rooms.find((room) => room._id === schedule.roomId);
   const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
 
-  // Hàm lấy thông tin source và màu sắc
+  // Nhãn + icon cho nguồn booking (giữ tông màu trung tính, không tô màu nền)
   const getSourceInfo = (source?: string) => {
     switch (source) {
       case "customer":
-        return {
-          label: "Khách hàng online",
-          icon: Globe,
-          color: "text-green-600",
-          bgColor: "bg-green-50",
-          borderColor: "border-green-200",
-        };
+        return { label: "Khách đặt online", icon: Globe };
       case "admin":
-        return {
-          label: "Admin đặt",
-          icon: UserCheck,
-          color: "text-blue-600",
-          bgColor: "bg-blue-50",
-          borderColor: "border-blue-200",
-        };
+        return { label: "Admin đặt", icon: UserCheck };
       case "walk-in":
-        return {
-          label: "Walk-in",
-          icon: Building,
-          color: "text-purple-600",
-          bgColor: "bg-purple-50",
-          borderColor: "border-purple-200",
-        };
+        return { label: "Khách vãng lai", icon: Building };
       default:
-        return {
-          label: "Đặt bởi Hệ thống",
-          icon: User,
-          color: "text-gray-600",
-          bgColor: "bg-gray-50",
-          borderColor: "border-gray-200",
-        };
+        return { label: "Hệ thống", icon: User };
     }
   };
 
@@ -534,7 +512,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       onClose();
       toast({
         title: "Success",
-        description: "Đã đổi phòng thành công",
+        description:
+          "Đã đổi phòng thành công. Queue nhạc đã được chuyển sang phòng mới.",
       });
     },
     onError: () => {
@@ -578,7 +557,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     changeRoom(payload);
   };
 
-  const handleUpdate = async (newStatus: RoomStatus) => {
+  const handleUpdate = (newStatus: RoomStatus) => {
     const updateData: Partial<IRoomSchedule> = { status: newStatus };
 
     // Nếu chuyển sang "In use", sử dụng thời gian đã điều chỉnh hoặc thời gian hiện tại
@@ -678,26 +657,89 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         if (!open) onClose();
       }}
     >
-      <DialogContent className="sm:max-w-[725px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Process Booked Event</DialogTitle>
-          <DialogDescription>
-            Here is the event details. You can cancel the booking, mark the
-            event as in use, or adjust the event time.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-2">
-          <p>
-            <span className="font-medium">Start:</span>{" "}
-            {eventStart.format("HH:mm")}
-          </p>
-          <p>
-            <span className="font-medium">End:</span> {eventEnd.format("HH:mm")}
-          </p>
-          <div>
-            <span className="font-medium">Note:</span>
+      <DialogContent
+        className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[725px]"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
+          <DialogHeader className="pr-10">
+            <DialogTitle className="flex items-center gap-2 text-lg">
+              <Clock className="w-5 h-5 text-muted-foreground" />
+              Xử lý booking
+            </DialogTitle>
+            <DialogDescription>
+              Xác nhận thông tin khách, kiểm tra giờ rồi mở phiên hoặc hủy
+              booking.
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Tóm tắt nhanh: giờ dự kiến + nguồn booking */}
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2.5">
+            <div className="flex items-center gap-2 text-sm">
+              <Clock className="w-4 h-4 shrink-0 text-muted-foreground" />
+              <span>
+                Giờ dự kiến: <strong>{eventStart.format("HH:mm")}</strong> –{" "}
+                <strong>{eventEnd.format("HH:mm")}</strong>
+              </span>
+            </div>
+            <Badge variant="secondary" className="gap-1 font-normal">
+              {React.createElement(getSourceInfo(schedule.source).icon, {
+                className: "w-3.5 h-3.5",
+              })}
+              {getSourceInfo(schedule.source).label}
+            </Badge>
+          </div>
+
+          <ScheduleMemberSection
+            className="mt-4"
+            inputId="booked-member-phone"
+            phone={member.phone}
+            savedPhone={member.savedPhone}
+            onPhoneChange={member.setPhone}
+            isPhoneDirty={member.isPhoneDirty}
+            hasSavedValidPhone={member.hasSavedValidPhone}
+            isSavingPhone={member.isSavingPhone}
+            onSavePhone={member.savePhone}
+            showGiftToggle={false}
+            customerName={schedule.customerName}
+            customerEmail={schedule.customerEmail}
+            memberInfo={member.memberInfo}
+            isLoadingMemberInfo={member.isLoadingMemberInfo}
+            isMemberInfoError={member.isMemberInfoError}
+            isMemberNotFound={member.isMemberNotFound}
+            availableGifts={member.availableGifts}
+            streakRewards={member.streakRewards}
+            giftItemsById={member.giftItemsById}
+            onServeGift={member.serveStreakGift}
+            isServingGift={member.isServingGift}
+          />
+
+          <ScheduleRoomTypeSection
+            className="mt-4"
+            schedule={schedule}
+            physicalRoomType={currentRoom?.roomType}
+            onUpdated={refetchSchedules}
+          />
+
+          {/* Ghi chú */}
+          <div className="mt-4 space-y-2">
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold">Ghi chú</h3>
+              {!isEditingNote && (
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 px-2 text-muted-foreground"
+                  onClick={handleEditNote}
+                  disabled={isUpdatingNote}
+                >
+                  <Pencil className="w-3.5 h-3.5 mr-1" />
+                  {currentSchedule.note ? "Sửa" : "Thêm"}
+                </Button>
+              )}
+            </div>
             {isEditingNote ? (
-              <div className="mt-2 space-y-2">
+              <div className="space-y-2">
                 <Input
                   value={noteValue}
                   onChange={(e) => setNoteValue(e.target.value)}
@@ -708,10 +750,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                   <Button
                     size="sm"
                     onClick={handleSaveNote}
-                    disabled={isUpdatingNote}
-                    className="bg-green-600 hover:bg-green-700"
+                    loading={isUpdatingNote}
                   >
-                    {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                    Lưu
                   </Button>
                   <Button
                     size="sm"
@@ -724,463 +765,325 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 </div>
               </div>
             ) : (
-              <div className="mt-1 flex items-start gap-2">
-                <p className="flex-1 break-words">
-                  {currentSchedule.note || "Chưa có ghi chú"}
-                </p>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleEditNote}
-                  disabled={isUpdatingNote}
-                >
-                  Chỉnh sửa
-                </Button>
-              </div>
+              <p className="text-sm text-muted-foreground break-words">
+                {currentSchedule.note || "Chưa có ghi chú"}
+              </p>
             )}
           </div>
-        </div>
 
-        {/* Thông tin nguồn booking */}
-        {schedule.source === "customer" && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              {React.createElement(getSourceInfo(schedule.source).icon, {
-                className: `w-4 h-4 ${getSourceInfo(schedule.source).color}`,
-              })}
-              Nguồn booking
+          {/* Thông tin nâng cấp phòng (nếu có) */}
+          {schedule.upgraded && schedule.originalRoomType && (
+            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
+              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
+              Đã nâng cấp từ phòng gốc:{" "}
+              <span className="font-medium text-foreground">
+                {schedule.originalRoomType}
+              </span>
+            </p>
+          )}
+
+          {/* Đổi phòng */}
+          <div className="mt-4 space-y-2 border-t pt-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
+              Đổi phòng
             </h3>
-            <div
-              className={`${
-                getSourceInfo(schedule.source).bgColor
-              } p-3 rounded-lg border ${
-                getSourceInfo(schedule.source).borderColor
-              }`}
-            >
-              <Badge
-                variant="outline"
-                className={`${getSourceInfo(schedule.source).color} ${
-                  getSourceInfo(schedule.source).borderColor
-                }`}
+            <p className="text-xs text-muted-foreground">
+              Queue nhạc sẽ tự chuyển theo khi đổi phòng.
+            </p>
+            <div className="space-y-2">
+              <Select
+                value={targetRoomId}
+                onValueChange={setTargetRoomId}
+                disabled={isLoadingRooms || availableRooms.length === 0}
               >
-                {getSourceInfo(schedule.source).label}
-              </Badge>
+                <SelectTrigger className="w-full">
+                  <SelectValue
+                    placeholder={
+                      availableRooms.length === 0
+                        ? "Không còn phòng khác để đổi"
+                        : "Chọn phòng muốn chuyển"
+                    }
+                  />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableRooms.map((room) => (
+                    <SelectItem key={String(room._id)} value={String(room._id)}>
+                      {room.roomName} - {getRoomTypeLabel(room.roomType)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+
+              <Textarea
+                placeholder="Lý do đổi phòng (tuỳ chọn)"
+                value={roomChangeNote}
+                onChange={(e) => setRoomChangeNote(e.target.value)}
+                className="min-h-[80px]"
+              />
+
+              <Button
+                variant="secondary"
+                onClick={handleChangeRoom}
+                loading={isChangingRoom}
+                disabled={availableRooms.length === 0}
+              >
+                Chuyển sang phòng mới
+              </Button>
             </div>
           </div>
-        )}
 
-        {/* Thông tin khách hàng */}
-        {(schedule.customerName ||
-          schedule.customerPhone ||
-          schedule.customerEmail) && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <User className="w-4 h-4" />
-              Thông tin khách hàng
-            </h3>
-            <div className="bg-blue-50 p-3 rounded-lg space-y-1">
-              {schedule.customerName && (
-                <div className="flex items-center gap-2">
-                  <User className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">Tên:</span>{" "}
-                    {schedule.customerName}
-                  </span>
-                </div>
-              )}
-              {schedule.customerPhone && (
-                <div className="flex items-center gap-2">
-                  <Phone className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">SĐT:</span>{" "}
-                    {schedule.customerPhone}
-                  </span>
-                </div>
-              )}
-              {schedule.customerEmail && (
-                <div className="flex items-center gap-2">
-                  <Mail className="w-3 h-3 text-blue-600" />
-                  <span className="text-sm">
-                    <span className="font-medium">Email:</span>{" "}
-                    {schedule.customerEmail}
-                  </span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          {/* Đồ ăn & nước đã đặt */}
+          {hasOrders && (
+            <div className="mt-4 space-y-2 border-t pt-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Utensils className="w-4 h-4 text-muted-foreground" />
+                Đồ ăn & nước đã đặt
+              </h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Drinks */}
+                {orderDetailData?.items?.drinks &&
+                  orderDetailData.items.drinks.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Coffee className="w-4 h-4" />
+                          Nước uống
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-1">
+                          {orderDetailData.items.drinks.map((item) => (
+                            <div
+                              key={item.itemId}
+                              className="flex justify-between items-center"
+                            >
+                              <span className="text-sm">{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      "drinks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <Badge variant="secondary">
+                                  {item.quantity}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      1,
+                                      "drinks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
-        {/* Thông tin room upgrade */}
-        {schedule.upgraded && schedule.originalRoomType && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <ArrowUpRight className="w-4 h-4 text-orange-500" />
-              Thông tin nâng cấp phòng
-            </h3>
-            <div className="bg-orange-50 p-3 rounded-lg">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="text-orange-600 border-orange-200"
-                >
-                  Đã nâng cấp
-                </Badge>
-                <span className="text-sm">
-                  <span className="font-medium">Phòng gốc:</span>{" "}
-                  {schedule.originalRoomType}
-                </span>
+                {/* Snacks */}
+                {orderDetailData?.items?.snacks &&
+                  orderDetailData.items.snacks.length > 0 && (
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-sm">
+                          <Utensils className="w-4 h-4" />
+                          Đồ ăn
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="pt-0">
+                        <div className="space-y-1">
+                          {orderDetailData.items.snacks.map((item) => (
+                            <div
+                              key={item.itemId}
+                              className="flex justify-between items-center"
+                            >
+                              <span className="text-sm">{item.name}</span>
+                              <div className="flex items-center gap-2">
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      -1,
+                                      "snacks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Minus className="w-3 h-3" />
+                                </Button>
+                                <Badge variant="secondary">
+                                  {item.quantity}
+                                </Badge>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() =>
+                                    handleQuantityChange(
+                                      item.itemId,
+                                      item.quantity,
+                                      1,
+                                      "snacks",
+                                    )
+                                  }
+                                  disabled={isUpdatingQuantity}
+                                  className="w-6 h-6 p-0"
+                                >
+                                  <Plus className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
               </div>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* Đổi phòng */}
-        <div className="mt-4 space-y-2">
-          <h3 className="font-semibold">Đổi phòng</h3>
-          <div className="space-y-2">
-            <Select
-              value={targetRoomId}
-              onValueChange={setTargetRoomId}
-              disabled={isLoadingRooms || availableRooms.length === 0}
-            >
-              <SelectTrigger className="w-full">
-                <SelectValue
-                  placeholder={
-                    availableRooms.length === 0
-                      ? "Không còn phòng khác để đổi"
-                      : "Chọn phòng muốn chuyển"
-                  }
+          {/* Điều chỉnh ngày & giờ */}
+          <div className="mt-4 space-y-3 border-t pt-4">
+            <h3 className="font-semibold flex items-center gap-2">
+              <Clock className="w-4 h-4 text-muted-foreground" />
+              Điều chỉnh ngày & giờ
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label
+                  htmlFor="adjustedStartDate"
+                  className="text-xs text-muted-foreground"
+                >
+                  Ngày bắt đầu
+                </label>
+                <input
+                  id="adjustedStartDate"
+                  type="date"
+                  value={adjustedStartDate}
+                  onChange={(e) => setAdjustedStartDate(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
                 />
-              </SelectTrigger>
-              <SelectContent>
-                {availableRooms.map((room) => (
-                  <SelectItem key={String(room._id)} value={String(room._id)}>
-                    {room.roomName} - {room.roomType}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            <Textarea
-              placeholder="Lý do đổi phòng (tuỳ chọn)"
-              value={roomChangeNote}
-              onChange={(e) => setRoomChangeNote(e.target.value)}
-              className="min-h-[80px]"
-            />
-
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="adjustedStartTime"
+                  className="text-xs text-muted-foreground"
+                >
+                  Giờ bắt đầu
+                </label>
+                <input
+                  id="adjustedStartTime"
+                  type="time"
+                  value={adjustedStartTime}
+                  onChange={(e) => setAdjustedStartTime(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="adjustedEndDate"
+                  className="text-xs text-muted-foreground"
+                >
+                  Ngày kết thúc
+                </label>
+                <input
+                  id="adjustedEndDate"
+                  type="date"
+                  value={adjustedEndDate}
+                  onChange={(e) => setAdjustedEndDate(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+              <div className="space-y-1">
+                <label
+                  htmlFor="adjustedEndTime"
+                  className="text-xs text-muted-foreground"
+                >
+                  Giờ kết thúc
+                </label>
+                <input
+                  id="adjustedEndTime"
+                  type="time"
+                  value={adjustedEndTime}
+                  onChange={(e) => setAdjustedEndTime(e.target.value)}
+                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+                />
+              </div>
+            </div>
             <Button
               variant="secondary"
-              onClick={handleChangeRoom}
-              loading={isChangingRoom}
-              disabled={availableRooms.length === 0}
+              size="sm"
+              onClick={handleUpdateTime}
+              loading={isPending}
             >
-              Chuyển sang phòng mới
+              Cập nhật giờ
+            </Button>
+          </div>
+
+          <div className="mt-6 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-2">
+            <Button
+              variant="outline"
+              onClick={() => setIsMenuModalOpen(true)}
+              className="h-11 justify-center"
+            >
+              <Utensils className="w-4 h-4 mr-2" />
+              Đặt đồ ăn / uống
+            </Button>
+            <Button
+              onClick={() => {
+                handleUpdate(RoomStatus.InUse);
+              }}
+              loading={isPending}
+              className="h-11"
+            >
+              Bắt đầu sử dụng
+              {adjustedStartTime && (
+                <span className="text-xs ml-1 opacity-70">
+                  ({adjustedStartTime})
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                handleUpdate(RoomStatus.Cancelled);
+              }}
+              loading={isPending}
+              className="h-11"
+            >
+              Hủy booking
+            </Button>
+            <Button variant="ghost" onClick={onClose} className="h-11">
+              Đóng
             </Button>
           </div>
         </div>
-
-        {/* Thông tin quà tặng */}
-        {(hasGift || schedule.giftEnabled !== undefined) && (
-          <div className="mt-4">
-            <h3 className="font-semibold mb-2 flex items-center gap-2">
-              <Gift className="w-4 h-4 text-pink-500" />
-              Trạng thái quà tặng
-            </h3>
-
-            <div
-              className={`flex items-center gap-2 ${
-                hasGift || schedule.giftEnabled ? "bg-pink-50" : "bg-gray-50"
-              } p-3 rounded-lg border ${
-                hasGift || schedule.giftEnabled
-                  ? "border-pink-200"
-                  : "border-gray-200"
-              }`}
-            >
-              <Badge
-                variant="outline"
-                className={`${
-                  hasGift || schedule.giftEnabled
-                    ? "text-pink-600 border-pink-200"
-                    : "text-gray-600 border-gray-200"
-                }`}
-              >
-                {hasGift
-                  ? isGiftClaimed
-                    ? "Đã nhận quà"
-                    : "Đã được gán quà"
-                  : schedule.giftEnabled
-                    ? "Được nhận quà"
-                    : "Không được nhận quà"}
-              </Badge>
-              {hasGift && (
-                <div className="text-sm space-y-1">
-                  <p className="font-medium">{giftInfo?.name || "Quà tặng"}</p>
-                  <p className="text-xs text-gray-600">
-                    Trạng thái: {giftStatus || "N/A"}
-                  </p>
-                  {giftInfo?.type === "snacks_drinks" &&
-                    giftItems.length > 0 && (
-                      <div className="mt-2 space-y-1">
-                        <p className="font-semibold text-gray-700">Bao gồm:</p>
-                        <ul className="list-disc pl-5 space-y-0.5">
-                          {giftItems.map(
-                            (item: {
-                              itemId: string;
-                              name?: string;
-                              quantity?: number;
-                              category?: string;
-                            }) => (
-                              <li
-                                key={item.itemId}
-                                className="text-xs text-gray-700"
-                              >
-                                <span className="font-medium">
-                                  {item.name || "Món"}
-                                </span>
-                                {item.quantity !== undefined && (
-                                  <span className="ml-1">x{item.quantity}</span>
-                                )}
-                                {item.category && (
-                                  <span className="ml-2 text-gray-500">
-                                    ({item.category})
-                                  </span>
-                                )}
-                              </li>
-                            ),
-                          )}
-                        </ul>
-                      </div>
-                    )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* Hiển thị thông tin đã đặt snacks và drinks */}
-        {hasOrders && (
-          <div className="mt-4 space-y-2">
-            <h3 className="font-semibold">Ordered Snacks & Drinks</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Drinks */}
-              {orderDetailData?.items?.drinks &&
-                orderDetailData.items.drinks.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <Coffee className="w-4 h-4" />
-                        Drinks
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-1">
-                        {orderDetailData.items.drinks.map((item) => (
-                          <div
-                            key={item.itemId}
-                            className="flex justify-between items-center"
-                          >
-                            <span className="text-sm">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    -1,
-                                    "drinks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <Badge variant="secondary">{item.quantity}</Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    1,
-                                    "drinks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-
-              {/* Snacks */}
-              {orderDetailData?.items?.snacks &&
-                orderDetailData.items.snacks.length > 0 && (
-                  <Card>
-                    <CardHeader className="pb-2">
-                      <CardTitle className="flex items-center gap-2 text-sm">
-                        <Utensils className="w-4 h-4" />
-                        Snacks
-                      </CardTitle>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="space-y-1">
-                        {orderDetailData.items.snacks.map((item) => (
-                          <div
-                            key={item.itemId}
-                            className="flex justify-between items-center"
-                          >
-                            <span className="text-sm">{item.name}</span>
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    -1,
-                                    "snacks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Minus className="w-3 h-3" />
-                              </Button>
-                              <Badge variant="secondary">{item.quantity}</Badge>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() =>
-                                  handleQuantityChange(
-                                    item.itemId,
-                                    item.quantity,
-                                    1,
-                                    "snacks",
-                                  )
-                                }
-                                disabled={isUpdatingQuantity}
-                                className="w-6 h-6 p-0"
-                              >
-                                <Plus className="w-3 h-3" />
-                              </Button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-            </div>
-          </div>
-        )}
-
-        {/* Phần điều chỉnh ngày & thời gian */}
-        <div className="mt-4 space-y-3">
-          <h3 className="font-semibold">Adjust Date & Time</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="adjustedStartDate" className="text-sm">
-                Start Date:
-              </label>
-              <input
-                id="adjustedStartDate"
-                type="date"
-                value={adjustedStartDate}
-                onChange={(e) => setAdjustedStartDate(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="adjustedEndDate" className="text-sm">
-                End Date:
-              </label>
-              <input
-                id="adjustedEndDate"
-                type="date"
-                value={adjustedEndDate}
-                onChange={(e) => setAdjustedEndDate(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="space-y-1">
-              <label htmlFor="adjustedStartTime" className="text-sm">
-                Start Time:
-              </label>
-              <input
-                id="adjustedStartTime"
-                type="time"
-                value={adjustedStartTime}
-                onChange={(e) => setAdjustedStartTime(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-            <div className="space-y-1">
-              <label htmlFor="adjustedEndTime" className="text-sm">
-                End Time:
-              </label>
-              <input
-                id="adjustedEndTime"
-                type="time"
-                value={adjustedEndTime}
-                onChange={(e) => setAdjustedEndTime(e.target.value)}
-                className="border rounded p-1 w-full"
-              />
-            </div>
-          </div>
-          <Button
-            variant="default"
-            onClick={handleUpdateTime}
-            loading={isPending}
-          >
-            Update Time
-          </Button>
-        </div>
-
-        <DialogFooter className="flex justify-end space-x-2 mt-4">
-          <Button variant="outline" onClick={() => setIsMenuModalOpen(true)}>
-            Order Snacks & Drinks
-          </Button>
-
-          <Button
-            variant="default"
-            onClick={() => {
-              handleUpdate(RoomStatus.InUse);
-            }}
-            loading={isPending}
-          >
-            Mark as In Use
-            {adjustedStartTime && (
-              <span className="text-xs ml-1 opacity-70">
-                ({adjustedStartTime})
-              </span>
-            )}
-          </Button>
-          <Button
-            variant="destructive"
-            onClick={() => {
-              handleUpdate(RoomStatus.Cancelled);
-            }}
-            loading={isPending}
-          >
-            Cancel Booking
-          </Button>
-          <Button variant="outline" onClick={onClose}>
-            Close
-          </Button>
-        </DialogFooter>
       </DialogContent>
 
       {/* Modal đặt đồ ăn */}

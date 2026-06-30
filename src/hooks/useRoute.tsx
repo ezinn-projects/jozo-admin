@@ -3,9 +3,6 @@ import RoleGuard from "@/components/guards/RoleGuard";
 import { Layout } from "@/components/Layout";
 import { Role } from "@/constants/enum";
 import PATHS from "@/constants/paths";
-import CalendarPage from "@/pages/CalendarPage";
-import PromotionPage from "@/pages/PromotionPage";
-import RevenueStatisticsPage from "@/pages/RevenueStatisticsPage";
 
 import { lazy, Suspense } from "react";
 import {
@@ -17,6 +14,11 @@ import {
 import { NuqsAdapter } from "nuqs/adapters/react-router/v6";
 
 const AdminPage = lazy(() => import("@/pages/AdminPage"));
+const CalendarPage = lazy(() => import("@/pages/CalendarPage"));
+const PromotionPage = lazy(() => import("@/pages/PromotionPage"));
+const RevenueStatisticsPage = lazy(
+  () => import("@/pages/RevenueStatisticsPage")
+);
 const RoomsListPage = lazy(
   () => import("@/pages/RoomsManagement/pages/RoomsListPage")
 );
@@ -26,6 +28,8 @@ const UpsertRoomPage = lazy(
 const StaffPage = lazy(() => import("@/pages/StaffPage"));
 const UnauthorizedPage = lazy(() => import("@/pages/UnauthorizedPage"));
 const LoginPage = lazy(() => import("@/pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("@/pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("@/pages/ResetPasswordPage"));
 const PricePage = lazy(() => import("@/pages/PricePage"));
 const CoffeePricingPage = lazy(() => import("@/pages/CoffeePricingPage"));
 const RoomTypesListPage = lazy(
@@ -46,6 +50,7 @@ const CustomizationGroupTemplatesPage = lazy(
   () => import("@/pages/FnB/CustomizationGroupTemplatesPage")
 );
 const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
+const FnbShiftCountPage = lazy(() => import("@/pages/FnbShiftCount"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const GamesPage = lazy(() => import("@/pages/Games"));
 const MembershipConfigPage = lazy(() => import("@/pages/Membership"));
@@ -87,6 +92,8 @@ function useRoute() {
         <Suspense fallback={<div>Loading...</div>}>
           <Routes>
           <Route path={PATHS.LOGIN} element={<LoginPage />} />
+          <Route path={PATHS.FORGOT_PASSWORD} element={<ForgotPasswordPage />} />
+          <Route path={PATHS.RESET_PASSWORD} element={<ResetPasswordPage />} />
           <Route path={PATHS.UNAUTHORIZED} element={<UnauthorizedPage />} />
 
           <Route element={<AuthGuard />}>
@@ -102,26 +109,7 @@ function useRoute() {
                 element={<RoleGuard requiredRoles={[Role.Admin, Role.Staff]} />}
               >
                 <Route path={PATHS.HOME} element={<AdminPage />} />
-                <Route path={PATHS.ROOMS}>
-                  <Route index element={<RoomsListPage />} />
-                  <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
-                  <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
-                </Route>
-                <Route path={PATHS.COFFEE_TABLES}>
-                  <Route index element={<CoffeeTablesListPage />} />
-                  <Route
-                    path={PATHS.COFFEE_TABLES_NEW}
-                    element={<UpsertCoffeeTablePage />}
-                  />
-                  <Route
-                    path={PATHS.COFFEE_TABLES_EDIT}
-                    element={<UpsertCoffeeTablePage />}
-                  />
-                </Route>
-                <Route
-                  path={PATHS.COFFEE_PRICING}
-                  element={<CoffeePricingPage />}
-                />
+                <Route path={PATHS.ROOMS} element={<RoomsListPage />} />
                 <Route
                   path={PATHS.TOTAL_REVENUE}
                   element={<RevenueStatisticsPage />}
@@ -139,6 +127,10 @@ function useRoute() {
                 <Route
                   path={PATHS.SONGS_COLLECTION}
                   element={<SongsCollectionPage />}
+                />
+                <Route
+                  path={PATHS.FNB_SHIFT_COUNT}
+                  element={<FnbShiftCountPage />}
                 />
                 <Route
                   path={PATHS.CHANGE_PASSWORD}
@@ -162,6 +154,23 @@ function useRoute() {
                 </Route>
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />
+                <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.COFFEE_TABLES}>
+                  <Route index element={<CoffeeTablesListPage />} />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_NEW}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_EDIT}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                </Route>
+                <Route
+                  path={PATHS.COFFEE_PRICING}
+                  element={<CoffeePricingPage />}
+                />
                 {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route
