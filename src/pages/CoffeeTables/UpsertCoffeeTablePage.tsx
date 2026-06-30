@@ -112,11 +112,11 @@ function UpsertCoffeeTablePage() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title={isEditMode ? "Edit Coffee Table" : "New Coffee Table"}
+        title={isEditMode ? "Edit Service Station" : "New Service Station"}
         description={
           isEditMode
-            ? "Edit coffee table details"
-            : "Create a new coffee table"
+            ? "Update service station details"
+            : "Create a new service station"
         }
         icon={Coffee}
         showBackButton

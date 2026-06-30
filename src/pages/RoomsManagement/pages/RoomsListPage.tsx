@@ -90,15 +90,14 @@ function RoomsListPage() {
     {
       id: "actions",
       header: "",
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
-          <Link to={`/rooms/${row.original._id}/edit`}>
-            <Button variant="ghost" size="icon">
-              <PencilIcon size={16} />
-            </Button>
-          </Link>
-
-          {isAdmin && (
+      cell: ({ row }) =>
+        isAdmin ? (
+          <div className="flex items-center justify-center gap-2">
+            <Link to={`/rooms/${row.original._id}/edit`}>
+              <Button variant="ghost" size="icon">
+                <PencilIcon size={16} />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -106,9 +105,8 @@ function RoomsListPage() {
             >
               <TrashIcon size={16} />
             </Button>
-          )}
-        </div>
-      ),
+          </div>
+        ) : null,
     },
   ];
 

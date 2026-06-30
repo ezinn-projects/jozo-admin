@@ -109,26 +109,7 @@ function useRoute() {
                 element={<RoleGuard requiredRoles={[Role.Admin, Role.Staff]} />}
               >
                 <Route path={PATHS.HOME} element={<AdminPage />} />
-                <Route path={PATHS.ROOMS}>
-                  <Route index element={<RoomsListPage />} />
-                  <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
-                  <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
-                </Route>
-                <Route path={PATHS.COFFEE_TABLES}>
-                  <Route index element={<CoffeeTablesListPage />} />
-                  <Route
-                    path={PATHS.COFFEE_TABLES_NEW}
-                    element={<UpsertCoffeeTablePage />}
-                  />
-                  <Route
-                    path={PATHS.COFFEE_TABLES_EDIT}
-                    element={<UpsertCoffeeTablePage />}
-                  />
-                </Route>
-                <Route
-                  path={PATHS.COFFEE_PRICING}
-                  element={<CoffeePricingPage />}
-                />
+                <Route path={PATHS.ROOMS} element={<RoomsListPage />} />
                 <Route
                   path={PATHS.TOTAL_REVENUE}
                   element={<RevenueStatisticsPage />}
@@ -173,6 +154,23 @@ function useRoute() {
                 </Route>
 
                 <Route path={PATHS.PRICE} element={<PricePage />} />
+                <Route path={PATHS.NEW_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.EDIT_ROOM} element={<UpsertRoomPage />} />
+                <Route path={PATHS.COFFEE_TABLES}>
+                  <Route index element={<CoffeeTablesListPage />} />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_NEW}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                  <Route
+                    path={PATHS.COFFEE_TABLES_EDIT}
+                    element={<UpsertCoffeeTablePage />}
+                  />
+                </Route>
+                <Route
+                  path={PATHS.COFFEE_PRICING}
+                  element={<CoffeePricingPage />}
+                />
                 {/* <Route path={PATHS.FNB} element={<FnBPage />} /> */}
                 <Route path={PATHS.MENU_ITEMS} element={<MenuItemsPage />} />
                 <Route

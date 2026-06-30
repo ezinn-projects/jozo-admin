@@ -6,8 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
 import PATHS from "@/constants/paths";
-import { Role } from "@/constants/enum";
-import useAuth from "@/hooks/useAuth";
+import { useIsAdmin } from "@/hooks/usePermission";
 import { useToast } from "@/hooks/use-toast";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ColumnDef } from "@tanstack/react-table";
@@ -16,8 +15,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 
 function CoffeeTablesListPage() {
-  const { user } = useAuth();
-  const isAdmin = user?.role === Role.Admin;
+  const isAdmin = useIsAdmin();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedTable, setSelectedTable] = useState<ICoffeeTable | null>(null);
@@ -72,14 +70,14 @@ function CoffeeTablesListPage() {
     {
       id: "actions",
       header: "",
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center gap-2">
-          <Link to={`${PATHS.COFFEE_TABLES}/${row.original._id}/edit`}>
-            <Button variant="ghost" size="icon">
-              <PencilIcon size={16} />
-            </Button>
-          </Link>
-          {isAdmin && (
+      cell: ({ row }) =>
+        isAdmin ? (
+          <div className="flex items-center justify-center gap-2">
+            <Link to={`${PATHS.COFFEE_TABLES}/${row.original._id}/edit`}>
+              <Button variant="ghost" size="icon">
+                <PencilIcon size={16} />
+              </Button>
+            </Link>
             <Button
               variant="ghost"
               size="icon"
@@ -87,22 +85,23 @@ function CoffeeTablesListPage() {
             >
               <TrashIcon size={16} />
             </Button>
-          )}
-        </div>
-      ),
+          </div>
+        ) : null,
     },
   ];
 
   return (
     <div>
       <PageHeader
-        title="Coffee Tables"
-        description="Coffee tables list"
+        title="Service Stations"
+        description="Manage coffee lounge service stations"
         icon={Coffee}
         actions={
-          <Link to={PATHS.COFFEE_TABLES_NEW}>
-            <Button>New Table</Button>
-          </Link>
+          isAdmin ? (
+            <Link to={PATHS.COFFEE_TABLES_NEW}>
+              <Button>New Station</Button>
+            </Link>
+          ) : undefined
         }
         className="mb-4"
       />
@@ -122,7 +121,7 @@ function CoffeeTablesListPage() {
             deleteCoffeeTableMutation.mutate(selectedTable._id);
           }
         }}
-        title="Delete Coffee Table"
+        title="Delete Service Station"
         description={`Are you sure you want to delete "${selectedTable?.name}"?`}
         isLoading={deleteCoffeeTableMutation.isPending}
       />

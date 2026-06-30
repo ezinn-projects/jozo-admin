@@ -118,8 +118,8 @@ function CoffeePricingPage() {
   return (
     <div className="max-w-3xl">
       <PageHeader
-        title="Coffee Pricing"
-        description="Configure board game pricing for coffee table customers."
+        title="Pricing"
+        description="Configure board game pricing for coffee lounge customers."
         icon={Coffee}
         className="mb-4"
       />
