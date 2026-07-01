@@ -175,6 +175,9 @@ const MenuItemsModal: React.FC<MenuItemsModalProps> = ({
       if (!childrenMap[parentId].some((existing) => existing._id === child._id)) {
         childrenMap[parentId].push(child);
       }
+      if (child._id) {
+        itemById[child._id] = child;
+      }
     };
 
     menuItems.forEach((item) => {
