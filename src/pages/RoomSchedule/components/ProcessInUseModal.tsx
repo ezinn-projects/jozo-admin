@@ -328,7 +328,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         quantity: number;
         category: string;
       }) => {
-        if (!schedule._id || !user?._id) return;
+        if (!schedule._id || !schedule.createdBy) return;
 
         // Get current quantity
         const currentQuantity = getOrderItemQuantity(orderDetailData, itemId);
@@ -346,7 +346,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               ? { drinks: { [itemId]: Math.abs(diff) } }
               : { snacks: { [itemId]: Math.abs(diff) } }),
           },
-          createdBy: user._id,
+          createdBy: schedule.createdBy,
         };
 
         if (diff > 0) {
@@ -711,7 +711,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           status: RoomStatus.Finished,
           endTime: actualEndTime,
           startTime: actualStartTime,
-          customerPhone: member.savedPhone.trim() || schedule.customerPhone || "",
+          customerPhone:
+            member.savedPhone.trim() || schedule.customerPhone || "",
           customerName,
           customerEmail,
         };
@@ -932,7 +933,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
             <DialogHeader className="pb-3 pr-10 space-y-1">
               <DialogTitle className="flex flex-wrap items-center gap-2 text-base sm:text-lg">
-                <span>Phiên đang sử dụng</span>
+                <span>Thông tin phòng đang sử dụng</span>
                 {room?.roomName && (
                   <span className="rounded bg-muted px-2 py-0.5 text-xs font-medium text-foreground">
                     {room.roomName}
@@ -940,8 +941,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
-                Bắt đầu {dayjs(schedule.startTime).format("HH:mm")} · Kết thúc dự
-                kiến {dayjs(schedule.endTime).format("HH:mm")}
+                Bắt đầu {dayjs(schedule.startTime).format("HH:mm")} · Kết thúc
+                dự kiến {dayjs(schedule.endTime).format("HH:mm")}
               </DialogDescription>
             </DialogHeader>
 
@@ -956,543 +957,570 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </TabsList>
 
               <TabsContent value="bill" className="space-y-4 mt-0">
-            {/* Bill Section */}
-            <div className="rounded-md border bg-card text-sm">
-              <div className="flex items-center justify-between border-b px-3 py-2">
-                <h4 className="text-sm font-semibold">Hóa đơn</h4>
-                <span className="text-[11px] text-muted-foreground">
-                  Mã {room?._id.slice(0, 2)}
-                  {dayjs(createdAt || new Date()).format("HHmmDDMMYYYY")}
-                </span>
-              </div>
-
-              <div className="text-foreground">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 p-3 sm:grid-cols-4">
-                  <div className="flex flex-col">
+                {/* Bill Section */}
+                <div className="rounded-md border bg-card text-sm">
+                  <div className="flex items-center justify-between border-b px-3 py-2">
+                    <h4 className="text-sm font-semibold">Hóa đơn</h4>
                     <span className="text-[11px] text-muted-foreground">
-                      Phòng
+                      Mã {room?._id.slice(0, 2)}
+                      {dayjs(createdAt || new Date()).format("HHmmDDMMYYYY")}
                     </span>
-                    <span className="font-medium">{room?.roomName || "—"}</span>
-                  </div>
-                  <div className="col-span-2 flex flex-col sm:col-span-1">
-                    <span className="text-[11px] text-muted-foreground">
-                      Size
-                    </span>
-                    <ScheduleRoomTypeSection
-                      variant="inline"
-                      schedule={schedule}
-                      physicalRoomType={room?.roomType}
-                      onUpdated={handleRoomTypeUpdated}
-                    />
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-muted-foreground">
-                      Ngày tạo
-                    </span>
-                    <span className="font-medium">
-                      {dayjs(createdAt || new Date()).format("DD/MM/YYYY HH:mm")}
-                    </span>
-                  </div>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] text-muted-foreground">
-                      Người tạo
-                    </span>
-                    <span className="font-medium">{user?.name || "—"}</span>
-                  </div>
-                </div>
-                <div className="border-t" />
-                <div className="grid gap-3 p-3 sm:grid-cols-3">
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="start-time"
-                      className="flex items-center gap-1 text-[11px] text-muted-foreground"
-                    >
-                      <Clock className="h-3 w-3" />
-                      Bắt đầu
-                    </Label>
-                    <Input
-                      id="start-time"
-                      type="time"
-                      value={customStartTime}
-                      onChange={handleStartTimeChange}
-                      className="h-9"
-                    />
                   </div>
 
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="end-time"
-                      className="flex items-center gap-1 text-[11px] text-muted-foreground"
-                    >
-                      <Clock className="h-3 w-3" />
-                      Kết thúc
-                    </Label>
-                    <Input
-                      id="end-time"
-                      type="time"
-                      value={customEndTime}
-                      onChange={handleEndTimeChange}
-                      className="h-9"
-                    />
-                  </div>
-
-                  <div className="space-y-1">
-                    <Label
-                      htmlFor="end-date"
-                      className="text-[11px] text-muted-foreground"
-                    >
-                      Ngày kết thúc
-                    </Label>
-                    <Popover modal={true}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          id="end-date"
-                          type="button"
-                          variant="outline"
-                          className="h-9 w-full justify-between font-normal"
-                        >
-                          {customEndDate
-                            ? dayjs(customEndDate).format("DD/MM/YYYY")
-                            : "Chọn ngày"}
-                          <CalendarDays className="h-4 w-4 opacity-60" />
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0" align="start">
-                        <Calendar
-                          mode="single"
-                          selected={
-                            customEndDate
-                              ? dayjs(customEndDate).toDate()
-                              : undefined
-                          }
-                          onSelect={handleEndDateChange}
-                          initialFocus
+                  <div className="text-foreground">
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-1.5 p-3 sm:grid-cols-4">
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-muted-foreground">
+                          Phòng
+                        </span>
+                        <span className="font-medium">
+                          {room?.roomName || "—"}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex flex-col sm:col-span-1">
+                        <span className="text-[11px] text-muted-foreground">
+                          Size
+                        </span>
+                        <ScheduleRoomTypeSection
+                          variant="inline"
+                          schedule={schedule}
+                          physicalRoomType={room?.roomType}
+                          onUpdated={handleRoomTypeUpdated}
                         />
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-                </div>
-                <div className="border-t" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-muted-foreground">
+                          Ngày tạo
+                        </span>
+                        <span className="font-medium">
+                          {dayjs(createdAt || new Date()).format(
+                            "DD/MM/YYYY HH:mm",
+                          )}
+                        </span>
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[11px] text-muted-foreground">
+                          Người tạo
+                        </span>
+                        <span className="font-medium">
+                          {user?._id === schedule.createdBy
+                            ? user?.name || "—"
+                            : "—"}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="border-t" />
+                    <div className="grid gap-3 p-3 sm:grid-cols-3">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="start-time"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        >
+                          <Clock className="h-3 w-3" />
+                          Bắt đầu
+                        </Label>
+                        <Input
+                          id="start-time"
+                          type="time"
+                          value={customStartTime}
+                          onChange={handleStartTimeChange}
+                          className="h-9"
+                        />
+                      </div>
 
-                <div className="p-3">
-                  <div className="flex items-center gap-2 border-b pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
-                    <span className="min-w-0 flex-1">Tên</span>
-                    <span className="w-[104px] shrink-0 text-center">SL</span>
-                    <span className="hidden w-20 shrink-0 text-right sm:block">
-                      Đơn giá
-                    </span>
-                    <span className="shrink-0 whitespace-nowrap text-right">
-                      Thành tiền
-                    </span>
-                  </div>
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="end-time"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        >
+                          <Clock className="h-3 w-3" />
+                          Kết thúc
+                        </Label>
+                        <Input
+                          id="end-time"
+                          type="time"
+                          value={customEndTime}
+                          onChange={handleEndTimeChange}
+                          className="h-9"
+                        />
+                      </div>
 
-                  {items.length === 0 ? (
-                    <p className="py-3 text-center text-xs text-muted-foreground">
-                      Chưa có món nào
-                    </p>
-                  ) : (
-                    <div className="divide-y">
-                      {items.map((item: BillItem, index: number) => (
-                        <div key={index} className="py-2">
-                          <div className="flex items-center gap-2">
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate">{item.description}</p>
-                              <p className="text-[11px] text-muted-foreground sm:hidden">
-                                {formatVnd(item.price)}/đv
-                              </p>
-                            </div>
-                            <div className="flex w-[104px] shrink-0 items-center justify-center gap-1">
-                              {isRecordingFee(item) ? (
-                                <span className="w-8 text-center font-medium">
-                                  {item.quantity}
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="end-date"
+                          className="text-[11px] text-muted-foreground"
+                        >
+                          Ngày kết thúc
+                        </Label>
+                        <Popover modal={true}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="end-date"
+                              type="button"
+                              variant="outline"
+                              className="h-9 w-full justify-between font-normal"
+                            >
+                              {customEndDate
+                                ? dayjs(customEndDate).format("DD/MM/YYYY")
+                                : "Chọn ngày"}
+                              <CalendarDays className="h-4 w-4 opacity-60" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                customEndDate
+                                  ? dayjs(customEndDate).toDate()
+                                  : undefined
+                              }
+                              onSelect={handleEndDateChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    </div>
+                    <div className="border-t" />
+
+                    <div className="p-3">
+                      <div className="flex items-center gap-2 border-b pb-1.5 text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                        <span className="min-w-0 flex-1">Tên</span>
+                        <span className="w-[104px] shrink-0 text-center">
+                          SL
+                        </span>
+                        <span className="hidden w-20 shrink-0 text-right sm:block">
+                          Đơn giá
+                        </span>
+                        <span className="shrink-0 whitespace-nowrap text-right">
+                          Thành tiền
+                        </span>
+                      </div>
+
+                      {items.length === 0 ? (
+                        <p className="py-3 text-center text-xs text-muted-foreground">
+                          Chưa có món nào
+                        </p>
+                      ) : (
+                        <div className="divide-y">
+                          {items.map((item: BillItem, index: number) => (
+                            <div key={index} className="py-2">
+                              <div className="flex items-center gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <p className="truncate">{item.description}</p>
+                                  <p className="text-[11px] text-muted-foreground sm:hidden">
+                                    {formatVnd(item.price)}/đv
+                                  </p>
+                                </div>
+                                <div className="flex w-[104px] shrink-0 items-center justify-center gap-1">
+                                  {isRecordingFee(item) ? (
+                                    <span className="w-8 text-center font-medium">
+                                      {item.quantity}
+                                    </span>
+                                  ) : (
+                                    <>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          adjustItemQuantity(item, -1)
+                                        }
+                                        disabled={
+                                          item.quantity <= 0 ||
+                                          isUpdatingQuantity
+                                        }
+                                        className="h-7 w-7 shrink-0 p-0"
+                                      >
+                                        <Minus className="h-3 w-3" />
+                                      </Button>
+                                      <span className="w-8 text-center font-medium">
+                                        {item.quantity}
+                                      </span>
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() =>
+                                          adjustItemQuantity(item, 1)
+                                        }
+                                        disabled={isUpdatingQuantity}
+                                        className="h-7 w-7 shrink-0 p-0"
+                                      >
+                                        <Plus className="h-3 w-3" />
+                                      </Button>
+                                    </>
+                                  )}
+                                </div>
+                                <span className="hidden w-20 shrink-0 text-right text-muted-foreground sm:block">
+                                  {formatVnd(item.price)}
                                 </span>
-                              ) : (
-                                <>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => adjustItemQuantity(item, -1)}
-                                    disabled={
-                                      item.quantity <= 0 || isUpdatingQuantity
-                                    }
-                                    className="h-7 w-7 shrink-0 p-0"
-                                  >
-                                    <Minus className="h-3 w-3" />
-                                  </Button>
-                                  <span className="w-8 text-center font-medium">
-                                    {item.quantity}
+                                <span className="shrink-0 whitespace-nowrap pl-1 text-right font-medium">
+                                  {formatVnd(item.price * item.quantity)}
+                                </span>
+                              </div>
+                              {item.discountName && item.discountPercentage ? (
+                                <div className="mt-0.5 flex items-center justify-between text-[11px] text-emerald-600">
+                                  <span className="truncate">
+                                    - {item.discountName} (
+                                    {item.discountPercentage}
+                                    %)
                                   </span>
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => adjustItemQuantity(item, 1)}
-                                    disabled={isUpdatingQuantity}
-                                    className="h-7 w-7 shrink-0 p-0"
-                                  >
-                                    <Plus className="h-3 w-3" />
-                                  </Button>
-                                </>
-                              )}
+                                  <span className="shrink-0">
+                                    -
+                                    {formatVnd(
+                                      (item.price *
+                                        item.quantity *
+                                        (item.discountPercentage || 0)) /
+                                        100,
+                                    )}
+                                  </span>
+                                </div>
+                              ) : null}
                             </div>
-                            <span className="hidden w-20 shrink-0 text-right text-muted-foreground sm:block">
-                              {formatVnd(item.price)}
-                            </span>
-                            <span className="shrink-0 whitespace-nowrap pl-1 text-right font-medium">
-                              {formatVnd(item.price * item.quantity)}
-                            </span>
-                          </div>
-                          {item.discountName && item.discountPercentage ? (
-                            <div className="mt-0.5 flex items-center justify-between text-[11px] text-emerald-600">
-                              <span className="truncate">
-                                - {item.discountName} ({item.discountPercentage}
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="border-t" />
+
+                    <div className="space-y-3 p-3">
+                      <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
+                        <Label
+                          htmlFor="bill-promotion"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground sm:w-28 sm:shrink-0"
+                        >
+                          <Gift className="h-3 w-3" />
+                          Khuyến mãi
+                        </Label>
+                        <Select
+                          value={selectedPromotion || "none"}
+                          onValueChange={handlePromotionChange}
+                        >
+                          <SelectTrigger
+                            id="bill-promotion"
+                            className="h-9 w-full sm:max-w-xs"
+                          >
+                            <SelectValue placeholder="Chọn khuyến mãi" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="none">Không áp dụng</SelectItem>
+                            {promotionList.map((promotion) => (
+                              <SelectItem
+                                key={promotion._id}
+                                value={promotion._id}
+                              >
+                                {promotion.name} ({promotion.discountPercentage}
                                 %)
-                              </span>
-                              <span className="shrink-0">
-                                -
-                                {formatVnd(
-                                  (item.price *
-                                    item.quantity *
-                                    (item.discountPercentage || 0)) /
-                                    100,
-                                )}
-                              </span>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {gift && (
+                        <div className="space-y-1 rounded-md border bg-muted/40 p-2 text-xs">
+                          <div className="flex items-center gap-2 font-medium">
+                            <Gift className="h-3.5 w-3.5" />
+                            <span>Quà tặng: {gift.name}</span>
+                          </div>
+                          {gift.type === "discount" &&
+                          gift.discountPercentage ? (
+                            <p className="text-muted-foreground">
+                              Giảm {gift.discountPercentage}%
+                            </p>
+                          ) : null}
+                          {giftDiscountAmount > 0 && (
+                            <p className="text-muted-foreground">
+                              Trị giá giảm: {formatVnd(giftDiscountAmount)}
+                            </p>
+                          )}
+                          {gift.type === "snacks_drinks" &&
+                          gift.items &&
+                          gift.items.length > 0 ? (
+                            <div className="space-y-0.5">
+                              <p className="font-medium">Items tặng:</p>
+                              <ul className="list-inside list-disc pl-3 text-muted-foreground">
+                                {gift.items.map((item, idx) => (
+                                  <li key={idx}>
+                                    {item.name} x{item.quantity}
+                                  </li>
+                                ))}
+                              </ul>
                             </div>
                           ) : null}
                         </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-                <div className="border-t" />
+                      )}
 
-                <div className="space-y-3 p-3">
-                  <div className="flex flex-col gap-1.5 sm:flex-row sm:items-center sm:gap-2">
-                    <Label
-                      htmlFor="bill-promotion"
-                      className="flex items-center gap-1 text-[11px] text-muted-foreground sm:w-28 sm:shrink-0"
-                    >
-                      <Gift className="h-3 w-3" />
-                      Khuyến mãi
-                    </Label>
+                      {appliedPromotion && (
+                        <div className="space-y-0.5 rounded-md border bg-muted/40 p-2 text-xs">
+                          <p className="font-medium">{appliedPromotion.name}</p>
+                          {appliedPromotion.description && (
+                            <p className="text-muted-foreground">
+                              {appliedPromotion.description}
+                            </p>
+                          )}
+                          <p className="font-medium text-emerald-600">
+                            Giảm {appliedPromotion.discountPercentage}%
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                    <div className="border-t" />
+
+                    {/* Hiển thị chi tiết tính toán giá */}
+                    <div className="space-y-1.5 p-3">
+                      {/* Chi tiết từng khoản */}
+                      {roomTotal && roomTotal > 0 && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">
+                            Tiền phòng
+                          </span>
+                          <span className="ml-2 text-right font-medium">
+                            {formatVnd(roomTotal)}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Tính toán giá gốc */}
+                      {(() => {
+                        let originalTotal = (roomTotal || 0) + (fnbTotal || 0);
+
+                        if (originalTotal === 0 && items && items.length > 0) {
+                          originalTotal = items.reduce(
+                            (sum, item) => sum + item.price * item.quantity,
+                            0,
+                          );
+                        }
+
+                        if (originalTotal === 0 && totalAmount) {
+                          originalTotal = totalAmount;
+                        }
+
+                        const promotionDiscountAmount = appliedPromotion
+                          ? (originalTotal *
+                              (appliedPromotion.discountPercentage || 0)) /
+                            100
+                          : 0;
+
+                        // Tổng cuối cùng: sử dụng totalAmount từ API (đã được tính sẵn)
+                        const finalTotal = totalAmount || 0;
+
+                        return (
+                          <>
+                            {/* Giảm giá từ quà tặng */}
+                            {giftDiscountAmount > 0 && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Giảm quà tặng
+                                  {gift?.name ? ` (${gift.name})` : ""}
+                                </span>
+                                <span className="ml-2 text-right font-medium text-emerald-600">
+                                  -{formatVnd(giftDiscountAmount)}
+                                </span>
+                              </div>
+                            )}
+                            {/* Giảm giá promotion (nếu có) */}
+                            {appliedPromotion &&
+                              promotionDiscountAmount > 0 && (
+                                <div className="flex justify-between">
+                                  <span className="text-muted-foreground">
+                                    Giảm {appliedPromotion.name} (
+                                    {appliedPromotion.discountPercentage}%)
+                                  </span>
+                                  <span className="ml-2 text-right font-medium text-emerald-600">
+                                    -{formatVnd(promotionDiscountAmount)}
+                                  </span>
+                                </div>
+                              )}
+
+                            {/* Giá cuối cùng */}
+                            <div className="mt-1.5 flex items-center justify-between border-t pt-2 text-base font-semibold">
+                              <span>Tổng cộng</span>
+                              <span className="ml-2 text-right">
+                                {formatVnd(finalTotal)}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+
+                    <div className="border-t" />
+                    <div className="space-y-3 p-3">
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div className="space-y-1">
+                          <Label className="text-[11px] text-muted-foreground">
+                            Phương thức thanh toán
+                          </Label>
+                          <Select
+                            defaultValue={PaymentMethod.Cash}
+                            value={paymentMethod}
+                            onValueChange={handlePaymentMethodChange}
+                          >
+                            <SelectTrigger className="h-9 w-full">
+                              <SelectValue placeholder="Chọn phương thức" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value={PaymentMethod.Cash}>
+                                Cash
+                              </SelectItem>
+                              <SelectItem value={PaymentMethod.BankTransfer}>
+                                Bank Transfer
+                              </SelectItem>
+                              <SelectItem value={PaymentMethod.Momo}>
+                                Momo
+                              </SelectItem>
+                              <SelectItem value={PaymentMethod.ZaloPay}>
+                                ZaloPay
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+
+                        <div className="space-y-1">
+                          <Label
+                            htmlFor="customer-paid"
+                            className="text-[11px] text-muted-foreground"
+                          >
+                            Khách đưa (nghìn)
+                          </Label>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              id="customer-paid"
+                              type="text"
+                              inputMode="numeric"
+                              placeholder="500"
+                              value={customerPaidInput}
+                              onChange={(e) =>
+                                setCustomerPaidInput(e.target.value)
+                              }
+                              className="h-9 w-28 font-mono"
+                            />
+                            {changeThousands !== null && (
+                              <span
+                                className={`text-sm font-semibold ${
+                                  changeThousands < 0
+                                    ? "text-red-600"
+                                    : "text-emerald-600"
+                                }`}
+                              >
+                                {changeThousands < 0 ? "Thiếu" : "Thừa"}{" "}
+                                {Math.abs(changeThousands)}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Note Section */}
+                      <div className="space-y-1">
+                        <Label className="text-[11px] text-muted-foreground">
+                          Ghi chú
+                        </Label>
+                        {isEditingNote ? (
+                          <div className="space-y-2">
+                            <Textarea
+                              value={noteValue}
+                              onChange={(e) => setNoteValue(e.target.value)}
+                              placeholder="Nhập ghi chú..."
+                              className="min-h-[72px] resize-y"
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={handleSaveNote}
+                                disabled={isUpdatingNote}
+                                className="h-9"
+                              >
+                                {isUpdatingNote ? "Đang lưu..." : "Lưu"}
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={handleCancelEditNote}
+                                className="h-9"
+                              >
+                                Hủy
+                              </Button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <span className="flex-1 break-words text-sm">
+                              {note || (
+                                <span className="text-muted-foreground">
+                                  Chưa có ghi chú
+                                </span>
+                              )}
+                            </span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={handleEditNote}
+                              disabled={isUpdatingNote}
+                              className="h-9"
+                            >
+                              Chỉnh sửa
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Đổi phòng */}
+                <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="font-semibold">Đổi phòng</h3>
+                    <span className="text-[11px] text-muted-foreground">
+                      Queue nhạc tự chuyển theo
+                    </span>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-end">
                     <Select
-                      value={selectedPromotion || "none"}
-                      onValueChange={handlePromotionChange}
+                      value={targetRoomId}
+                      onValueChange={setTargetRoomId}
+                      disabled={isLoadingRooms || availableRooms.length === 0}
                     >
-                      <SelectTrigger
-                        id="bill-promotion"
-                        className="h-9 w-full sm:max-w-xs"
-                      >
-                        <SelectValue placeholder="Chọn khuyến mãi" />
+                      <SelectTrigger className="h-9 w-full">
+                        <SelectValue
+                          placeholder={
+                            availableRooms.length === 0
+                              ? "Không còn phòng khác"
+                              : "Chọn phòng mới"
+                          }
+                        />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Không áp dụng</SelectItem>
-                        {promotionList.map((promotion) => (
-                          <SelectItem key={promotion._id} value={promotion._id}>
-                            {promotion.name} ({promotion.discountPercentage}%)
+                        {availableRooms.map((room) => (
+                          <SelectItem
+                            key={String(room._id)}
+                            value={String(room._id)}
+                          >
+                            {room.roomName} - {getRoomTypeLabel(room.roomType)}
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
-                  </div>
 
-                  {gift && (
-                    <div className="space-y-1 rounded-md border bg-muted/40 p-2 text-xs">
-                      <div className="flex items-center gap-2 font-medium">
-                        <Gift className="h-3.5 w-3.5" />
-                        <span>Quà tặng: {gift.name}</span>
-                      </div>
-                      {gift.type === "discount" && gift.discountPercentage ? (
-                        <p className="text-muted-foreground">
-                          Giảm {gift.discountPercentage}%
-                        </p>
-                      ) : null}
-                      {giftDiscountAmount > 0 && (
-                        <p className="text-muted-foreground">
-                          Trị giá giảm: {formatVnd(giftDiscountAmount)}
-                        </p>
-                      )}
-                      {gift.type === "snacks_drinks" &&
-                      gift.items &&
-                      gift.items.length > 0 ? (
-                        <div className="space-y-0.5">
-                          <p className="font-medium">Items tặng:</p>
-                          <ul className="list-inside list-disc pl-3 text-muted-foreground">
-                            {gift.items.map((item, idx) => (
-                              <li key={idx}>
-                                {item.name} x{item.quantity}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      ) : null}
-                    </div>
-                  )}
+                    <Input
+                      value={roomChangeNote}
+                      onChange={(e) => setRoomChangeNote(e.target.value)}
+                      placeholder="Lý do đổi (nếu có)"
+                      className="h-9"
+                    />
 
-                  {appliedPromotion && (
-                    <div className="space-y-0.5 rounded-md border bg-muted/40 p-2 text-xs">
-                      <p className="font-medium">{appliedPromotion.name}</p>
-                      {appliedPromotion.description && (
-                        <p className="text-muted-foreground">
-                          {appliedPromotion.description}
-                        </p>
-                      )}
-                      <p className="font-medium text-emerald-600">
-                        Giảm {appliedPromotion.discountPercentage}%
-                      </p>
-                    </div>
-                  )}
-                </div>
-                <div className="border-t" />
-
-                {/* Hiển thị chi tiết tính toán giá */}
-                <div className="space-y-1.5 p-3">
-                  {/* Chi tiết từng khoản */}
-                  {roomTotal && roomTotal > 0 && (
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">Tiền phòng</span>
-                      <span className="ml-2 text-right font-medium">
-                        {formatVnd(roomTotal)}
-                      </span>
-                    </div>
-                  )}
-
-                  {/* Tính toán giá gốc */}
-                  {(() => {
-                    let originalTotal = (roomTotal || 0) + (fnbTotal || 0);
-
-                    if (originalTotal === 0 && items && items.length > 0) {
-                      originalTotal = items.reduce(
-                        (sum, item) => sum + item.price * item.quantity,
-                        0,
-                      );
-                    }
-
-                    if (originalTotal === 0 && totalAmount) {
-                      originalTotal = totalAmount;
-                    }
-
-                    const promotionDiscountAmount = appliedPromotion
-                      ? (originalTotal *
-                          (appliedPromotion.discountPercentage || 0)) /
-                        100
-                      : 0;
-
-                    // Tổng cuối cùng: sử dụng totalAmount từ API (đã được tính sẵn)
-                    const finalTotal = totalAmount || 0;
-
-                    return (
-                      <>
-                        {/* Giảm giá từ quà tặng */}
-                        {giftDiscountAmount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Giảm quà tặng{gift?.name ? ` (${gift.name})` : ""}
-                            </span>
-                            <span className="ml-2 text-right font-medium text-emerald-600">
-                              -{formatVnd(giftDiscountAmount)}
-                            </span>
-                          </div>
-                        )}
-                        {/* Giảm giá promotion (nếu có) */}
-                        {appliedPromotion && promotionDiscountAmount > 0 && (
-                          <div className="flex justify-between">
-                            <span className="text-muted-foreground">
-                              Giảm {appliedPromotion.name} (
-                              {appliedPromotion.discountPercentage}%)
-                            </span>
-                            <span className="ml-2 text-right font-medium text-emerald-600">
-                              -{formatVnd(promotionDiscountAmount)}
-                            </span>
-                          </div>
-                        )}
-
-                        {/* Giá cuối cùng */}
-                        <div className="mt-1.5 flex items-center justify-between border-t pt-2 text-base font-semibold">
-                          <span>Tổng cộng</span>
-                          <span className="ml-2 text-right">
-                            {formatVnd(finalTotal)}
-                          </span>
-                        </div>
-                      </>
-                    );
-                  })()}
-                </div>
-
-                <div className="border-t" />
-                <div className="space-y-3 p-3">
-                  <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="space-y-1">
-                      <Label className="text-[11px] text-muted-foreground">
-                        Phương thức thanh toán
-                      </Label>
-                      <Select
-                        defaultValue={PaymentMethod.Cash}
-                        value={paymentMethod}
-                        onValueChange={handlePaymentMethodChange}
-                      >
-                        <SelectTrigger className="h-9 w-full">
-                          <SelectValue placeholder="Chọn phương thức" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={PaymentMethod.Cash}>
-                            Cash
-                          </SelectItem>
-                          <SelectItem value={PaymentMethod.BankTransfer}>
-                            Bank Transfer
-                          </SelectItem>
-                          <SelectItem value={PaymentMethod.Momo}>
-                            Momo
-                          </SelectItem>
-                          <SelectItem value={PaymentMethod.ZaloPay}>
-                            ZaloPay
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-1">
-                      <Label
-                        htmlFor="customer-paid"
-                        className="text-[11px] text-muted-foreground"
-                      >
-                        Khách đưa (nghìn)
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="customer-paid"
-                          type="text"
-                          inputMode="numeric"
-                          placeholder="500"
-                          value={customerPaidInput}
-                          onChange={(e) => setCustomerPaidInput(e.target.value)}
-                          className="h-9 w-28 font-mono"
-                        />
-                        {changeThousands !== null && (
-                          <span
-                            className={`text-sm font-semibold ${
-                              changeThousands < 0
-                                ? "text-red-600"
-                                : "text-emerald-600"
-                            }`}
-                          >
-                            {changeThousands < 0 ? "Thiếu" : "Thừa"}{" "}
-                            {Math.abs(changeThousands)}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Note Section */}
-                  <div className="space-y-1">
-                    <Label className="text-[11px] text-muted-foreground">
-                      Ghi chú
-                    </Label>
-                    {isEditingNote ? (
-                      <div className="space-y-2">
-                        <Textarea
-                          value={noteValue}
-                          onChange={(e) => setNoteValue(e.target.value)}
-                          placeholder="Nhập ghi chú..."
-                          className="min-h-[72px] resize-y"
-                        />
-                        <div className="flex gap-2">
-                          <Button
-                            size="sm"
-                            onClick={handleSaveNote}
-                            disabled={isUpdatingNote}
-                            className="h-9"
-                          >
-                            {isUpdatingNote ? "Đang lưu..." : "Lưu"}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={handleCancelEditNote}
-                            className="h-9"
-                          >
-                            Hủy
-                          </Button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2">
-                        <span className="flex-1 break-words text-sm">
-                          {note || (
-                            <span className="text-muted-foreground">
-                              Chưa có ghi chú
-                            </span>
-                          )}
-                        </span>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={handleEditNote}
-                          disabled={isUpdatingNote}
-                          className="h-9"
-                        >
-                          Chỉnh sửa
-                        </Button>
-                      </div>
-                    )}
+                    <Button
+                      variant="secondary"
+                      onClick={handleChangeRoom}
+                      loading={isChangingRoom}
+                      disabled={availableRooms.length === 0}
+                      className="h-9 w-full sm:w-auto"
+                    >
+                      Chuyển phòng
+                    </Button>
                   </div>
                 </div>
-              </div>
-            </div>
-
-            {/* Đổi phòng */}
-            <div className="space-y-2 rounded-md border bg-muted/30 p-3">
-              <div className="flex items-center justify-between">
-                <h3 className="font-semibold">Đổi phòng</h3>
-                <span className="text-[11px] text-muted-foreground">
-                  Queue nhạc tự chuyển theo
-                </span>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_auto] sm:items-end">
-                  <Select
-                    value={targetRoomId}
-                    onValueChange={setTargetRoomId}
-                    disabled={isLoadingRooms || availableRooms.length === 0}
-                  >
-                    <SelectTrigger className="h-9 w-full">
-                      <SelectValue
-                        placeholder={
-                          availableRooms.length === 0
-                            ? "Không còn phòng khác"
-                            : "Chọn phòng mới"
-                        }
-                      />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableRooms.map((room) => (
-                        <SelectItem
-                          key={String(room._id)}
-                          value={String(room._id)}
-                        >
-                          {room.roomName} - {getRoomTypeLabel(room.roomType)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-
-                  <Input
-                    value={roomChangeNote}
-                    onChange={(e) => setRoomChangeNote(e.target.value)}
-                    placeholder="Lý do đổi (nếu có)"
-                    className="h-9"
-                  />
-
-                  <Button
-                    variant="secondary"
-                    onClick={handleChangeRoom}
-                    loading={isChangingRoom}
-                    disabled={availableRooms.length === 0}
-                    className="h-9 w-full sm:w-auto"
-                  >
-                    Chuyển phòng
-                </Button>
-              </div>
-            </div>
               </TabsContent>
 
               <TabsContent value="member" className="mt-0">
@@ -1605,7 +1633,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         menuItems={menuItems || []}
         roomId={schedule.roomId}
         scheduleId={schedule._id}
-        createdBy={user?._id || ""}
+        createdBy={schedule.createdBy}
       />
     </>
   );
