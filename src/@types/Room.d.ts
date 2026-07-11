@@ -50,6 +50,8 @@ interface IRoomSchedule {
   bookingCode?: string;
   // Gift enabled
   giftEnabled?: boolean;
+  /** Khuyến mãi đã chọn lúc booked — dùng lại khi mở modal thanh toán */
+  promotionId?: string;
   // Free hour promotion
   applyFreeHourPromo?: boolean;
   /** Size khách đặt / đang sử dụng (snapshot, khác room.roomType vật lý) */

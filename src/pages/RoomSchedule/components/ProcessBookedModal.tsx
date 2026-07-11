@@ -28,6 +28,11 @@ import dayjs, {
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import {
+  getRoomSchedulesQueryKeyForSchedule,
+  patchScheduleInRoomSchedulesCache,
+  persistSchedulePromotionInCache,
+} from "@/hooks/room-schedule";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
 import { getRoomTypeLabel } from "../utils/scheduleRoomType";
@@ -51,7 +56,9 @@ import {
   Clock,
   Pencil,
   ArrowRightLeft,
+  Gift,
 } from "lucide-react";
+import { useGetStandardPromotions } from "@/hooks/promotion";
 
 // Import type MenuItem từ MenuItemsModal
 interface MenuItem {
@@ -128,8 +135,13 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   // State đổi phòng
   const [targetRoomId, setTargetRoomId] = React.useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = React.useState<string>("");
+  const [promotionSelectOpen, setPromotionSelectOpen] = React.useState(false);
+  const [roomSelectOpen, setRoomSelectOpen] = React.useState(false);
 
   const queryClient = useQueryClient();
+  const { data: standardPromotions } = useGetStandardPromotions();
+  const promotionList = standardPromotions?.data.result ?? [];
+  const [selectedPromotion, setSelectedPromotion] = React.useState<string>("");
 
   const member = useScheduleMemberPhone({
     scheduleId: schedule._id,
@@ -384,25 +396,41 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     setIsEditingNote(false);
   };
 
-  // Khởi tạo state khi schedule thay đổi
   React.useEffect(() => {
-    if (schedule) {
-      setCurrentSchedule(schedule);
-      const start = parseUTCToLocal(schedule.startTime);
-      const defaultEnd = schedule.endTime
-        ? parseUTCToLocal(schedule.endTime)
-        : start.add(120, "minute");
-
-      setAdjustedStartDate(start.format("YYYY-MM-DD"));
-      setAdjustedEndDate(defaultEnd.format("YYYY-MM-DD"));
-      setAdjustedStartTime(start.format("HH:mm"));
-      setAdjustedEndTime(defaultEnd.format("HH:mm"));
-      setNoteValue(schedule.note || "");
-      setIsEditingNote(false);
-      setTargetRoomId("");
-      setRoomChangeNote("");
+    if (!isOpen) {
+      setPromotionSelectOpen(false);
+      setRoomSelectOpen(false);
     }
-  }, [schedule]);
+  }, [isOpen]);
+
+  React.useEffect(() => {
+    return () => {
+      document.body.style.removeProperty("pointer-events");
+      document.body.style.removeProperty("overflow");
+      document.documentElement.style.removeProperty("overflow");
+    };
+  }, []);
+
+  // Khởi tạo state khi mở modal hoặc schedule/promotion đổi
+  React.useEffect(() => {
+    if (!isOpen || !schedule) return;
+
+    setCurrentSchedule(schedule);
+    const start = parseUTCToLocal(schedule.startTime);
+    const defaultEnd = schedule.endTime
+      ? parseUTCToLocal(schedule.endTime)
+      : start.add(120, "minute");
+
+    setAdjustedStartDate(start.format("YYYY-MM-DD"));
+    setAdjustedEndDate(defaultEnd.format("YYYY-MM-DD"));
+    setAdjustedStartTime(start.format("HH:mm"));
+    setAdjustedEndTime(defaultEnd.format("HH:mm"));
+    setNoteValue(schedule.note || "");
+    setSelectedPromotion(schedule.promotionId || "");
+    setIsEditingNote(false);
+    setTargetRoomId("");
+    setRoomChangeNote("");
+  }, [isOpen, schedule._id, schedule.promotionId, schedule.note, schedule.startTime, schedule.endTime]);
 
   // Hàm xử lý tăng/giảm số lượng
   const handleQuantityChange = (
@@ -439,32 +467,87 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     },
   });
 
+  // Mutation riêng để cập nhật promotion
+  const { mutate: updatePromotion, isPending: isUpdatingPromotion } =
+    useMutation({
+      mutationFn: (promotionId: string | null) =>
+        roomsScheduleApis.updateSchedule(schedule._id, { promotionId }),
+      onMutate: async (newPromotionId) => {
+        const queryKey = getRoomSchedulesQueryKeyForSchedule(schedule);
+
+        await queryClient.cancelQueries({ queryKey });
+
+        const previousSchedules =
+          queryClient.getQueryData<IRoomSchedule[]>(queryKey);
+
+        patchScheduleInRoomSchedulesCache(queryClient, schedule, {
+          promotionId: newPromotionId || undefined,
+        });
+
+        setSelectedPromotion(newPromotionId || "");
+        setCurrentSchedule((prev) => ({
+          ...prev,
+          promotionId: newPromotionId || undefined,
+        }));
+
+        return { previousSchedules, queryKey };
+      },
+      onSuccess: (_data, newPromotionId) => {
+        persistSchedulePromotionInCache(
+          queryClient,
+          schedule,
+          newPromotionId,
+        );
+        setSelectedPromotion(newPromotionId || "");
+        setCurrentSchedule((prev) => ({
+          ...prev,
+          promotionId: newPromotionId || undefined,
+        }));
+        toast({
+          title: "Success",
+          description: "Khuyến mãi đã được cập nhật",
+        });
+      },
+      onError: (_error, _newPromotionId, context) => {
+        if (context?.previousSchedules && context?.queryKey) {
+          queryClient.setQueryData(context.queryKey, context.previousSchedules);
+        }
+        const rollbackPromotionId =
+          context?.previousSchedules?.find((s) => s._id === schedule._id)
+            ?.promotionId || schedule.promotionId;
+        setSelectedPromotion(rollbackPromotionId || "");
+        setCurrentSchedule((prev) => ({
+          ...prev,
+          promotionId: rollbackPromotionId,
+        }));
+        toast({
+          title: "Error",
+          description: "Không thể cập nhật khuyến mãi",
+          variant: "destructive",
+        });
+      },
+    });
+
+  const handlePromotionChange = (value: string) => {
+    const nextPromotionId = value === "none" ? "" : value;
+    setSelectedPromotion(nextPromotionId);
+    updatePromotion(nextPromotionId || null);
+  };
+
   // Mutation riêng để cập nhật note
   const { mutate: updateNote, isPending: isUpdatingNote } = useMutation({
     mutationFn: (note: string) =>
       roomsScheduleApis.updateSchedule(schedule._id, { note }),
     onMutate: async (newNote) => {
-      // Cancel any outgoing refetches để tránh overwrite optimistic update
-      const queryKey = [
-        "roomSchedules",
-        parseUTCToLocal(schedule.startTime).toISOString(),
-      ];
+      const queryKey = getRoomSchedulesQueryKeyForSchedule(schedule);
 
       await queryClient.cancelQueries({ queryKey });
 
-      // Snapshot giá trị cũ
       const previousSchedules =
         queryClient.getQueryData<IRoomSchedule[]>(queryKey);
 
-      // Optimistically update cache
-      queryClient.setQueryData<IRoomSchedule[]>(queryKey, (old) => {
-        if (!old) return old;
-        return old.map((s) =>
-          s._id === schedule._id ? { ...s, note: newNote } : s,
-        );
-      });
+      patchScheduleInRoomSchedulesCache(queryClient, schedule, { note: newNote });
 
-      // Cập nhật noteValue và currentSchedule để UI hiển thị ngay
       setNoteValue(newNote);
       setCurrentSchedule((prev) => ({ ...prev, note: newNote }));
 
@@ -476,12 +559,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
         description: "Ghi chú đã được cập nhật",
       });
       setIsEditingNote(false);
-      // Invalidate để sync với server (nhưng không refetch ngay)
-      const queryKey = [
-        "roomSchedules",
-        parseUTCToLocal(schedule.startTime).toISOString(),
-      ];
-      queryClient.invalidateQueries({ queryKey });
+      queryClient.invalidateQueries({
+        queryKey: getRoomSchedulesQueryKeyForSchedule(schedule),
+      });
     },
     onError: (error, _newNote, context) => {
       console.error("Error updating note:", error);
@@ -650,13 +730,17 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
       (orderDetailData.items.snacks &&
         orderDetailData.items.snacks.length > 0));
 
+  const handleDialogOpenChange = (open: boolean) => {
+    if (!open) {
+      setPromotionSelectOpen(false);
+      setRoomSelectOpen(false);
+      document.body.style.removeProperty("pointer-events");
+      onClose();
+    }
+  };
+
   return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => {
-        if (!open) onClose();
-      }}
-    >
+    <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent
         className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[725px]"
         style={{ WebkitOverflowScrolling: "touch" }}
@@ -720,6 +804,36 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             physicalRoomType={currentRoom?.roomType}
             onUpdated={refetchSchedules}
           />
+
+          {/* Khuyến mãi */}
+          <div className="mt-4 space-y-2">
+            <h3 className="font-semibold flex items-center gap-1.5">
+              <Gift className="w-4 h-4 text-muted-foreground" />
+              Khuyến mãi
+            </h3>
+            <Select
+              open={promotionSelectOpen}
+              onOpenChange={setPromotionSelectOpen}
+              value={selectedPromotion || "none"}
+              onValueChange={handlePromotionChange}
+              disabled={isUpdatingPromotion}
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue placeholder="Chọn khuyến mãi" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">Không áp dụng</SelectItem>
+                {promotionList.map((promotion) => (
+                  <SelectItem key={promotion._id} value={promotion._id}>
+                    {promotion.name} ({promotion.discountPercentage}%)
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="text-xs text-muted-foreground">
+              Khuyến mãi được lưu vào booking và tự áp dụng khi thanh toán.
+            </p>
+          </div>
 
           {/* Ghi chú */}
           <div className="mt-4 space-y-2">
@@ -793,6 +907,8 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             </p>
             <div className="space-y-2">
               <Select
+                open={roomSelectOpen}
+                onOpenChange={setRoomSelectOpen}
                 value={targetRoomId}
                 onValueChange={setTargetRoomId}
                 disabled={isLoadingRooms || availableRooms.length === 0}

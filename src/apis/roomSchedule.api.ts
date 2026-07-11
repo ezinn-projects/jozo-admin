@@ -11,6 +11,8 @@ interface ICreateRoomScheduleRequest {
   note?: string;
   customerPhone?: string;
   giftEnabled?: boolean;
+  /** Gửi `null` hoặc `""` để xóa promotion đã chọn */
+  promotionId?: string | null;
   applyFreeHourPromo?: boolean;
   roomType?: RoomType;
 }

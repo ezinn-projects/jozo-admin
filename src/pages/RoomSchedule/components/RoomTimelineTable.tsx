@@ -12,7 +12,7 @@ import coffeeTableApis from "@/apis/coffeeTable.apis";
 import roomApis from "@/apis/room.apis";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import dayjs, { Dayjs } from "dayjs";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 // import roomsScheduleApis from "@/apis/roomSchedule.api";
 import GiftDetailsModal from "@/components/modules/RoomSchedule/GiftDetailsModal";
 import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
@@ -99,6 +99,15 @@ const groupSchedulesByRoom = (schedules: IRoomSchedule[]): GroupedSchedules =>
     acc[schedule.roomId].push(schedule);
     return acc;
   }, {});
+
+const resolveScheduleFromCache = (
+  schedule: IRoomSchedule | null,
+  schedules: IRoomSchedule[] | undefined,
+): IRoomSchedule | null => {
+  if (!schedule) return null;
+  if (!schedules) return schedule;
+  return schedules.find((item) => item._id === schedule._id) ?? schedule;
+};
 
 const groupCoffeeSessionsByTable = (
   sessions: ICoffeeSession[],
@@ -231,6 +240,7 @@ const RoomTimelineTable: React.FC = () => {
   const [coffeeDate, setCoffeeDate] = useState<Dayjs>(dayjs());
   const { data: schedules, isLoading, error, refetch } =
     useRoomSchedules(roomsDate);
+
   const {
     data: roomsData,
     isLoading: loadingRooms,
@@ -252,6 +262,17 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null,
   );
+
+  const activeBookedSchedule = useMemo(
+    () => resolveScheduleFromCache(bookedSchedule, schedules),
+    [bookedSchedule, schedules],
+  );
+
+  const activeInUseSchedule = useMemo(
+    () => resolveScheduleFromCache(inUseSchedule, schedules),
+    [inUseSchedule, schedules],
+  );
+
   const [orderData, setOrderData] = useState<OrderData | null>(null);
   const [orderRoomId, setOrderRoomId] = useState<string>("");
   const [giftData, setGiftData] = useState<{
@@ -1862,28 +1883,31 @@ const RoomTimelineTable: React.FC = () => {
           schedule={lockedSchedule}
         />
       )}
-      {modal === "booked" && bookedSchedule && (
+      {bookedSchedule && activeBookedSchedule && (
         <ProcessBookedModal
-          isOpen={true}
-          onClose={closeModal}
-          schedule={bookedSchedule}
+          isOpen={modal === "booked"}
+          onClose={() => {
+            setModal(null);
+            window.setTimeout(() => setBookedSchedule(null), 300);
+          }}
+          schedule={activeBookedSchedule}
           refetchSchedules={refetch}
         />
       )}
-      {modal === "inUse" && inUseSchedule && (
+      {modal === "inUse" && activeInUseSchedule && (
         <ProcessInUseModal
           isOpen={true}
           onClose={closeModal}
-          schedule={inUseSchedule}
+          schedule={activeInUseSchedule}
           refetchSchedules={refetch}
           onExtendSession={() => setModal("extend")}
         />
       )}
-      {modal === "extend" && inUseSchedule && (
+      {modal === "extend" && activeInUseSchedule && (
         <ExtendSessionModal
           isOpen={true}
           onClose={closeModal}
-          schedule={inUseSchedule}
+          schedule={activeInUseSchedule}
           refetchSchedules={refetch}
         />
       )}

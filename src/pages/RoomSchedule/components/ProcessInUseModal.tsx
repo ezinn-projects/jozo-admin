@@ -61,6 +61,11 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useGetStandardPromotions } from "@/hooks/promotion";
+import {
+  getRoomSchedulesQueryKeyForSchedule,
+  patchScheduleInRoomSchedulesCache,
+  persistSchedulePromotionInCache,
+} from "@/hooks/room-schedule";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
 import { buildBillDateTimeFromSchedule } from "@/utils/billDateTime";
@@ -173,7 +178,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
-  // Giờ kết thúc / ngày / SĐT: đồng bộ khi mở modal hoặc khi schedule đổi
+  // Giờ kết thúc / ngày / SĐT / KM: đồng bộ khi mở modal hoặc khi schedule đổi
   useEffect(() => {
     if (isOpen) {
       setCustomEndTime(dayjs().format("HH:mm"));
@@ -181,8 +186,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
       setIsEndDateManuallyAdjusted(false);
       setCustomerPaidInput("");
+      setSelectedPromotion(schedule.promotionId || "");
     }
-  }, [isOpen, schedule.startTime]);
+  }, [isOpen, schedule._id, schedule.startTime, schedule.promotionId]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -234,6 +240,48 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       toast({
         title: "Success",
         description: `Schedule updated to ${variables.status}`,
+      });
+    },
+  });
+
+  // Mutation riêng để cập nhật promotion trên schedule
+  const { mutate: updatePromotion } = useMutation({
+    mutationFn: (promotionId: string | null) =>
+      roomsScheduleApis.updateSchedule(schedule._id, { promotionId }),
+    onMutate: async (newPromotionId) => {
+      const queryKey = getRoomSchedulesQueryKeyForSchedule(schedule);
+
+      await queryClient.cancelQueries({ queryKey });
+
+      const previousSchedules =
+        queryClient.getQueryData<IRoomSchedule[]>(queryKey);
+
+      patchScheduleInRoomSchedulesCache(queryClient, schedule, {
+        promotionId: newPromotionId || undefined,
+      });
+
+      return { previousSchedules, queryKey, newPromotionId };
+    },
+    onSuccess: (_data, newPromotionId) => {
+      persistSchedulePromotionInCache(
+        queryClient,
+        schedule,
+        newPromotionId,
+      );
+      setSelectedPromotion(newPromotionId || "");
+    },
+    onError: (_error, _variables, context) => {
+      if (context?.previousSchedules && context?.queryKey) {
+        queryClient.setQueryData(context.queryKey, context.previousSchedules);
+      }
+      const rollbackPromotionId =
+        context?.previousSchedules?.find((s) => s._id === schedule._id)
+          ?.promotionId || schedule.promotionId;
+      setSelectedPromotion(rollbackPromotionId || "");
+      toast({
+        title: "Error",
+        description: "Không thể cập nhật khuyến mãi",
+        variant: "destructive",
       });
     },
   });
@@ -749,8 +797,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   };
 
   const handlePromotionChange = (value: string) => {
-    setSelectedPromotion(value === "none" ? "" : value);
-    // Query sẽ tự động refetch khi selectedPromotion thay đổi
+    const nextPromotionId = value === "none" ? "" : value;
+    setSelectedPromotion(nextPromotionId);
+    updatePromotion(nextPromotionId || null);
   };
 
   const syncSuggestedEndDate = (nextStartTime: string, nextEndTime: string) => {

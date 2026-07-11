@@ -48,6 +48,8 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import * as z from "zod";
 import { Switch } from "@/components/ui/switch";
+import { useGetStandardPromotions } from "@/hooks/promotion";
+import { Gift } from "lucide-react";
 import { roomTypeOptions } from "@/pages/RoomsManagement/constants";
 import {
   getRoomTypeForBooking,
@@ -89,6 +91,7 @@ const buildScheduleSchema = (requirePeopleCount: boolean) =>
       ),
     note: z.string().max(200).optional(),
     giftEnabled: z.boolean().optional(),
+    promotionId: z.string().optional(),
     use4Mic: z.boolean().optional(),
   });
 
@@ -132,6 +135,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       note: "",
       customerPhone: "",
       giftEnabled: false,
+      promotionId: "",
       peopleCount: undefined,
       use4Mic: false,
     },
@@ -161,6 +165,8 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     useState<FormValues | null>(null);
 
   const { user } = useAuth();
+  const { data: standardPromotions } = useGetStandardPromotions();
+  const promotionList = standardPromotions?.data.result ?? [];
 
   // Load schedule khi mở modal chỉnh sửa (scheduleId có giá trị)
   const { data: scheduleData } = useQuery({
@@ -187,6 +193,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       setValue("note", schedule.note ?? "");
       setValue("customerPhone", schedule.customerPhone ?? "");
       setValue("giftEnabled", schedule.giftEnabled ?? false);
+      setValue("promotionId", schedule.promotionId ?? "");
       if (schedule.roomType) {
         setValue("roomType", schedule.roomType as RoomType);
       }
@@ -376,6 +383,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       note: values.note,
       customerPhone: values.customerPhone?.trim() || undefined,
       giftEnabled: values.giftEnabled,
+      promotionId: values.promotionId || undefined,
       roomType: bookingRoomType,
     };
     await createSchedule(scheduleData);
@@ -407,6 +415,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
           note: values.note,
           customerPhone: values.customerPhone?.trim() || undefined,
           giftEnabled: values.giftEnabled,
+          promotionId: values.promotionId || null,
         };
 
         if (
@@ -806,6 +815,47 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       </FormItem>
                     )}
                   />
+                  {statusValue === RoomStatus.Booked && (
+                    <FormField
+                      control={control}
+                      name="promotionId"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="flex items-center gap-1 text-muted-foreground font-normal">
+                            <Gift className="h-3.5 w-3.5" />
+                            Khuyến mãi
+                          </FormLabel>
+                          <Select
+                            onValueChange={(value) =>
+                              field.onChange(value === "none" ? "" : value)
+                            }
+                            value={field.value || "none"}
+                          >
+                            <FormControl>
+                              <SelectTrigger className="h-11">
+                                <SelectValue placeholder="Chọn khuyến mãi" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="none">
+                                Không áp dụng
+                              </SelectItem>
+                              {promotionList.map((promotion) => (
+                                <SelectItem
+                                  key={promotion._id}
+                                  value={promotion._id}
+                                >
+                                  {promotion.name} (
+                                  {promotion.discountPercentage}%)
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               </div>
 
