@@ -1,4 +1,4 @@
-import { IRoom } from "@/@types/Room";
+import { IRoom, RoomDeviceConnectionsSnapshot } from "@/@types/Room";
 import { RoomType } from "@/constants/enum";
 import http from "@/utils/http";
 
@@ -49,6 +49,11 @@ const roomApis = {
   },
   turnOffAllRooms: () => {
     return http.post<HTTPResponse>(`${ROOM_CONTROLLER}/turn-off-videos`);
+  },
+  getDeviceConnections: () => {
+    return http.get<HTTPResponse<RoomDeviceConnectionsSnapshot>>(
+      `${ROOM_CONTROLLER}/device-connections`
+    );
   },
 };
 

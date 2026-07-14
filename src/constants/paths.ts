@@ -4,6 +4,7 @@ const PATHS = {
   ROOMS: "/rooms",
   NEW_ROOM: "/rooms/new",
   EDIT_ROOM: "/rooms/:id/edit",
+  ROOM_DEVICE_CONNECTIONS: "/room-device-connections",
 
   // user managemen
   SETTINGS: "/settings",

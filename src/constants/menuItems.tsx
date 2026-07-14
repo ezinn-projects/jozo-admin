@@ -11,6 +11,7 @@ import {
   Gamepad2,
   Gift,
   Home,
+  MonitorSmartphone,
   Music,
   PercentIcon,
   Settings2,
@@ -67,6 +68,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Rooms Management",
         url: PATHS.ROOMS,
         icon: DoorOpenIcon,
+        roles: STAFF_AND_ADMIN,
+      },
+      {
+        title: "Device Connections",
+        url: PATHS.ROOM_DEVICE_CONNECTIONS,
+        icon: MonitorSmartphone,
         roles: STAFF_AND_ADMIN,
       },
       {

@@ -84,6 +84,9 @@ const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const SongsCollectionPage = lazy(
   () => import("@/pages/SongsCollectionPage")
 );
+const RoomDeviceConnectionsPage = lazy(
+  () => import("@/pages/RoomDeviceConnections")
+);
 
 function useRoute() {
   return (
@@ -110,6 +113,10 @@ function useRoute() {
               >
                 <Route path={PATHS.HOME} element={<AdminPage />} />
                 <Route path={PATHS.ROOMS} element={<RoomsListPage />} />
+                <Route
+                  path={PATHS.ROOM_DEVICE_CONNECTIONS}
+                  element={<RoomDeviceConnectionsPage />}
+                />
                 <Route
                   path={PATHS.TOTAL_REVENUE}
                   element={<RevenueStatisticsPage />}

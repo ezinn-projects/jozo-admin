@@ -64,10 +64,36 @@ interface IRoomScheduleChangedSocketPayload {
   roomIndex: string;
 }
 
+type RoomDeviceClientType = "control" | "video" | "unknown";
+
+interface RoomDeviceConnection {
+  deviceId: string;
+  roomId: string;
+  clientType: RoomDeviceClientType;
+  socketId: string;
+  origin: string;
+  connectedAt: string; // ISO
+}
+
+interface RoomDeviceRoomGroup {
+  roomId: string;
+  count: number;
+  devices: RoomDeviceConnection[];
+}
+
+interface RoomDeviceConnectionsSnapshot {
+  rooms: RoomDeviceRoomGroup[];
+  totalDevices: number;
+}
+
 export type {
   IRoom,
   ITimeSlot,
   ITimeSlotPrice,
   IRoomSchedule,
   IRoomScheduleChangedSocketPayload,
+  RoomDeviceClientType,
+  RoomDeviceConnection,
+  RoomDeviceRoomGroup,
+  RoomDeviceConnectionsSnapshot,
 };
