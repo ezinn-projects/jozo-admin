@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/dialog";
 import { PaymentMethod, RoomStatus } from "@/constants/enum";
 import { toast } from "@/hooks/use-toast";
-import dayjs from "@/lib/dayjs";
+import dayjs, { parseUTCToLocal } from "@/lib/dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import React, { useEffect, useState } from "react";
@@ -138,6 +138,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [selectedPromotion, setSelectedPromotion] = useState<string>("");
   const [customEndTime, setCustomEndTime] = useState<string>("");
   const [customStartTime, setCustomStartTime] = useState<string>("");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
   const [isEndDateManuallyAdjusted, setIsEndDateManuallyAdjusted] =
     useState<boolean>(false);
@@ -158,6 +159,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     selectedPromotion,
     customEndTime,
     customStartTime,
+    customStartDate,
     customEndDate,
   ] as const;
 
@@ -178,17 +180,29 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
-  // Giờ kết thúc / ngày / SĐT / KM: đồng bộ khi mở modal hoặc khi schedule đổi
+  // Giờ bắt đầu/kết thúc / ngày / KM: đồng bộ khi mở modal hoặc khi schedule đổi
   useEffect(() => {
     if (isOpen) {
-      setCustomEndTime(dayjs().format("HH:mm"));
-      setCustomStartTime(dayjs(schedule.startTime).format("HH:mm"));
-      setCustomEndDate(dayjs(schedule.startTime).format("YYYY-MM-DD"));
-      setIsEndDateManuallyAdjusted(false);
+      const startLocal = parseUTCToLocal(schedule.startTime);
+      const endLocal = schedule.endTime
+        ? parseUTCToLocal(schedule.endTime)
+        : dayjs();
+
+      setCustomStartDate(startLocal.format("YYYY-MM-DD"));
+      setCustomStartTime(startLocal.format("HH:mm"));
+      setCustomEndDate(endLocal.format("YYYY-MM-DD"));
+      setCustomEndTime(endLocal.format("HH:mm"));
+      setIsEndDateManuallyAdjusted(!!schedule.endTime);
       setCustomerPaidInput("");
       setSelectedPromotion(schedule.promotionId || "");
     }
-  }, [isOpen, schedule._id, schedule.startTime, schedule.promotionId]);
+  }, [
+    isOpen,
+    schedule._id,
+    schedule.startTime,
+    schedule.endTime,
+    schedule.promotionId,
+  ]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -298,6 +312,30 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       toast({
         title: "Error",
         description: "Không thể cập nhật ghi chú",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const { mutate: updateScheduleTime, isPending: isUpdatingTime } = useMutation({
+    mutationFn: (payload: { startTime: string; endTime: string }) =>
+      roomsScheduleApis.updateSchedule(schedule._id, payload),
+    onSuccess: (_, variables) => {
+      patchScheduleInRoomSchedulesCache(queryClient, schedule, {
+        startTime: variables.startTime,
+        endTime: variables.endTime,
+      });
+      refetchSchedules?.();
+      queryClient.invalidateQueries({ queryKey: billQueryKey });
+      toast({
+        title: "Đã cập nhật giờ",
+        description: "Thời gian bắt đầu / kết thúc đã được lưu.",
+      });
+    },
+    onError: (mutationError) => {
+      toast({
+        title: "Không thể cập nhật giờ",
+        description: mutationError.message || "Vui lòng thử lại.",
         variant: "destructive",
       });
     },
@@ -602,6 +640,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const billDateTimePayload = buildBillDateTimeFromSchedule({
     scheduleStartTime: schedule.startTime,
     selectedStartTime: customStartTime,
+    selectedStartDate: customStartDate || undefined,
     selectedEndTime: customEndTime,
     selectedEndDate: customEndDate || undefined,
   });
@@ -802,11 +841,16 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     updatePromotion(nextPromotionId || null);
   };
 
-  const syncSuggestedEndDate = (nextStartTime: string, nextEndTime: string) => {
+  const syncSuggestedEndDate = (
+    nextStartDate: string,
+    nextStartTime: string,
+    nextEndTime: string,
+  ) => {
     if (isEndDateManuallyAdjusted) return;
 
     const suggested = buildBillDateTimeFromSchedule({
       scheduleStartTime: schedule.startTime,
+      selectedStartDate: nextStartDate || undefined,
       selectedStartTime: nextStartTime,
       selectedEndTime: nextEndTime,
     });
@@ -816,13 +860,20 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const handleEndTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextEndTime = e.target.value;
     setCustomEndTime(nextEndTime);
-    syncSuggestedEndDate(customStartTime, nextEndTime);
+    syncSuggestedEndDate(customStartDate, customStartTime, nextEndTime);
   };
 
   const handleStartTimeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const nextStartTime = e.target.value;
     setCustomStartTime(nextStartTime);
-    syncSuggestedEndDate(nextStartTime, customEndTime);
+    syncSuggestedEndDate(customStartDate, nextStartTime, customEndTime);
+  };
+
+  const handleStartDateChange = (date?: Date) => {
+    if (!date) return;
+    const nextStartDate = dayjs(date).format("YYYY-MM-DD");
+    setCustomStartDate(nextStartDate);
+    syncSuggestedEndDate(nextStartDate, customStartTime, customEndTime);
   };
 
   const handleEndDateChange = (date?: Date) => {
@@ -830,6 +881,44 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
     setCustomEndDate(dayjs(date).format("YYYY-MM-DD"));
     setIsEndDateManuallyAdjusted(true);
+  };
+
+  const handleUpdateScheduleTime = () => {
+    if (!customStartTime || !customEndTime || !customStartDate) {
+      toast({
+        title: "Thiếu thông tin",
+        description: "Vui lòng nhập đủ ngày/giờ bắt đầu và kết thúc.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const { actualStartTime, actualEndTime, suggestedEndDate, isCrossDay } =
+      buildBillDateTimeFromSchedule({
+        scheduleStartTime: schedule.startTime,
+        selectedStartDate: customStartDate,
+        selectedStartTime: customStartTime,
+        selectedEndTime: customEndTime,
+        selectedEndDate: customEndDate || undefined,
+      });
+
+    if (!dayjs(actualEndTime).isAfter(dayjs(actualStartTime))) {
+      toast({
+        title: "Giờ không hợp lệ",
+        description: "Thời gian kết thúc phải sau thời gian bắt đầu.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (isCrossDay && !customEndDate) {
+      setCustomEndDate(suggestedEndDate);
+    }
+
+    updateScheduleTime({
+      startTime: actualStartTime,
+      endTime: actualEndTime,
+    });
   };
 
   // Functions để xử lý edit note
@@ -990,8 +1079,12 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
-                Bắt đầu {dayjs(schedule.startTime).format("HH:mm")} · Kết thúc
-                dự kiến {dayjs(schedule.endTime).format("HH:mm")}
+                Bắt đầu{" "}
+                {parseUTCToLocal(schedule.startTime).format("HH:mm DD/MM")} ·
+                Kết thúc dự kiến{" "}
+                {schedule.endTime
+                  ? parseUTCToLocal(schedule.endTime).format("HH:mm DD/MM")
+                  : "—"}
               </DialogDescription>
             </DialogHeader>
 
@@ -1059,37 +1152,57 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                       </div>
                     </div>
                     <div className="border-t" />
-                    <div className="grid gap-3 p-3 sm:grid-cols-3">
+                    <div className="grid gap-3 p-3 sm:grid-cols-2">
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="start-date"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        >
+                          <CalendarDays className="h-3 w-3" />
+                          Ngày bắt đầu
+                        </Label>
+                        <Popover modal={true}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              id="start-date"
+                              type="button"
+                              variant="outline"
+                              className="h-9 w-full justify-between font-normal"
+                            >
+                              {customStartDate
+                                ? dayjs(customStartDate).format("DD/MM/YYYY")
+                                : "Chọn ngày"}
+                              <CalendarDays className="h-4 w-4 opacity-60" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              selected={
+                                customStartDate
+                                  ? dayjs(customStartDate).toDate()
+                                  : undefined
+                              }
+                              onSelect={handleStartDateChange}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+
                       <div className="space-y-1">
                         <Label
                           htmlFor="start-time"
                           className="flex items-center gap-1 text-[11px] text-muted-foreground"
                         >
                           <Clock className="h-3 w-3" />
-                          Bắt đầu
+                          Giờ bắt đầu
                         </Label>
                         <Input
                           id="start-time"
                           type="time"
                           value={customStartTime}
                           onChange={handleStartTimeChange}
-                          className="h-9"
-                        />
-                      </div>
-
-                      <div className="space-y-1">
-                        <Label
-                          htmlFor="end-time"
-                          className="flex items-center gap-1 text-[11px] text-muted-foreground"
-                        >
-                          <Clock className="h-3 w-3" />
-                          Kết thúc
-                        </Label>
-                        <Input
-                          id="end-time"
-                          type="time"
-                          value={customEndTime}
-                          onChange={handleEndTimeChange}
                           className="h-9"
                         />
                       </div>
@@ -1129,6 +1242,40 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                           </PopoverContent>
                         </Popover>
                       </div>
+
+                      <div className="space-y-1">
+                        <Label
+                          htmlFor="end-time"
+                          className="flex items-center gap-1 text-[11px] text-muted-foreground"
+                        >
+                          <Clock className="h-3 w-3" />
+                          Giờ kết thúc
+                        </Label>
+                        <Input
+                          id="end-time"
+                          type="time"
+                          value={customEndTime}
+                          onChange={handleEndTimeChange}
+                          className="h-9"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end px-3 pb-3">
+                      <Button
+                        type="button"
+                        variant="secondary"
+                        size="sm"
+                        onClick={handleUpdateScheduleTime}
+                        loading={isUpdatingTime}
+                        disabled={
+                          !customStartDate ||
+                          !customStartTime ||
+                          !customEndTime ||
+                          isUpdatingTime
+                        }
+                      >
+                        Cập nhật giờ
+                      </Button>
                     </div>
                     <div className="border-t" />
 

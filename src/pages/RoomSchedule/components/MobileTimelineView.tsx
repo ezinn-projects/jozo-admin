@@ -26,9 +26,16 @@ import {
   getRoomTypeLabel as getScheduleRoomTypeLabel,
   getScheduleTimelineLabel,
 } from "../utils/scheduleRoomType";
+import {
+  DAY_END_HOUR,
+  DAY_START_HOUR,
+  TIMELINE_MINUTE_SPAN,
+  formatTimelineHourLabel,
+  getTimelineDayEnd,
+  getTimelineDayStart,
+  packTimelineLanes,
+} from "../utils/timelineHours";
 
-const DAY_START_HOUR = 0;
-const DAY_END_HOUR = 24;
 const MOBILE_HOUR_HEIGHT = 60; // Chiều cao mỗi giờ tính bằng pixel
 const MOBILE_SCALE = MOBILE_HOUR_HEIGHT / 60; // Scale cho mỗi phút
 const MOBILE_TIMELINE_HEIGHT =
@@ -94,10 +101,12 @@ const getRoomTypeLeadIcon = (type: RoomType) => {
 const getVerticalMarkerStyle = (
   schedule: IRoomSchedule,
   currentTime: Dayjs,
-  isToday: boolean
+  isToday: boolean,
+  viewDate: Dayjs,
 ) => {
   const eventStart = dayjs(schedule.startTime);
-  const dayStart = eventStart.startOf("day").hour(DAY_START_HOUR).minute(0);
+  const dayStart = getTimelineDayStart(viewDate);
+  const dayEnd = getTimelineDayEnd(viewDate);
   let offsetMinutes = eventStart.diff(dayStart, "minute");
   if (offsetMinutes < 0) offsetMinutes = 0;
 
@@ -120,13 +129,22 @@ const getVerticalMarkerStyle = (
       const eventEnd = dayjs(schedule.endTime);
       durationMinutes = eventEnd.diff(eventStart, "minute");
     } else {
-      const endOfDay = eventStart.startOf("day").hour(DAY_END_HOUR).minute(0);
       const now = dayjs();
-      const actualEnd = now.isBefore(endOfDay) ? now : endOfDay;
+      const actualEnd = now.isBefore(dayEnd) ? now : dayEnd;
       durationMinutes = actualEnd.diff(eventStart, "minute");
       if (durationMinutes <= 0) durationMinutes = 1;
     }
   }
+
+  if (offsetMinutes > TIMELINE_MINUTE_SPAN) {
+    offsetMinutes = TIMELINE_MINUTE_SPAN;
+    durationMinutes = 1;
+  }
+
+  durationMinutes = Math.min(
+    Math.max(durationMinutes, 1),
+    TIMELINE_MINUTE_SPAN - offsetMinutes,
+  );
 
   const top = offsetMinutes * MOBILE_SCALE;
   let height = durationMinutes * MOBILE_SCALE;
@@ -159,11 +177,9 @@ const getVerticalMarkerStyle = (
 
   // Nếu sự kiện đã hoàn toàn nằm phía trên now marker (đã qua) thì thay đổi màu
   if (isToday) {
-    const totalMinutes =
-      (currentTime.hour() - DAY_START_HOUR) * 60 + currentTime.minute();
     const clampedMinutes = Math.min(
-      Math.max(totalMinutes, 0),
-      (DAY_END_HOUR - DAY_START_HOUR) * 60
+      Math.max(currentTime.diff(dayStart, "minute"), 0),
+      TIMELINE_MINUTE_SPAN,
     );
     const markerTop = clampedMinutes * MOBILE_SCALE;
 
@@ -192,6 +208,7 @@ const getVerticalMarkerStyle = (
 const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
   roomsData,
   grouped,
+  date,
   currentTime,
   isToday,
   notifications,
@@ -403,8 +420,12 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                             className="absolute left-0 right-0 border-t border-gray-200"
                             style={{ top: `${top}px` }}
                           >
-                            <div className="absolute left-0 top-0 -translate-y-1/2 bg-white px-2 text-xs sm:text-sm text-gray-600 font-medium">
-                              {hour.toString().padStart(2, "0")}:00
+                            <div
+                              className={`absolute left-0 top-0 -translate-y-1/2 bg-white px-2 text-xs sm:text-sm font-medium ${
+                                hour >= 24 ? "text-amber-700" : "text-gray-600"
+                              }`}
+                            >
+                              {formatTimelineHourLabel(hour)}
                             </div>
                           </div>
                         );
@@ -424,15 +445,13 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         );
                       })}
 
-                      {/* Now marker (nếu là hôm nay) */}
+                      {/* Now marker (nếu đang trong khung ngày kinh doanh) */}
                       {isToday &&
                         (() => {
-                          const totalMinutes =
-                            (currentTime.hour() - DAY_START_HOUR) * 60 +
-                            currentTime.minute();
+                          const dayStart = getTimelineDayStart(date);
                           const clampedMinutes = Math.min(
-                            Math.max(totalMinutes, 0),
-                            (DAY_END_HOUR - DAY_START_HOUR) * 60
+                            Math.max(currentTime.diff(dayStart, "minute"), 0),
+                            TIMELINE_MINUTE_SPAN,
                           );
                           const markerTop = clampedMinutes * MOBILE_SCALE;
                           return (
@@ -460,20 +479,40 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         })()}
 
                       {/* Schedule blocks */}
-                      {roomSchedules
-                        .filter((schedule) => {
+                      {(() => {
+                        const visible = roomSchedules.filter((schedule) => {
                           if (!isStaff) return true;
                           const status = schedule.status.toLowerCase();
                           return (
                             status !== "finished" && status !== "completed"
                           );
-                        })
-                        .map((schedule) => {
+                        });
+                        const packed = packTimelineLanes(
+                          visible.map((schedule) => {
+                            const { top, height } = getVerticalMarkerStyle(
+                              schedule,
+                              currentTime,
+                              isToday,
+                              date,
+                            );
+                            return {
+                              item: schedule,
+                              startMin: top / MOBILE_SCALE,
+                              endMin: (top + height) / MOBILE_SCALE,
+                            };
+                          }),
+                        );
+                        const laneCount = packed[0]?.laneCount ?? 1;
+
+                        return packed.map(({ item: schedule, lane }) => {
                         const { top, height, bgColor } = getVerticalMarkerStyle(
                           schedule,
                           currentTime,
-                          isToday
+                          isToday,
+                          date,
                         );
+                        const leftPct = 12 + lane * ((100 - 14) / laneCount);
+                        const widthPct = (100 - 14) / laneCount - 1;
                         const eventStart = dayjs(schedule.startTime);
                         const eventEnd = schedule.endTime
                           ? dayjs(schedule.endTime)
@@ -518,10 +557,13 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         const eventElement = (
                           <div
                             key={schedule._id}
-                            className={`absolute left-12 sm:left-14 right-2 sm:right-4 ${bgColor} opacity-75 rounded shadow-sm hover:opacity-100 active:opacity-90 transition-all duration-200 hover:shadow-md cursor-pointer touch-manipulation min-h-[32px]`}
+                            className={`absolute ${bgColor} opacity-80 rounded shadow-sm hover:opacity-100 active:opacity-90 transition-[opacity,box-shadow] duration-150 hover:shadow-md cursor-pointer touch-manipulation min-h-[32px]`}
                             style={{
                               top: `${top}px`,
                               height: `${Math.max(height, 32)}px`,
+                              left: `${Math.max(leftPct, 10)}%`,
+                              width: `${Math.max(widthPct, 18)}%`,
+                              zIndex: lane + 1,
                             }}
                             onClick={() => onScheduleClick(schedule)}
                           >
@@ -558,7 +600,8 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         }
 
                         return eventElement;
-                      })}
+                      });
+                      })()}
                     </div>
                   </div>
                 </div>
