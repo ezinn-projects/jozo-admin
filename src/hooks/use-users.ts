@@ -6,7 +6,7 @@ import type { AxiosError } from "axios";
 
 export const useUsers = (params: UsersQueryParams = {}) => {
   const queryClient = useQueryClient();
-  const { page = 1, limit = 1000, search, role, enabled = true } = params;
+  const { page = 1, limit = 10000, search, role, enabled = true } = params;
 
   const extractErrorMessage = (error: unknown) => {
     const axiosError = error as AxiosError<{ message?: string }>;
