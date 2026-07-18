@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PageHeader } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -14,12 +14,22 @@ import PATHS from "@/constants/paths";
 import { DeleteModal } from "@/components/shared/DeleteModal";
 import { toast } from "@/hooks/use-toast";
 import { Role } from "@/constants/enum";
+import PaginationContainer from "@/pages/RecruitmentPage/components/PaginationContainer";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const StaffManagementPage = () => {
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const { users, isLoadingUsers, deleteUser, isDeletingUser } = useUsers();
+  const { users, isLoadingUsers, isFetchingUsers, deleteUser, isDeletingUser } =
+    useUsers({
+      page: 1,
+      limit: 10000,
+      search: searchTerm || undefined,
+    });
 
   // Lọc chỉ admin/staff có role "admin" hoặc "staff"
   const adminStaff = users.filter(
@@ -34,6 +44,24 @@ const StaffManagementPage = () => {
         .includes(searchTerm.toLowerCase()) ||
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.phone_number.includes(searchTerm)
+  );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalRecords = filteredUsers.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / (pageSize || 1)));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedUsers = filteredUsers.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
   );
 
   const handleDeleteUser = (userId: string) => {
@@ -56,6 +84,16 @@ const StaffManagementPage = () => {
     if (role === Role.Admin) return <Badge variant="default">Admin</Badge>;
     if (role === Role.Staff) return <Badge variant="secondary">Staff</Badge>;
     return null;
+  };
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
   };
 
   if (isLoadingUsers) {
@@ -91,6 +129,7 @@ const StaffManagementPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
+              disabled={isFetchingUsers}
             />
           </div>
         </CardContent>
@@ -98,7 +137,7 @@ const StaffManagementPage = () => {
 
       {/* Users List */}
       <div className="grid gap-4">
-        {filteredUsers.map((user: User) => (
+        {paginatedUsers.map((user: User) => (
           <Card key={user._id} className="hover:shadow-md transition-shadow">
             <CardContent className="p-6">
               <div className="flex justify-between items-start">
@@ -155,7 +194,7 @@ const StaffManagementPage = () => {
         ))}
       </div>
 
-      {filteredUsers.length === 0 && (
+      {paginatedUsers.length === 0 && (
         <Card>
           <CardContent className="p-12 text-center">
             <p className="text-gray-500">
@@ -165,6 +204,18 @@ const StaffManagementPage = () => {
             </p>
           </CardContent>
         </Card>
+      )}
+
+      {totalRecords > 0 && (
+        <PaginationContainer
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          total={totalRecords}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+        />
       )}
 
       {/* Delete Confirmation Modal */}
