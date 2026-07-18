@@ -36,6 +36,9 @@ import StaffScheduleShiftFilter, {
   getVisibleShifts,
   type ShiftFilter,
 } from "./components/StaffScheduleShiftFilter";
+import PaginationContainer from "@/pages/RecruitmentPage/components/PaginationContainer";
+
+const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 const StaffSchedulePage = () => {
   const navigate = useNavigate();
@@ -48,13 +51,18 @@ const StaffSchedulePage = () => {
   const [selectedSchedule, setSelectedSchedule] =
     useState<IEmployeeSchedule | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [shiftFilter, setShiftFilter] = useState<ShiftFilter>("all");
   const [initialDate, setInitialDate] = useState<Date | undefined>(undefined);
   const [initialShift, setInitialShift] = useState<ShiftType | undefined>(
     undefined,
   );
 
-  const { users, isLoadingUsers } = useUsers();
+  const { users, isLoadingUsers } = useUsers({
+    page: 1,
+    limit: 10000,
+  });
   const isAdmin = useIsAdmin();
 
   const dayNames = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
@@ -149,6 +157,34 @@ const StaffSchedulePage = () => {
       user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       user.phone_number.includes(searchTerm),
   );
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
+  const totalRecords = filteredStaff.length;
+  const totalPages = Math.max(1, Math.ceil(totalRecords / (pageSize || 1)));
+
+  useEffect(() => {
+    if (currentPage > totalPages) {
+      setCurrentPage(totalPages);
+    }
+  }, [currentPage, totalPages]);
+
+  const paginatedStaff = filteredStaff.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize,
+  );
+
+  const handlePageChange = (page: number) => {
+    if (page < 1 || page > totalPages) return;
+    setCurrentPage(page);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    setCurrentPage(1);
+  };
 
   const getUserName = (user: User) => {
     return user.name || user.full_name || "No name";
@@ -486,7 +522,7 @@ const StaffSchedulePage = () => {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {filteredStaff.length === 0 ? (
+            {paginatedStaff.length === 0 ? (
               <TableRow>
                 <TableCell
                   colSpan={dates.length * visibleShifts.length + 1}
@@ -496,7 +532,7 @@ const StaffSchedulePage = () => {
                 </TableCell>
               </TableRow>
             ) : (
-              filteredStaff.map((user: User) => {
+              paginatedStaff.map((user: User) => {
                 const userName = getUserName(user);
                 return (
                   <TableRow key={user._id}>
@@ -570,6 +606,18 @@ Trạng thái: ${schedule ? status || "Không có" : "Chưa đăng ký"}${
           </TableBody>
         </Table>
       </div>
+
+      {totalRecords > 0 && (
+        <PaginationContainer
+          currentPage={currentPage}
+          totalPages={totalPages}
+          pageSize={pageSize}
+          total={totalRecords}
+          onPageChange={handlePageChange}
+          onPageSizeChange={handlePageSizeChange}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+        />
+      )}
 
       {selectedUserId && (
         <StaffScheduleRegistrationModal
