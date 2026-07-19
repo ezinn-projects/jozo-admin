@@ -55,6 +55,7 @@ import {
   getRoomTypeForBooking,
   getRoomTypeLabel,
   isScheduleRoomTypeEditable,
+  normalizeRoomType,
 } from "@/pages/RoomSchedule/utils/scheduleRoomType";
 
 import {
@@ -195,7 +196,10 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
       setValue("giftEnabled", schedule.giftEnabled ?? false);
       setValue("promotionId", schedule.promotionId ?? "");
       if (schedule.roomType) {
-        setValue("roomType", schedule.roomType as RoomType);
+        const normalized = normalizeRoomType(schedule.roomType);
+        if (normalized) {
+          setValue("roomType", normalized);
+        }
       }
       setIsEndTimeModified(true);
     }

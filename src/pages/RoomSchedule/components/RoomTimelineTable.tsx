@@ -66,6 +66,7 @@ import {
   getEffectiveScheduleRoomType,
   getRoomTypeLabel as getScheduleRoomTypeLabel,
   getScheduleTimelineLabel,
+  normalizeRoomType,
 } from "../utils/scheduleRoomType";
 import {
   DAY_END_HOUR,
@@ -187,8 +188,8 @@ interface OrderData {
 
 export type { OrderData };
 
-const getRoomTypeLabel = (type: RoomType) => {
-  switch (type) {
+const getRoomTypeLabel = (type: RoomType | string) => {
+  switch (normalizeRoomType(type)) {
     case RoomType.Medium:
       return "Vừa";
     case RoomType.Large:
@@ -200,9 +201,9 @@ const getRoomTypeLabel = (type: RoomType) => {
   }
 };
 
-const getRoomTypeLeadIcon = (type: RoomType) => {
+const getRoomTypeLeadIcon = (type: RoomType | string) => {
   const className = "h-4 w-4 shrink-0 text-slate-500";
-  if (type === RoomType.Dorm) {
+  if (normalizeRoomType(type) === RoomType.Dorm) {
     return <Gamepad2 className={className} aria-hidden />;
   }
   return <DoorOpen className={className} aria-hidden />;

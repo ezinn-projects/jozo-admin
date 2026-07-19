@@ -18,11 +18,12 @@ import {
   getEffectiveScheduleRoomType,
   getRoomTypeLabel,
   isScheduleRoomTypeEditable,
+  normalizeRoomType,
 } from "../utils/scheduleRoomType";
 
 interface ScheduleRoomTypeSectionProps {
   schedule: IRoomSchedule;
-  physicalRoomType?: RoomType;
+  physicalRoomType?: RoomType | string;
   canEdit?: boolean;
   onUpdated?: () => void;
   className?: string;
@@ -37,9 +38,10 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
   className,
   variant = "default",
 }) => {
+  const normalizedPhysicalType = normalizeRoomType(physicalRoomType);
   const effectiveRoomType = getEffectiveScheduleRoomType(
     schedule,
-    physicalRoomType ? { roomType: physicalRoomType } : undefined,
+    normalizedPhysicalType ? { roomType: normalizedPhysicalType } : undefined,
   );
   const editable =
     (canEdit ?? isScheduleRoomTypeEditable(schedule)) && !!schedule._id;
@@ -76,7 +78,8 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
   const isInline = variant === "inline";
 
   const physicalTypeHint =
-    physicalRoomType && physicalRoomType !== effectiveRoomType ? (
+    normalizedPhysicalType &&
+    normalizedPhysicalType !== effectiveRoomType ? (
       <p
         className={
           isInline
@@ -85,7 +88,7 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
         }
       >
         {isInline ? "Gốc: " : "Size gốc: "}
-        {getRoomTypeLabel(physicalRoomType).toLowerCase()}
+        {getRoomTypeLabel(normalizedPhysicalType).toLowerCase()}
         {!isInline && "."}
       </p>
     ) : null;
@@ -127,9 +130,9 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
         ) : (
           <p className="font-medium">
             {getRoomTypeLabel(effectiveRoomType)}
-            {physicalRoomType &&
-              physicalRoomType !== effectiveRoomType &&
-              ` (gốc: ${getRoomTypeLabel(physicalRoomType).toLowerCase()})`}
+            {normalizedPhysicalType &&
+              normalizedPhysicalType !== effectiveRoomType &&
+              ` (gốc: ${getRoomTypeLabel(normalizedPhysicalType).toLowerCase()})`}
           </p>
         )}
       </div>
@@ -173,9 +176,9 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
       ) : (
         <p className="text-sm">
           {getRoomTypeLabel(effectiveRoomType)}
-          {physicalRoomType &&
-            physicalRoomType !== effectiveRoomType &&
-            ` (size gốc: ${getRoomTypeLabel(physicalRoomType).toLowerCase()})`}
+          {normalizedPhysicalType &&
+            normalizedPhysicalType !== effectiveRoomType &&
+            ` (size gốc: ${getRoomTypeLabel(normalizedPhysicalType).toLowerCase()})`}
         </p>
       )}
     </div>
