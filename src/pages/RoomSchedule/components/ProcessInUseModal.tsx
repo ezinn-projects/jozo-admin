@@ -180,29 +180,29 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
 
-  // Giờ bắt đầu/kết thúc / ngày / KM: đồng bộ khi mở modal hoặc khi schedule đổi
+  // Giờ bắt đầu lấy từ schedule; giờ kết thúc mặc định = hiện tại (endTime trên schedule chỉ là dự kiến)
   useEffect(() => {
     if (isOpen) {
       const startLocal = parseUTCToLocal(schedule.startTime);
-      const endLocal = schedule.endTime
-        ? parseUTCToLocal(schedule.endTime)
-        : dayjs();
+      const startDate = startLocal.format("YYYY-MM-DD");
+      const startTime = startLocal.format("HH:mm");
+      const endTimeNow = dayjs().format("HH:mm");
+      const suggested = buildBillDateTimeFromSchedule({
+        scheduleStartTime: schedule.startTime,
+        selectedStartDate: startDate,
+        selectedStartTime: startTime,
+        selectedEndTime: endTimeNow,
+      });
 
-      setCustomStartDate(startLocal.format("YYYY-MM-DD"));
-      setCustomStartTime(startLocal.format("HH:mm"));
-      setCustomEndDate(endLocal.format("YYYY-MM-DD"));
-      setCustomEndTime(endLocal.format("HH:mm"));
-      setIsEndDateManuallyAdjusted(!!schedule.endTime);
+      setCustomStartDate(startDate);
+      setCustomStartTime(startTime);
+      setCustomEndTime(endTimeNow);
+      setCustomEndDate(suggested.suggestedEndDate);
+      setIsEndDateManuallyAdjusted(false);
       setCustomerPaidInput("");
       setSelectedPromotion(schedule.promotionId || "");
     }
-  }, [
-    isOpen,
-    schedule._id,
-    schedule.startTime,
-    schedule.endTime,
-    schedule.promotionId,
-  ]);
+  }, [isOpen, schedule._id, schedule.startTime, schedule.promotionId]);
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -1080,10 +1080,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
                 Bắt đầu{" "}
-                {parseUTCToLocal(schedule.startTime).format("HH:mm DD/MM")} ·
-                Kết thúc dự kiến{" "}
+                {parseUTCToLocal(schedule.startTime).format("HH:mm")} · Kết thúc
+                dự kiến{" "}
                 {schedule.endTime
-                  ? parseUTCToLocal(schedule.endTime).format("HH:mm DD/MM")
+                  ? parseUTCToLocal(schedule.endTime).format("HH:mm")
                   : "—"}
               </DialogDescription>
             </DialogHeader>
