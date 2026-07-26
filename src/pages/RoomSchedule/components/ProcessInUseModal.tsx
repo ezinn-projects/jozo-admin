@@ -26,6 +26,7 @@ import { AxiosResponse } from "axios";
 import React, { useEffect, useState } from "react";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
 import { getScheduleCustomerContact } from "../utils/memberPhone";
+import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
 import { getRoomTypeLabel } from "../utils/scheduleRoomType";
@@ -226,7 +227,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     (room) => room._id === schedule.roomId,
   );
   const rooms = fetchedRooms?.data?.result || roomsData?.data.result || [];
-  const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
+  const availableRooms = rooms.filter(
+    (room) => room._id !== schedule.roomId && !isRoomUnderMaintenance(room),
+  );
 
   const { mutate, isPending } = useMutation({
     mutationFn: (payload: Partial<IRoomSchedule>) =>

@@ -1,4 +1,9 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  keepPreviousData,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
 import { userApis } from "@/apis/user.apis";
 import { UpdateUserRequest, UsersQueryParams } from "@/@types/user";
 import { toast } from "@/hooks/use-toast";
@@ -33,6 +38,7 @@ export const useUsers = (params: UsersQueryParams = {}) => {
         ...(role ? { role } : {}),
       }),
     enabled,
+    placeholderData: keepPreviousData,
   });
 
   // Lấy users từ response

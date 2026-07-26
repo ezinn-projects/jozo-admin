@@ -16,7 +16,6 @@ import {
   SidebarSeparator,
   useSidebar,
 } from "@/components/ui/sidebar";
-// import { JozoLogo } from "@/components/shared/JozoLogo";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -33,6 +32,7 @@ import { cn } from "@/lib/utils";
 import { ChevronRight, Settings, User } from "lucide-react";
 import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
+import { JozoLogo } from "../shared/JozoLogo";
 import { LogoutButton } from "../shared/LogoutButton";
 
 export function AppSidebar() {
@@ -81,8 +81,10 @@ export function AppSidebar() {
           <SidebarMenuItem>
             <SidebarMenuButton size="lg" asChild className="rounded-xl">
               <Link to="/" onClick={closeMobileSidebar}>
-                Jozo admin
-                {/* <JozoLogo iconClassName="size-8 rounded-lg" /> */}
+                <JozoLogo
+                  showText={state !== "collapsed" || isMobile}
+                  iconClassName="size-8 rounded-lg"
+                />
               </Link>
             </SidebarMenuButton>
           </SidebarMenuItem>

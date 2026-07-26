@@ -7,6 +7,7 @@ import {
   Gamepad2,
   Gift,
   UtensilsCrossed,
+  XCircle,
 } from "lucide-react";
 import {
   Tooltip,
@@ -27,6 +28,7 @@ import {
   getScheduleTimelineLabel,
   normalizeRoomType,
 } from "../utils/scheduleRoomType";
+import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import {
   DAY_END_HOUR,
   DAY_START_HOUR,
@@ -246,6 +248,7 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         const isOrderBlinking = orderBlinkingRooms[room._id];
         const hasGiftNotification = giftNotifications[room._id];
         const isGiftBlinking = giftBlinkingRooms[room._id];
+        const isMaintenance = isRoomUnderMaintenance(room);
 
         // Tìm schedule có gift nhưng chưa finished
         const scheduleWithGift = roomSchedules.find((schedule) => {
@@ -290,7 +293,11 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
 
         return (
           <Collapsible key={room._id} defaultOpen={shouldDefaultOpen}>
-            <Card className="overflow-hidden">
+            <Card
+              className={`overflow-hidden ${
+                isMaintenance ? "border-red-200 bg-red-50/40" : ""
+              }`}
+            >
               <CollapsibleTrigger className="w-full touch-manipulation">
                 <div className="flex items-center justify-between p-3 sm:p-4 hover:bg-gray-50 active:bg-gray-100 transition-colors">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -299,7 +306,9 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         e.stopPropagation();
                         onRoomClick(room._id);
                       }}
-                      className={`text-blue-600 hover:underline active:opacity-70 text-left font-medium text-sm sm:text-base touch-manipulation min-h-[44px] inline-flex items-center gap-1.5 ${
+                      className={`hover:underline active:opacity-70 text-left font-medium text-sm sm:text-base touch-manipulation min-h-[44px] inline-flex items-center gap-1.5 ${
+                        isMaintenance ? "text-red-600" : "text-blue-600"
+                      } ${
                         isBlinking
                           ? "animate-[blink_1s_ease-in-out_infinite]"
                           : ""
@@ -311,6 +320,21 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                     <span className="text-xs sm:text-sm text-gray-500 bg-gray-100 px-2 py-1 rounded whitespace-nowrap">
                       {getRoomTypeLabel(room.roomType)}
                     </span>
+                    {isMaintenance && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            className="inline-flex items-center shrink-0"
+                            aria-label="Đang bảo trì"
+                          >
+                            <XCircle className="h-4 w-4 text-red-500" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Đang bảo trì — không thể đặt phòng</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    )}
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-2">
                     {hasNotification && (

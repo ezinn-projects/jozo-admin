@@ -28,6 +28,7 @@ import dayjs, {
 import * as React from "react";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
+import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import {
   getRoomSchedulesQueryKeyForSchedule,
   patchScheduleInRoomSchedulesCache,
@@ -364,7 +365,9 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
     []) as unknown as MenuItem[];
   const rooms = (roomsData?.data?.result || []) as IRoom[];
   const currentRoom = rooms.find((room) => room._id === schedule.roomId);
-  const availableRooms = rooms.filter((room) => room._id !== schedule.roomId);
+  const availableRooms = rooms.filter(
+    (room) => room._id !== schedule.roomId && !isRoomUnderMaintenance(room),
+  );
 
   // Nhãn + icon cho nguồn booking (giữ tông màu trung tính, không tô màu nền)
   const getSourceInfo = (source?: string) => {

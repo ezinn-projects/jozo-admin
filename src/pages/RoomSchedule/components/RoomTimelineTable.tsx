@@ -52,6 +52,7 @@ import {
   Gift,
   ShoppingCart,
   UtensilsCrossed,
+  XCircle,
 } from "lucide-react";
 import CoffeeBookedModal from "./CoffeeBookedModal";
 import CoffeeCreateSessionModal from "./CoffeeCreateSessionModal";
@@ -68,6 +69,7 @@ import {
   getScheduleTimelineLabel,
   normalizeRoomType,
 } from "../utils/scheduleRoomType";
+import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import {
   DAY_END_HOUR,
   DAY_START_HOUR,
@@ -635,15 +637,25 @@ const RoomTimelineTable: React.FC = () => {
 
   const handleRoomClick = (roomId: string) => {
     const foundRoom = roomsData?.find((room) => room._id === roomId);
-    if (foundRoom) {
-      setSelectedRoom(foundRoom);
-      setModal("create");
-      // Stop blinking when clicked
-      const socketRoomId = getSocketRoomId(roomId);
-      if (socketRoomId) {
-        clearSupportNotification(socketRoomId);
-      }
+    if (!foundRoom) return;
+
+    // Stop blinking when clicked
+    const socketRoomId = getSocketRoomId(roomId);
+    if (socketRoomId) {
+      clearSupportNotification(socketRoomId);
     }
+
+    if (isRoomUnderMaintenance(foundRoom)) {
+      toast({
+        title: "Phòng đang bảo trì",
+        description: "Không thể đặt phòng khi đang ở trạng thái bảo trì.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setSelectedRoom(foundRoom);
+    setModal("create");
   };
 
   const closeModal = () => {
@@ -1110,6 +1122,7 @@ const RoomTimelineTable: React.FC = () => {
                   const hasOrderNotification = orderNotifications[socketRoomId];
                   const isOrderBlinking = !!blinkingOrderRooms[socketRoomId];
                   const giftNotification = giftNotifications[socketRoomId];
+                  const isMaintenance = isRoomUnderMaintenance(room);
                   const giftSchedule = giftNotification
                     ? roomSchedules.find(
                         (s) => s._id === giftNotification.scheduleId,
@@ -1145,16 +1158,26 @@ const RoomTimelineTable: React.FC = () => {
                   return (
                     <div
                       key={room._id}
-                      className="flex border-b hover:bg-gray-50 w-full transition-colors duration-200"
+                      className={`flex border-b hover:bg-gray-50 w-full transition-colors duration-200 ${
+                        isMaintenance ? "bg-red-50/60 hover:bg-red-50" : ""
+                      }`}
                       // onDragOver={handleDragOver}
                       // onDragLeave={handleDragLeave}
                       // onDrop={(e) => handleDrop(e, room._id)}
                     >
-                      <div className="w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 bg-white">
-                        <div className="flex items-center gap-2">
+                      <div
+                        className={`w-[240px] p-2 border-r flex items-center justify-between sticky left-0 z-10 ${
+                          isMaintenance ? "bg-red-50/60" : "bg-white"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0">
                           <button
                             onClick={() => handleRoomClick(room._id)}
-                            className={`inline-flex items-center gap-1.5 text-blue-600 hover:underline ${
+                            className={`inline-flex items-center gap-1.5 hover:underline truncate ${
+                              isMaintenance
+                                ? "text-red-600"
+                                : "text-blue-600"
+                            } ${
                               isBlinking
                                 ? "animate-[blink_1s_ease-in-out_infinite]"
                                 : ""
@@ -1163,9 +1186,24 @@ const RoomTimelineTable: React.FC = () => {
                             {getRoomTypeLeadIcon(room.roomType)}
                             {room.roomName}
                           </button>
-                          <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded">
+                          <span className="text-xs text-gray-500 bg-gray-100 px-1 py-0.5 rounded shrink-0">
                             {getRoomTypeLabel(room.roomType)}
                           </span>
+                          {isMaintenance && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <span
+                                  className="inline-flex items-center shrink-0"
+                                  aria-label="Đang bảo trì"
+                                >
+                                  <XCircle className="h-4 w-4 text-red-500" />
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p>Đang bảo trì — không thể đặt phòng</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           {hasNotification && (

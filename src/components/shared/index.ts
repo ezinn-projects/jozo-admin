@@ -6,3 +6,4 @@ export { NotificationBell } from "./NotificationBell";
 export { ChangePasswordModal } from "./ChangePasswordModal";
 export { PageHeader } from "./PageHeader";
 export type { PageHeaderProps } from "./PageHeader";
+export { JozoLogo } from "./JozoLogo";
