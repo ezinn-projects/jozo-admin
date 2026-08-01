@@ -6,6 +6,7 @@ import { useGiftItemsByIds } from "@/hooks/use-gifts";
 import { useServeStreakGift, useStreakGifts } from "@/hooks/use-membership";
 import {
   collectSnacksGiftIds,
+  mergeGiftItemsById,
   normalizeStreakGiftsResponse,
 } from "@/pages/RoomSchedule/utils/streakGifts";
 import { toast } from "@/hooks/use-toast";
@@ -67,9 +68,14 @@ export const useScheduleMemberPhone = ({
     () => collectSnacksGiftIds(availableGifts, streakRewards),
     [availableGifts, streakRewards],
   );
-  const giftItemsById = useGiftItemsByIds(snacksGiftIds, {
+  const fetchedGiftItemsById = useGiftItemsByIds(snacksGiftIds, {
     enabled: shouldLookupMember && !!memberInfo && snacksGiftIds.length > 0,
   });
+  const giftItemsById = useMemo(
+    () =>
+      mergeGiftItemsById(availableGifts, streakRewards, fetchedGiftItemsById),
+    [availableGifts, streakRewards, fetchedGiftItemsById],
+  );
   const isMemberNotFound =
     shouldLookupMember &&
     hasFetchedMemberInfo &&

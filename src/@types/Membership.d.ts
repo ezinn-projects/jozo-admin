@@ -1,4 +1,5 @@
 // Membership configuration types
+import type { GiftBundleItem } from "./Gift";
 import type { User } from "./user";
 
 type ObjectId = string;
@@ -156,6 +157,8 @@ export interface IAvailableStreakGift {
   giftType: string;
   giftImage?: string;
   bonusPoints?: number;
+  /** Chi tiết món FNB nếu BE trả kèm */
+  items?: GiftBundleItem[];
 }
 
 // Tiến độ mốc streak — GET /streak-gifts
@@ -168,6 +171,8 @@ export interface IStreakRewardProgress {
   bonusPoints?: number;
   claimed: boolean;
   isNext?: boolean;
+  /** Chi tiết món FNB nếu BE trả kèm */
+  items?: GiftBundleItem[];
 }
 
 // Response từ GET /streak-gifts
