@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Role } from "@/constants/enum";
+import { useUsersManagementQueryConfig } from "./hooks/useUsersManagementQueryConfig";
 
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 const SEARCH_DEBOUNCE_MS = 400;
@@ -140,10 +141,13 @@ const PaginationControls = ({
 
 const UsersManagementPage = () => {
   const navigate = useNavigate();
-  const [searchTerm, setSearchTerm] = useState("");
+  const { queryConfig, setQueryConfig } = useUsersManagementQueryConfig();
+  const pageSize = PAGE_SIZE_OPTIONS.includes(queryConfig.limit)
+    ? queryConfig.limit
+    : 10;
+  const currentPage = queryConfig.page > 0 ? queryConfig.page : 1;
+  const [searchTerm, setSearchTerm] = useState(queryConfig.search);
   const debouncedSearchTerm = useDebounce(searchTerm, SEARCH_DEBOUNCE_MS);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
   const {
     users,
@@ -155,7 +159,7 @@ const UsersManagementPage = () => {
   } = useUsers({
     page: currentPage,
     limit: pageSize,
-    search: debouncedSearchTerm.trim() || undefined,
+    search: queryConfig.search.trim() || undefined,
     role: Role.User,
   });
 
@@ -164,9 +168,19 @@ const UsersManagementPage = () => {
     (user: User) => user.role === Role.User || user.role === Role.Member
   );
 
+  // Đồng bộ input khi URL thay đổi (back/forward)
   useEffect(() => {
-    setCurrentPage(1);
-  }, [debouncedSearchTerm]);
+    setSearchTerm(queryConfig.search);
+  }, [queryConfig.search]);
+
+  // Ghi search đã debounce vào URL và reset về trang 1
+  useEffect(() => {
+    if (debouncedSearchTerm === queryConfig.search) return;
+    void setQueryConfig(
+      { search: debouncedSearchTerm, page: 1 },
+      { history: "replace" }
+    );
+  }, [debouncedSearchTerm, queryConfig.search, setQueryConfig]);
 
   const totalRecords = pagination?.total ?? filteredUsers.length ?? 0;
   const effectivePage = pagination?.page ?? currentPage;
@@ -194,12 +208,11 @@ const UsersManagementPage = () => {
 
   const handlePageChange = (page: number) => {
     if (page < 1 || page > totalPages) return;
-    setCurrentPage(page);
+    void setQueryConfig({ page });
   };
 
   const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    setCurrentPage(1);
+    void setQueryConfig({ limit: size, page: 1 });
   };
 
   return (
@@ -309,7 +322,7 @@ const UsersManagementPage = () => {
             <Card>
               <CardContent className="p-12 text-center">
                 <p className="text-gray-500">
-                  {debouncedSearchTerm.trim()
+                  {queryConfig.search.trim()
                     ? "Không tìm thấy user nào phù hợp"
                     : "Chưa có user nào"}
                 </p>
