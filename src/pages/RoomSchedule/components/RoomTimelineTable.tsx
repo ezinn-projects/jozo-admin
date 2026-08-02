@@ -62,6 +62,7 @@ import ExtendSessionModal from "./ExtendSessionModal";
 import MobileTimelineView from "./MobileTimelineView";
 import ProcessBookedModal from "./ProcessBookedModal";
 import ProcessInUseModal from "./ProcessInUseModal";
+import ProcessMaintenanceModal from "./ProcessMaintenanceModal";
 import TimelineControls from "./TimelineControls";
 import {
   getEffectiveScheduleRoomType,
@@ -152,6 +153,7 @@ type Modal =
   | "process"
   | "booked"
   | "inUse"
+  | "maintenance"
   | "extend"
   | "foodDrink"
   | "bill"
@@ -250,9 +252,19 @@ const RoomTimelineTable: React.FC = () => {
     () => roomsDate.add(1, "day"),
     [roomsDate],
   );
-  const { data: schedules, isLoading, error, refetch } =
-    useRoomSchedules(roomsDate);
-  const { data: nextDaySchedules } = useRoomSchedules(nextRoomsDate);
+  const {
+    data: schedules,
+    isLoading,
+    error,
+    refetch: refetchRoomsDateSchedules,
+  } = useRoomSchedules(roomsDate);
+  const { data: nextDaySchedules, refetch: refetchNextDaySchedules } =
+    useRoomSchedules(nextRoomsDate);
+
+  const refetch = () => {
+    void refetchRoomsDateSchedules();
+    void refetchNextDaySchedules();
+  };
 
   const {
     data: roomsData,
@@ -275,6 +287,8 @@ const RoomTimelineTable: React.FC = () => {
   const [inUseSchedule, setInUseSchedule] = useState<IRoomSchedule | null>(
     null,
   );
+  const [maintenanceSchedule, setMaintenanceSchedule] =
+    useState<IRoomSchedule | null>(null);
 
   const activeBookedSchedule = useMemo(
     () => resolveScheduleFromCache(bookedSchedule, schedules),
@@ -664,6 +678,7 @@ const RoomTimelineTable: React.FC = () => {
     setLockedSchedule(null);
     setBookedSchedule(null);
     setInUseSchedule(null);
+    setMaintenanceSchedule(null);
     setOrderData(null);
     setOrderRoomId("");
     setGiftData(null);
@@ -722,6 +737,9 @@ const RoomTimelineTable: React.FC = () => {
     } else if (lowerStatus === "in use") {
       setInUseSchedule(schedule);
       setModal("inUse");
+    } else if (lowerStatus === "maintenance") {
+      setMaintenanceSchedule(schedule);
+      setModal("maintenance");
     }
   };
 
@@ -1348,20 +1366,7 @@ const RoomTimelineTable: React.FC = () => {
                               // draggable
                               // onDragStart={(e) => handleDragStart(e, schedule)}
                               // onDragEnd={handleDragEnd}
-                              onClick={() => {
-                                const lowerStatus =
-                                  schedule.status.toLowerCase();
-                                if (lowerStatus === "locked") {
-                                  setLockedSchedule(schedule);
-                                  setModal("process");
-                                } else if (lowerStatus === "booked") {
-                                  setBookedSchedule(schedule);
-                                  setModal("booked");
-                                } else if (lowerStatus === "in use") {
-                                  setInUseSchedule(schedule);
-                                  setModal("inUse");
-                                }
-                              }}
+                              onClick={() => handleScheduleClick(schedule)}
                             >
                               {/* Hiển thị thời gian trong schedule block */}
                               <div className="relative flex h-full min-h-9 items-center justify-center px-1.5">
@@ -1572,6 +1577,31 @@ const RoomTimelineTable: React.FC = () => {
                                       )}
                                     </div>
                                   </div>
+                                </TooltipContent>
+                              </Tooltip>
+                            );
+                          } else if (
+                            schedule.status.toLowerCase() === "maintenance"
+                          ) {
+                            const eventStart = dayjs(schedule.startTime);
+                            const eventEnd = schedule.endTime
+                              ? dayjs(schedule.endTime)
+                              : eventStart.add(240, "minute");
+                            return (
+                              <Tooltip key={schedule._id}>
+                                <TooltipTrigger asChild>
+                                  {eventElement}
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>Bảo trì</p>
+                                  <p>Bắt đầu: {eventStart.format("HH:mm")}</p>
+                                  <p>Kết thúc: {eventEnd.format("HH:mm")}</p>
+                                  {schedule.note && (
+                                    <p>Ghi chú: {schedule.note}</p>
+                                  )}
+                                  <p className="text-xs text-muted-foreground">
+                                    Bấm để chỉnh sửa / kết thúc
+                                  </p>
                                 </TooltipContent>
                               </Tooltip>
                             );
@@ -1972,6 +2002,14 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           refetchSchedules={refetch}
           schedule={lockedSchedule}
+        />
+      )}
+      {modal === "maintenance" && maintenanceSchedule && (
+        <ProcessMaintenanceModal
+          isOpen={true}
+          onClose={closeModal}
+          refetchSchedules={refetch}
+          schedule={maintenanceSchedule}
         />
       )}
       {bookedSchedule && activeBookedSchedule && (

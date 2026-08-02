@@ -577,6 +577,12 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                                     : ""
                                 }`;
                           tooltipContent = `Size: ${scheduleSizeLabel}\nĐang sử dụng ${durationText}`;
+                        } else if (status === "maintenance") {
+                          tooltipContent = `Bảo trì\nBắt đầu: ${eventStart.format(
+                            "HH:mm",
+                          )}\nKết thúc: ${eventEnd.format(
+                            "HH:mm",
+                          )}\nBấm để chỉnh sửa / kết thúc`;
                         }
 
                         const eventElement = (
