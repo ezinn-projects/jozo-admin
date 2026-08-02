@@ -98,28 +98,42 @@ export const useScheduleMemberPhone = ({
     [queryClient],
   );
 
-  const { mutate: savePhoneMutation, isPending: isSavingPhone } = useMutation({
-    mutationFn: (customerPhone: string) =>
-      roomsScheduleApis.updateSchedule(scheduleId, {
+  const { mutate: savePhoneMutation, mutateAsync: savePhoneMutationAsync, isPending: isSavingPhone } =
+    useMutation({
+      mutationFn: ({
         customerPhone,
-      } as Partial<ICreateRoomScheduleRequest>),
-    onSuccess: async (_, customerPhone) => {
-      setSavedPhone(customerPhone);
-      refetchSchedules?.();
-      await prefetchStreakGifts(customerPhone);
-      toast({
-        title: "Đã lưu",
-        description: "Số điện thoại thành viên đã được cập nhật",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Lỗi",
-        description: "Không thể cập nhật số điện thoại",
-        variant: "destructive",
-      });
-    },
-  });
+      }: {
+        customerPhone: string;
+        silent?: boolean;
+      }) =>
+        roomsScheduleApis.updateSchedule(scheduleId, {
+          customerPhone,
+        } as Partial<ICreateRoomScheduleRequest>),
+      onSuccess: async (_, { customerPhone, silent }) => {
+        setSavedPhone(customerPhone);
+        setPhone(customerPhone);
+        refetchSchedules?.();
+        if (customerPhone) {
+          await prefetchStreakGifts(customerPhone);
+        }
+        if (!silent) {
+          toast({
+            title: customerPhone ? "Đã lưu" : "Đã bỏ thành viên",
+            description: customerPhone
+              ? "Số điện thoại thành viên đã được cập nhật"
+              : "Đã gỡ số điện thoại / thành viên khỏi phiên",
+          });
+        }
+      },
+      onError: (_error, { silent }) => {
+        if (silent) return;
+        toast({
+          title: "Lỗi",
+          description: "Không thể cập nhật số điện thoại",
+          variant: "destructive",
+        });
+      },
+    });
 
   const { mutate: updateGiftEnabled, isPending: isUpdatingGiftEnabled } =
     useMutation({
@@ -194,8 +208,78 @@ export const useScheduleMemberPhone = ({
       });
       return;
     }
-    savePhoneMutation(value);
+    savePhoneMutation({ customerPhone: value });
   }, [phone, savePhoneMutation]);
+
+  /** Bỏ SĐT / thành viên khỏi phiên (local + persist nếu đã từng lưu). */
+  const clearPhone = useCallback(() => {
+    if (!phone.trim() && !savedPhone.trim()) return;
+
+    const previousPhone = phone;
+    setPhone("");
+    if (!savedPhone.trim()) return;
+
+    savePhoneMutation(
+      { customerPhone: "" },
+      {
+        onError: () => {
+          setPhone(previousPhone);
+        },
+      },
+    );
+  }, [phone, savedPhone, savePhoneMutation]);
+
+  /**
+   * Auto-save SĐT đang nhập (dirty) trước khi submit (vd: kết thúc phiên).
+   * @returns SĐT đã lưu / hiện tại, hoặc `null` nếu không hợp lệ / lưu thất bại.
+   */
+  const ensurePhoneSavedForSubmit = useCallback(async (): Promise<
+    string | null
+  > => {
+    if (!isPhoneDirty) {
+      return savedPhone.trim();
+    }
+
+    const value = phone.trim();
+    if (!value) {
+      if (savedPhone.trim()) {
+        try {
+          await savePhoneMutationAsync({ customerPhone: "", silent: true });
+        } catch {
+          toast({
+            title: "Lỗi",
+            description: "Không thể bỏ số điện thoại trước khi kết thúc",
+            variant: "destructive",
+          });
+          return null;
+        }
+      } else {
+        setSavedPhone("");
+      }
+      return "";
+    }
+
+    if (!isValidMemberPhone(value)) {
+      toast({
+        title: "Số điện thoại không hợp lệ",
+        description: "Vui lòng nhập đúng 10–11 số, bắt đầu bằng 0 trước khi kết thúc",
+        variant: "destructive",
+      });
+      return null;
+    }
+
+    try {
+      await savePhoneMutationAsync({ customerPhone: value, silent: true });
+      return value;
+    } catch {
+      toast({
+        title: "Lỗi",
+        description: "Không thể lưu số điện thoại trước khi kết thúc",
+        variant: "destructive",
+      });
+      return null;
+    }
+  }, [isPhoneDirty, phone, savedPhone, savePhoneMutationAsync]);
 
   return {
     phone,
@@ -208,6 +292,8 @@ export const useScheduleMemberPhone = ({
     isPhoneDirty,
     hasSavedValidPhone,
     savePhone,
+    clearPhone,
+    ensurePhoneSavedForSubmit,
     memberInfo,
     availableGifts,
     streakRewards,

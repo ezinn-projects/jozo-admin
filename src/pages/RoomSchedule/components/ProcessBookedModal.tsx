@@ -787,6 +787,7 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
             hasSavedValidPhone={member.hasSavedValidPhone}
             isSavingPhone={member.isSavingPhone}
             onSavePhone={member.savePhone}
+            onClearPhone={member.clearPhone}
             showGiftToggle={false}
             customerName={schedule.customerName}
             customerEmail={schedule.customerEmail}

@@ -22,6 +22,7 @@ import {
   Mail,
   Cake,
   Target,
+  X,
 } from "lucide-react";
 import React, { memo, useMemo, useState } from "react";
 import dayjs from "dayjs";
@@ -65,6 +66,7 @@ interface ScheduleMemberSectionProps {
   hasSavedValidPhone?: boolean;
   isSavingPhone?: boolean;
   onSavePhone?: () => void;
+  onClearPhone?: () => void;
   isGiftEnabled?: boolean;
   onGiftEnabledChange?: (enabled: boolean) => void;
   isUpdatingGiftEnabled?: boolean;
@@ -183,6 +185,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   hasSavedValidPhone = false,
   isSavingPhone = false,
   onSavePhone,
+  onClearPhone,
   isGiftEnabled = false,
   onGiftEnabledChange,
   isUpdatingGiftEnabled = false,
@@ -213,6 +216,9 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
 
   const isPhoneValid = isValidMemberPhone(phone);
   const showPhoneError = phone.length > 0 && !isPhoneValid;
+  const canClearPhone =
+    Boolean(onClearPhone) &&
+    (phone.trim().length > 0 || savedPhone.trim().length > 0);
   const isActive = hasClaimedGift || (showGiftToggle && isGiftEnabled);
   const showMemberLookup =
     hasSavedValidPhone &&
@@ -402,21 +408,36 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         </Label>
         <div className="flex flex-col gap-2 sm:flex-row">
           <div className="flex-1 space-y-1">
-            <Input
-              id={inputId}
-              type="tel"
-              inputMode="numeric"
-              autoComplete="tel"
-              placeholder="VD: 0912345678"
-              value={phone}
-              onChange={(e) => handlePhoneChange(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isSavingPhone}
-              className={cn(
-                "h-11 text-base sm:text-lg tracking-wide",
-                showPhoneError && "border-red-500 focus-visible:ring-red-500",
+            <div className="relative">
+              <Input
+                id={inputId}
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                placeholder="VD: 0912345678"
+                value={phone}
+                onChange={(e) => handlePhoneChange(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isSavingPhone}
+                className={cn(
+                  "h-11 text-base sm:text-lg tracking-wide",
+                  canClearPhone && "pr-10",
+                  showPhoneError && "border-red-500 focus-visible:ring-red-500",
+                )}
+              />
+              {canClearPhone && (
+                <button
+                  type="button"
+                  onClick={onClearPhone}
+                  disabled={isSavingPhone}
+                  aria-label="Bỏ thành viên"
+                  title="Bỏ thành viên"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                >
+                  <X className="h-4 w-4" />
+                </button>
               )}
-            />
+            </div>
             {showPhoneError ? (
               <p className="text-xs text-red-600">
                 Số điện thoại không hợp lệ (10–11 số, bắt đầu bằng 0)

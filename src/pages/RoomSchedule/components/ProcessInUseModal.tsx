@@ -242,6 +242,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         const memberLabel =
           member.memberInfo?.full_name?.trim() ||
           member.memberInfo?.name?.trim() ||
+          variables.customerPhone?.trim() ||
           member.savedPhone.trim() ||
           schedule.customerPhone ||
           "khách";
@@ -761,9 +762,17 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       ? customerPaidThousands - billTotalThousands
       : null;
 
-  const handleCompleteSession = () => {
+  const handleCompleteSession = async () => {
     const actualEndTime = billDateTimePayload.actualEndTime;
     const actualStartTime = billDateTimePayload.actualStartTime;
+
+    // Auto-save SĐT nếu đang dirty (đã nhập nhưng chưa bấm Lưu)
+    const ensuredPhone = await member.ensurePhoneSavedForSubmit();
+    if (ensuredPhone === null) return;
+
+    // Dùng đúng SĐT đã ensure (kể cả "" khi đã clear) — không fallback schedule cũ
+    const customerPhone = ensuredPhone;
+    setIsConfirmEndOpen(false);
 
     // Tạo bill object để save
     const billToSave = {
@@ -771,7 +780,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       roomId: schedule.roomId,
       items: items || [],
       totalAmount: totalAmount || 0,
-      customerPhone: member.savedPhone.trim() || schedule.customerPhone,
+      customerPhone,
       paymentMethod: paymentMethod,
       startTime: actualStartTime,
       endTime: actualEndTime,
@@ -783,9 +792,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     saveBillMutation(billToSave, {
       onSuccess: () => {
         // Invalidate streak-gifts query để refresh member info
-        if (member.savedPhone.trim()) {
+        if (customerPhone) {
           queryClient.invalidateQueries({
-            queryKey: ["streak-gifts", member.savedPhone.trim()],
+            queryKey: ["streak-gifts", customerPhone],
           });
         }
 
@@ -801,8 +810,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
           status: RoomStatus.Finished,
           endTime: actualEndTime,
           startTime: actualStartTime,
-          customerPhone:
-            member.savedPhone.trim() || schedule.customerPhone || "",
+          customerPhone,
           customerName,
           customerEmail,
         };
@@ -1732,6 +1740,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   hasSavedValidPhone={member.hasSavedValidPhone}
                   isSavingPhone={member.isSavingPhone}
                   onSavePhone={member.savePhone}
+                  onClearPhone={member.clearPhone}
                   isGiftEnabled={member.isGiftEnabled}
                   onGiftEnabledChange={member.updateGiftEnabled}
                   isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
@@ -1794,7 +1803,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 variant="destructive"
                 size="sm"
                 onClick={() => setIsConfirmEndOpen(true)}
-                disabled={isPending || isSavingBill}
+                disabled={isPending || isSavingBill || member.isSavingPhone}
                 className="h-9 w-full sm:w-auto"
               >
                 Kết thúc
@@ -1817,10 +1826,17 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
             <AlertDialogCancel>Hủy</AlertDialogCancel>
             <AlertDialogAction
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-              onClick={handleCompleteSession}
-              disabled={isSavingBill || isPending}
+              onClick={(e) => {
+                e.preventDefault();
+                void handleCompleteSession();
+              }}
+              disabled={isSavingBill || isPending || member.isSavingPhone}
             >
-              {isSavingBill ? "Đang lưu hóa đơn..." : "Tiếp tục kết thúc"}
+              {member.isSavingPhone
+                ? "Đang lưu SĐT..."
+                : isSavingBill
+                  ? "Đang lưu hóa đơn..."
+                  : "Tiếp tục kết thúc"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

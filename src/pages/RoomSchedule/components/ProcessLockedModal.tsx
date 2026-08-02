@@ -147,6 +147,7 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
               hasSavedValidPhone={member.hasSavedValidPhone}
               isSavingPhone={member.isSavingPhone}
               onSavePhone={member.savePhone}
+              onClearPhone={member.clearPhone}
               isGiftEnabled={member.isGiftEnabled}
               onGiftEnabledChange={member.updateGiftEnabled}
               isUpdatingGiftEnabled={member.isUpdatingGiftEnabled}
