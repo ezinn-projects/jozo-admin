@@ -62,6 +62,11 @@ import {
   isValidMemberPhone,
   sanitizePhoneInput,
 } from "@/pages/RoomSchedule/utils/memberPhone";
+import MemberPhoneLookupCard from "@/pages/RoomSchedule/components/MemberPhoneLookupCard";
+import {
+  useMembershipConfig,
+  useStreakGifts,
+} from "@/hooks/use-membership";
 
 const PEOPLE_COUNT_LARGE_THRESHOLD = 5;
 
@@ -148,6 +153,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const statusValue = watch("status");
   const peopleCountValue = watch("peopleCount");
   const use4MicValue = watch("use4Mic");
+  const customerPhoneValue = watch("customerPhone") ?? "";
   const parsedPeopleCount =
     typeof peopleCountValue === "number"
       ? peopleCountValue
@@ -158,6 +164,26 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     parsedPeopleCount >= 1
       ? getRoomTypeForBooking(!!use4MicValue)
       : null;
+
+  const lookupPhone = isValidMemberPhone(customerPhoneValue)
+    ? customerPhoneValue.trim()
+    : "";
+  const { data: membershipConfig } = useMembershipConfig();
+  const {
+    data: streakGiftsData,
+    isLoading: isLoadingMemberLookup,
+    isError: isMemberLookupError,
+    isFetched: hasFetchedMemberLookup,
+  } = useStreakGifts(lookupPhone, {
+    enabled: isOpen && !!lookupPhone,
+    scheduleId,
+  });
+  const memberLookupUser = streakGiftsData?.user ?? null;
+  const isMemberLookupNotFound =
+    !!lookupPhone &&
+    hasFetchedMemberLookup &&
+    !memberLookupUser &&
+    !isMemberLookupError;
 
   // Biến cờ để đánh dấu nếu người dùng đã tự chỉnh sửa End Time
   const [isEndTimeModified, setIsEndTimeModified] = useState(false);
@@ -636,8 +662,18 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                     />
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Nhập SĐT sớm để nhận member khi tính bill.
+                    Nhập SĐT để xem member và quà
                   </p>
+                  <MemberPhoneLookupCard
+                    phone={customerPhoneValue}
+                    isLoading={isLoadingMemberLookup}
+                    isError={isMemberLookupError}
+                    isNotFound={isMemberLookupNotFound}
+                    memberInfo={memberLookupUser}
+                    availableGifts={streakGiftsData?.availableGifts}
+                    streakRewards={streakGiftsData?.streakRewards}
+                    configStreakRewards={membershipConfig?.streak?.rewards}
+                  />
                 </div>
 
                 {!scheduleId && room && room.roomType !== RoomType.Dorm && (

@@ -161,14 +161,14 @@ const getRewardLabel = (reward: IStreakRewardProgress) => {
     parts.push(`+${reward.bonusPoints} điểm`);
   }
   return parts.length > 0
-    ? parts.join(" • ")
-    : `Mốc streak ${reward.streakCount}`;
+    ? parts.join(", ")
+    : `Streak ${reward.streakCount}`;
 };
 
 const formatAvailableGiftLabel = (gift: IAvailableStreakGift) => {
-  const parts = [`Chọn ${gift.itemCount} món`];
+  const parts = [`${gift.itemCount} món`];
   if (gift.bonusPoints) parts.push(`+${gift.bonusPoints} điểm`);
-  return parts.join(" • ");
+  return parts.join(", ");
 };
 
 const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
@@ -307,9 +307,9 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
     Boolean(onClearPhone) &&
     (phone.trim().length > 0 || savedPhone.trim().length > 0);
   const isActive = hasClaimedGift || (showGiftToggle && isGiftEnabled);
+  /** Hiện card member/quà ngay khi SĐT trên input hợp lệ (auto-lookup). */
   const showMemberLookup =
-    hasSavedValidPhone &&
-    !isPhoneDirty &&
+    isPhoneValid &&
     (isLoadingMemberInfo ||
       memberInfo ||
       isMemberInfoError ||
@@ -433,7 +433,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       {showMemberLookup && isLoadingMemberInfo && (
         <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2.5 flex items-center gap-2 text-sm text-gray-600">
           <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-          <span>Đang tra cứu thông tin thành viên...</span>
+          <span>Đang tìm member...</span>
         </div>
       )}
 
@@ -581,17 +581,15 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
             </div>
             {showPhoneError ? (
               <p className="text-xs text-red-600">
-                Số điện thoại không hợp lệ (10–11 số, bắt đầu bằng 0)
+                SĐT không hợp lệ (10–11 số, bắt đầu bằng 0)
               </p>
-            ) : isPhoneDirty ? (
-              <p className="text-xs text-amber-600">
-                Bấm Lưu SĐT để lưu và tra cứu thông tin thành viên
-              </p>
-            ) : hasSavedValidPhone ? (
-              <p className="text-xs text-emerald-600">Đã lưu: {savedPhone}</p>
+            ) : isPhoneValid && isLoadingMemberInfo ? (
+              <p className="text-xs text-muted-foreground">Đang tìm...</p>
+            ) : hasSavedValidPhone && !isPhoneDirty ? (
+              <p className="text-xs text-muted-foreground">Đã lưu: {savedPhone}</p>
             ) : (
-              <p className="text-xs text-gray-500">
-                Nhấn Enter hoặc bấm Lưu sau khi nhập xong
+              <p className="text-xs text-muted-foreground">
+                Nhập SĐT để xem member và quà
               </p>
             )}
           </div>
@@ -677,10 +675,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
             <div className="rounded-lg border border-pink-200 bg-pink-50/60 px-3 py-3 space-y-2.5">
               <p className="text-sm font-semibold text-pink-900 flex items-center gap-2">
                 <Gift className="w-4 h-4 text-pink-600" />
-                Quà cần phát ({availableGifts.length})
-              </p>
-              <p className="text-[11px] text-pink-800/80">
-                Click mốc bên dưới (Tiến độ streak) hoặc card này để chọn món.
+                Quà ({availableGifts.length})
               </p>
               <div className="space-y-2">
                 {availableGifts.map((gift) => {
@@ -701,7 +696,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                       <div className="flex items-center justify-between gap-2">
                         <div className="min-w-0">
                           <p className="font-semibold text-gray-900">
-                            Mốc streak {gift.streakCount}
+                            Streak {gift.streakCount}
                           </p>
                           <p className="text-xs text-gray-600">
                             {formatAvailableGiftLabel(gift)}
@@ -756,7 +751,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                               {getRewardLabel(reward)}
                             </p>
                             <p className="text-xs text-gray-500">
-                              Streak {reward.streakCount} • Đã claim
+                              Streak {reward.streakCount} · Đã nhận
                             </p>
                           </div>
                           <Badge
@@ -808,10 +803,10 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                           <p className="text-xs opacity-80">
                             Streak {reward.streakCount}
                             {served
-                              ? ` • Quota ${served.usedQuantity}/${served.itemCount}`
+                              ? ` • ${served.usedQuantity}/${served.itemCount} món`
                               : reward.isReached
-                                ? " • Click để claim / chọn món"
-                                : " • Click để claim"}
+                                ? " • Chọn để nhận"
+                                : ""}
                           </p>
                         </div>
                         <Badge
@@ -829,7 +824,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                             ? "Đang chọn"
                             : served
                               ? "Sửa món"
-                              : "Claim"}
+                              : "Nhận"}
                         </Badge>
                       </div>
                     </button>
@@ -844,22 +839,17 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
               <div className="flex items-center justify-between gap-2">
                 <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
                   {servedGiftForSelected
-                    ? `Quà đã phát — mốc ${selectedMilestone.streakCount}`
-                    : `Claim quà — mốc ${selectedMilestone.streakCount}`}
+                    ? `Quà đã phát — streak ${selectedMilestone.streakCount}`
+                    : `Nhận quà — streak ${selectedMilestone.streakCount}`}
                 </p>
                 <p className="text-xs font-semibold text-pink-700">
                   {servedGiftForSelected
-                    ? `${servedGiftForSelected.usedQuantity}/${servedGiftForSelected.itemCount} (còn ${servedGiftForSelected.remainingQuantity})`
+                    ? `${servedGiftForSelected.usedQuantity}/${servedGiftForSelected.itemCount}`
                     : quotaMax > 0
-                      ? `${selectedQtyTotal}/${quotaMax}`
-                      : "Không giới hạn món"}
+                      ? `${selectedQtyTotal}/${quotaMax} món`
+                      : null}
                 </p>
               </div>
-              <p className="text-[11px] text-gray-500">
-                {servedGiftForSelected
-                  ? "Thêm / giảm / xoá món như order thường — quota tự bù lại. Bill 0đ từ schedule.streakGifts."
-                  : "Claim soft: có thể claim trống hoặc chọn một phần, bổ sung món sau."}
-              </p>
 
               {servedGiftForSelected && (
                 <ul className="space-y-1.5">
@@ -1090,14 +1080,14 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                     {isServingGift ? (
                       <>
                         <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Đang claim...
+                        Đang phát...
                       </>
                     ) : (
                       <>
                         <Gift className="w-4 h-4 mr-2" />
                         {selectedQtyTotal > 0
-                          ? `Claim với ${selectedQtyTotal} món`
-                          : "Claim (chưa chọn món)"}
+                          ? `Phát quà (${selectedQtyTotal} món)`
+                          : "Phát quà"}
                       </>
                     )}
                   </Button>

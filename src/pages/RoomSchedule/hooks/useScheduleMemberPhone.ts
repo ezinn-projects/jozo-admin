@@ -30,8 +30,9 @@ interface UseScheduleMemberPhoneOptions {
 }
 
 /**
- * Gắn SĐT + streak gifts lên schedule.
- * Checkout membership (name/tier/discount) lấy từ GET /bill?phone= — không gọi /membership/lookup.
+ * Nhập SĐT → tra cứu streak/điểm/hạng + phát quà ngay (không bắt buộc Lưu SĐT vào booking).
+ * Lưu SĐT chỉ khi muốn gắn member vào schedule (vd. discount lúc checkout).
+ * Checkout membership discount lấy từ GET /bill?phone=.
  */
 export const useScheduleMemberPhone = ({
   scheduleId,
@@ -57,16 +58,20 @@ export const useScheduleMemberPhone = ({
     setIsGiftEnabled(Boolean(initialGiftEnabled));
   }, [isOpen, initialGiftEnabled]);
 
-  const isPhoneDirty = phone.trim() !== savedPhone.trim();
+  const trimmedPhone = phone.trim();
+  const isPhoneDirty = trimmedPhone !== savedPhone.trim();
   const hasSavedValidPhone = isValidMemberPhone(savedPhone);
-  const shouldLookupMember = isOpen && hasSavedValidPhone && !isPhoneDirty;
+  const isCurrentPhoneValid = isValidMemberPhone(trimmedPhone);
+  /** Tra cứu ngay khi nhập đủ SĐT — không cần Lưu / gắn booking. */
+  const shouldLookupMember = isOpen && isCurrentPhoneValid;
+  const lookupPhone = isCurrentPhoneValid ? trimmedPhone : "";
 
   const {
     data: streakGiftsData,
     isLoading: isLoadingMemberInfo,
     isError: isMemberInfoError,
     isFetched: hasFetchedMemberInfo,
-  } = useStreakGifts(savedPhone, {
+  } = useStreakGifts(lookupPhone, {
     enabled: shouldLookupMember,
     scheduleId,
   });
@@ -186,18 +191,19 @@ export const useScheduleMemberPhone = ({
   const { mutate: removeGiftItemMutation, isPending: isRemovingGiftItem } =
     useRemoveStreakGiftItem();
 
+  /** Dùng SĐT đang nhập — phát quà không cần Lưu vào booking trước. */
   const requireValidPhone = useCallback(() => {
-    const value = savedPhone.trim();
+    const value = phone.trim();
     if (!isValidMemberPhone(value)) {
       toast({
         title: "Số điện thoại không hợp lệ",
-        description: "Vui lòng lưu SĐT hợp lệ trước khi thao tác quà",
+        description: "Vui lòng nhập SĐT hợp lệ trước khi thao tác quà",
         variant: "destructive",
       });
       return null;
     }
     return value;
-  }, [savedPhone]);
+  }, [phone]);
 
   const claimStreakGift = useCallback(
     (streakCount: number, items: IClaimGiftItem[] = []) => {
