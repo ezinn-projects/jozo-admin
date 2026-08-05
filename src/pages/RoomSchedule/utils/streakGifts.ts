@@ -1,113 +1,105 @@
-import { GiftBundleItem } from "@/@types/Gift";
 import {
   IAvailableStreakGift,
+  IPendingGiftsResponse,
+  ISelectableStreakGiftItem,
+  IServedStreakGift,
+  IServedStreakGiftItem,
   IStreakGiftsResponse,
   IStreakRewardProgress,
 } from "@/@types/Membership";
-import { FnBCategory } from "@/constants/enum";
-
-type RawStreakGiftItem = {
-  itemId?: string;
-  quantity?: number;
-  name?: string;
-  category?: string;
-  priceSnapshot?: number;
-  source?: "fnb_menu" | "fnb_menu_item";
-};
-
-type RawStreakGiftRef = {
-  giftId?: string;
-  giftName?: string;
-  giftType?: string;
-  giftImage?: string;
-  items?: RawStreakGiftItem[];
-};
 
 type RawStreakReward = {
   streakCount: number;
   bonusPoints?: number;
-  gift?: RawStreakGiftRef;
-  giftId?: string;
-  giftName?: string;
-  giftType?: string;
-  giftImage?: string;
-  items?: RawStreakGiftItem[];
+  itemCount?: number;
+  usedQuantity?: number;
+  remainingQuantity?: number;
   isClaimed?: boolean;
   isReached?: boolean;
   claimed?: boolean;
   isNext?: boolean;
 };
 
-type RawAvailableGift = IAvailableStreakGift & {
-  gift?: RawStreakGiftRef;
-  items?: RawStreakGiftItem[];
+type RawAvailableGift = {
+  streakCount: number;
+  itemCount?: number;
+  usedQuantity?: number;
+  remainingQuantity?: number;
+  bonusPoints?: number;
+};
+
+type RawServedGift = {
+  streakCount: number;
+  itemCount?: number;
+  usedQuantity?: number;
+  remainingQuantity?: number;
+  bonusPoints?: number;
+  items?: IServedStreakGiftItem[];
 };
 
 type RawStreakGiftsResponse = Omit<
   IStreakGiftsResponse,
-  "streakRewards" | "availableGifts"
+  "streakRewards" | "availableGifts" | "selectableItems" | "servedGifts"
 > & {
   availableGifts?: RawAvailableGift[];
   streakRewards?: RawStreakReward[];
+  selectableItems?: ISelectableStreakGiftItem[];
+  servedGifts?: RawServedGift[];
 };
 
-const normalizeGiftItems = (
-  items?: RawStreakGiftItem[],
-): GiftBundleItem[] | undefined => {
-  if (!items?.length) return undefined;
-  const normalized = items
-    .filter((item): item is RawStreakGiftItem & { itemId: string } =>
-      Boolean(item.itemId),
-    )
-    .map((item) => ({
-      itemId: item.itemId,
-      quantity: item.quantity ?? 1,
-      name: item.name ?? "Món",
-      category: item.category as FnBCategory | undefined,
-      priceSnapshot: item.priceSnapshot,
-      source: item.source ?? "fnb_menu_item",
-    }));
-  return normalized.length > 0 ? normalized : undefined;
-};
-
-const normalizeStreakReward = (raw: RawStreakReward): IStreakRewardProgress => {
-  const gift = raw.gift ?? {};
-  return {
-    streakCount: raw.streakCount,
-    giftId: gift.giftId ?? raw.giftId,
-    giftName: gift.giftName ?? raw.giftName,
-    giftType: gift.giftType ?? raw.giftType,
-    giftImage: gift.giftImage ?? raw.giftImage,
-    bonusPoints: raw.bonusPoints,
-    items: normalizeGiftItems(gift.items ?? raw.items),
-    claimed: raw.isClaimed ?? raw.claimed ?? false,
-    isNext: raw.isNext,
-  };
-};
+const normalizeStreakReward = (raw: RawStreakReward): IStreakRewardProgress => ({
+  streakCount: raw.streakCount,
+  bonusPoints: raw.bonusPoints,
+  itemCount: raw.itemCount,
+  usedQuantity: raw.usedQuantity,
+  remainingQuantity: raw.remainingQuantity,
+  isReached: raw.isReached,
+  isClaimed: raw.isClaimed ?? raw.claimed,
+  claimed: raw.isClaimed ?? raw.claimed ?? false,
+  isNext: raw.isNext,
+});
 
 const normalizeAvailableGift = (
   raw: RawAvailableGift,
-): IAvailableStreakGift => {
-  const gift = raw.gift ?? {};
+): IAvailableStreakGift => ({
+  streakCount: raw.streakCount,
+  itemCount: raw.itemCount ?? 1,
+  usedQuantity: raw.usedQuantity,
+  remainingQuantity: raw.remainingQuantity,
+  bonusPoints: raw.bonusPoints,
+});
+
+const normalizeServedGift = (raw: RawServedGift): IServedStreakGift => {
+  const itemCount = raw.itemCount ?? 0;
+  const items = (raw.items ?? []).map((item) => ({
+    ...item,
+    quantity: item.quantity ?? 1,
+  }));
+  const usedQuantity =
+    raw.usedQuantity ??
+    items.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const remainingQuantity =
+    raw.remainingQuantity ?? Math.max(0, itemCount - usedQuantity);
+
   return {
     streakCount: raw.streakCount,
-    giftId: gift.giftId ?? raw.giftId,
-    giftName: gift.giftName ?? raw.giftName,
-    giftType: gift.giftType ?? raw.giftType,
-    giftImage: gift.giftImage ?? raw.giftImage,
+    itemCount,
+    usedQuantity,
+    remainingQuantity,
     bonusPoints: raw.bonusPoints,
-    items: normalizeGiftItems(gift.items ?? raw.items),
+    items,
   };
 };
 
 export const normalizeStreakGiftsResponse = (
   data: RawStreakGiftsResponse | undefined,
-): IStreakGiftsResponse | undefined => {
+): IPendingGiftsResponse | undefined => {
   if (!data) return undefined;
 
   const rawRewards = data.streakRewards ?? [];
   const streakRewards = rawRewards.map(normalizeStreakReward);
   const availableGifts = (data.availableGifts ?? []).map(normalizeAvailableGift);
+  const servedGifts = (data.servedGifts ?? []).map(normalizeServedGift);
   const nextMilestone = rawRewards
     .filter((raw) => !(raw.isClaimed ?? raw.claimed) && raw.isReached === false)
     .sort((a, b) => a.streakCount - b.streakCount)[0]?.streakCount;
@@ -115,6 +107,8 @@ export const normalizeStreakGiftsResponse = (
   return {
     ...data,
     availableGifts,
+    selectableItems: data.selectableItems ?? [],
+    servedGifts,
     streakRewards: streakRewards.map((reward) => ({
       ...reward,
       isNext:
@@ -138,41 +132,19 @@ export const formatFnBCategory = (category?: string) => {
   return FNB_CATEGORY_LABELS[category.toLowerCase()] ?? category;
 };
 
-type GiftRef = {
-  giftId?: string;
-  giftType?: string;
-  items?: GiftBundleItem[];
-};
+/** Chỉ món còn tồn kho để staff chọn khi phát quà */
+export const getSelectableInStockItems = (
+  items: ISelectableStreakGiftItem[] = [],
+) => items.filter((item) => item.quantity > 0);
 
-/** Thu thập giftId snacks_drinks còn thiếu items từ response streak-gifts. */
-export const collectSnacksGiftIds = (
-  availableGifts: GiftRef[],
-  streakRewards: GiftRef[],
-) => {
-  const ids = new Set<string>();
-  for (const entry of [...availableGifts, ...streakRewards]) {
-    if (
-      entry.giftType === "snacks_drinks" &&
-      entry.giftId &&
-      !entry.items?.length
-    ) {
-      ids.add(entry.giftId);
-    }
-  }
-  return [...ids];
-};
+export const sumSelectedItemQty = (
+  selected: Record<string, number>,
+): number =>
+  Object.values(selected).reduce((sum, qty) => sum + (qty > 0 ? qty : 0), 0);
 
-/** Ghép items có sẵn từ streak-gifts với items fetch theo giftId. */
-export const mergeGiftItemsById = (
-  availableGifts: GiftRef[],
-  streakRewards: GiftRef[],
-  fetchedItemsById: Record<string, GiftBundleItem[]>,
-): Record<string, GiftBundleItem[]> => {
-  const map: Record<string, GiftBundleItem[]> = { ...fetchedItemsById };
-  for (const entry of [...availableGifts, ...streakRewards]) {
-    if (entry.giftId && entry.items?.length && !map[entry.giftId]) {
-      map[entry.giftId] = entry.items;
-    }
-  }
-  return map;
-};
+export const selectedItemsToPayload = (
+  selected: Record<string, number>,
+): { itemId: string; quantity: number }[] =>
+  Object.entries(selected)
+    .filter(([, quantity]) => quantity > 0)
+    .map(([itemId, quantity]) => ({ itemId, quantity }));

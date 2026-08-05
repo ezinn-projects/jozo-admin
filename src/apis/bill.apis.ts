@@ -8,7 +8,8 @@ const billAPis = {
     promotionId?: string,
     actualEndTime?: string,
     actualStartTime?: string,
-    applyFreeHourPromotion?: boolean
+    applyFreeHourPromotion?: boolean,
+    phone?: string,
   ) => {
     const params = new URLSearchParams();
 
@@ -35,8 +36,12 @@ const billAPis = {
       params.append("applyFreeHourPromotion", applyFreeHourPromotion.toString());
     }
 
+    if (phone?.trim()) {
+      params.append("phone", phone.trim());
+    }
+
     return http.get<HTTPResponse<IBill>>(
-      `/bill/${scheduleId}?${params.toString()}`
+      `/bill/${scheduleId}?${params.toString()}`,
     );
   },
 
@@ -77,7 +82,9 @@ const billAPis = {
       promotionId?: string;
       actualStartTime?: string;
       applyFreeHourPromotion?: boolean;
-    }
+      phone?: string;
+      customerPhone?: string;
+    },
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}`, data),
 
   // Print bill via WiFi printer
@@ -88,7 +95,9 @@ const billAPis = {
       actualEndTime: string;
       promotionId?: string;
       actualStartTime?: string;
-    }
+      phone?: string;
+      customerPhone?: string;
+    },
   ) => http.post<HTTPResponse<IBill>>(`/bill/${scheduleId}/wifi`, data),
 
   // Save bill to bills collection
@@ -106,6 +115,7 @@ const billAPis = {
     }>;
     totalAmount: number;
     customerPhone?: string;
+    phone?: string;
     paymentMethod: string;
     startTime: string;
     endTime: string;
@@ -119,7 +129,13 @@ const billAPis = {
   // API generate PDF, trả về file PDF ở dạng buffer (arraybuffer)
   generateBill: async (
     scheduleId: string,
-    data: { paymentMethod: string; actualEndTime: string; promotionId?: string }
+    data: {
+      paymentMethod: string;
+      actualEndTime: string;
+      promotionId?: string;
+      phone?: string;
+      customerPhone?: string;
+    },
   ) =>
     http.post(`/bill/${scheduleId}/generate`, data, {
       responseType: "blob",
@@ -140,7 +156,7 @@ const billAPis = {
         bills: IBill[];
       }>
     >(
-      `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`
+      `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
     ),
 };
 

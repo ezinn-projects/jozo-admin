@@ -5,7 +5,7 @@ import {
   mergeOrderDetailItems,
 } from "@/utils/mergeOrderDetailItems";
 import { BillGift } from "@/@types/Gift";
-import { IRoomSchedule } from "@/@types/Room";
+import { IRoom, IRoomSchedule } from "@/@types/Room";
 import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
@@ -23,16 +23,20 @@ import { toast } from "@/hooks/use-toast";
 import dayjs, { parseUTCToLocal } from "@/lib/dayjs";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
 import { getScheduleCustomerContact } from "../utils/memberPhone";
+import {
+  formatTierDiscountLabel,
+  resolveBillMembershipDiscount,
+} from "../utils/membershipDiscount";
 import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
 import { getRoomTypeLabel } from "../utils/scheduleRoomType";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
-import { IRoom } from "@/@types/Room";
+import { IBillMembership, IBillMembershipDiscount } from "@/@types/Bill";
 import roomApis from "@/apis/room.apis";
 import {
   AlertDialog,
@@ -98,6 +102,9 @@ interface BillData {
   startTime?: string | Date;
   gift?: BillGift;
   giftDiscountAmount?: number;
+  membership?: IBillMembership;
+  membershipDiscountAmount?: number;
+  membershipDiscount?: IBillMembershipDiscount;
 }
 
 // Interface cho bill response từ API
@@ -113,6 +120,9 @@ interface BillResponse {
   startTime?: string | Date;
   gift?: BillGift;
   giftDiscountAmount?: number;
+  membership?: IBillMembership;
+  membershipDiscountAmount?: number;
+  membershipDiscount?: IBillMembershipDiscount;
 }
 
 interface BillResultWithNote extends BillResponse {
@@ -154,6 +164,25 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const promotionList = standardPromotions?.data.result ?? [];
   const queryClient = useQueryClient();
 
+  const member = useScheduleMemberPhone({
+    scheduleId: schedule._id,
+    initialPhone: schedule.customerPhone || "",
+    initialGiftEnabled: schedule.giftEnabled,
+    isOpen,
+    refetchSchedules,
+    onGiftServed: () => {
+      queryClient.invalidateQueries({ queryKey: ["bill", schedule._id] });
+      queryClient.invalidateQueries({
+        queryKey: ["fnbOrderDetail", schedule._id],
+      });
+    },
+  });
+
+  const billPhone =
+    member.hasSavedValidPhone && !member.isPhoneDirty
+      ? member.savedPhone.trim()
+      : "";
+
   const billQueryKey = [
     "bill",
     schedule._id,
@@ -162,21 +191,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     customStartTime,
     customStartDate,
     customEndDate,
+    billPhone,
   ] as const;
-
-  const member = useScheduleMemberPhone({
-    scheduleId: schedule._id,
-    initialPhone: schedule.customerPhone || "",
-    initialGiftEnabled: schedule.giftEnabled,
-    isOpen,
-    refetchSchedules,
-    onGiftServed: () => {
-      queryClient.invalidateQueries({ queryKey: billQueryKey });
-      queryClient.invalidateQueries({
-        queryKey: ["fnbOrderDetail", schedule._id],
-      });
-    },
-  });
 
   const openMenuItemsModal = () => setIsMenuItemsModalOpen(true);
   const closeMenuItemsModal = () => setIsMenuItemsModalOpen(false);
@@ -658,6 +674,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         selectedPromotion || undefined,
         billDateTimePayload.actualEndTime,
         billDateTimePayload.actualStartTime,
+        undefined,
+        billPhone || undefined,
       );
     },
     enabled: isOpen && !!customStartTime && !!customEndTime,
@@ -742,8 +760,40 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     note,
     gift,
     giftDiscountAmount = 0,
+    membership: billMembership,
+    membershipDiscountAmount: billMembershipDiscountAmount,
+    membershipDiscount: billMembershipDiscount,
   } = billResult;
   const items = itemsWithDetails;
+
+  const membershipDiscountDisplay = useMemo(
+    () =>
+      resolveBillMembershipDiscount({
+        membership: billMembership,
+        membershipDiscount: billMembershipDiscount,
+        membershipDiscountAmount: billMembershipDiscountAmount,
+      }),
+    [
+      billMembership,
+      billMembershipDiscount,
+      billMembershipDiscountAmount,
+    ],
+  );
+  const membershipDiscountLabel = formatTierDiscountLabel(
+    membershipDiscountDisplay,
+  );
+  const membershipDiscountApplied =
+    membershipDiscountDisplay?.appliedAmount !== undefined &&
+    membershipDiscountDisplay.appliedAmount > 0
+      ? membershipDiscountDisplay.appliedAmount
+      : 0;
+  const hasMembershipDiscountUi = Boolean(
+    membershipDiscountDisplay &&
+      (membershipDiscountLabel ||
+        membershipDiscountApplied > 0 ||
+        membershipDiscountDisplay.tier ||
+        membershipDiscountDisplay.name),
+  );
 
   const amountToThousands = (amount: number) => Math.round(amount / 1000);
 
@@ -781,6 +831,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       items: items || [],
       totalAmount: totalAmount || 0,
       customerPhone,
+      phone: customerPhone || undefined,
       paymentMethod: paymentMethod,
       startTime: actualStartTime,
       endTime: actualEndTime,
@@ -791,7 +842,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     // Save bill trước khi update schedule status
     saveBillMutation(billToSave, {
       onSuccess: () => {
-        // Invalidate streak-gifts query để refresh member info
+        // Invalidate membership/streak queries để refresh member info
         if (customerPhone) {
           queryClient.invalidateQueries({
             queryKey: ["streak-gifts", customerPhone],
@@ -1036,6 +1087,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         actualEndTime: billDateTimePayload.actualEndTime,
         actualStartTime: billDateTimePayload.actualStartTime,
         promotionId: selectedPromotion || undefined,
+        phone: billPhone || undefined,
+        customerPhone: billPhone || undefined,
       }),
     onSuccess: () => {
       toast({
@@ -1470,6 +1523,32 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                           </p>
                         </div>
                       )}
+
+                      {hasMembershipDiscountUi && (
+                        <div className="space-y-0.5 rounded-md border border-emerald-200 bg-emerald-50/70 p-2 text-xs">
+                          <p className="font-medium text-emerald-900">
+                            Ưu đãi hạng thành viên
+                            {membershipDiscountDisplay?.tier
+                              ? ` (${membershipDiscountDisplay.tier})`
+                              : ""}
+                          </p>
+                          {membershipDiscountDisplay?.name && (
+                            <p className="text-muted-foreground">
+                              {membershipDiscountDisplay.name}
+                            </p>
+                          )}
+                          {membershipDiscountLabel && (
+                            <p className="font-medium text-emerald-700">
+                              {membershipDiscountLabel}
+                            </p>
+                          )}
+                          {membershipDiscountDisplay?.note && (
+                            <p className="text-muted-foreground">
+                              {membershipDiscountDisplay.note}
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                     <div className="border-t" />
 
@@ -1538,6 +1617,25 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                                   </span>
                                 </div>
                               )}
+
+                            {hasMembershipDiscountUi && (
+                              <div className="flex justify-between">
+                                <span className="text-muted-foreground">
+                                  Giảm hạng
+                                  {membershipDiscountDisplay?.tier
+                                    ? ` ${membershipDiscountDisplay.tier}`
+                                    : ""}
+                                  {membershipDiscountLabel
+                                    ? ` (${membershipDiscountLabel.replace(/^Giảm\s+/i, "")})`
+                                    : ""}
+                                </span>
+                                <span className="ml-2 text-right font-medium text-emerald-600">
+                                  {membershipDiscountApplied > 0
+                                    ? `-${formatVnd(membershipDiscountApplied)}`
+                                    : membershipDiscountLabel || "—"}
+                                </span>
+                              </div>
+                            )}
 
                             {/* Giá cuối cùng */}
                             <div className="mt-1.5 flex items-center justify-between border-t pt-2 text-base font-semibold">
@@ -1754,9 +1852,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   isMemberNotFound={member.isMemberNotFound}
                   availableGifts={member.availableGifts}
                   streakRewards={member.streakRewards}
-                  giftItemsById={member.giftItemsById}
-                  onServeGift={member.serveStreakGift}
-                  isServingGift={member.isServingGift}
+                  selectableItems={member.selectableItems}
+                  servedGifts={member.servedGifts}
+                  onClaimGift={member.claimStreakGift}
+                  onAddGiftItems={member.addStreakGiftItems}
+                  onUpdateGiftItemQty={member.updateStreakGiftItemQty}
+                  onRemoveGiftItem={member.removeStreakGiftItem}
+                  isServingGift={member.isMutatingGift}
                 />
               </TabsContent>
             </Tabs>

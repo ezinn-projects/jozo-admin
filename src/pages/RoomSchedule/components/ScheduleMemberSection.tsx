@@ -4,17 +4,22 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
-import { GiftBundleItem } from "@/@types/Gift";
 import {
   IAvailableStreakGift,
+  IClaimGiftItem,
+  ISelectableStreakGiftItem,
+  IServedStreakGift,
   IStreakRewardProgress,
 } from "@/@types/Membership";
 import {
   Check,
   Gift,
   Loader2,
+  Minus,
   Phone,
+  Plus,
   Save,
+  Search,
   User,
   Award,
   Star,
@@ -24,14 +29,19 @@ import {
   Target,
   X,
 } from "lucide-react";
-import React, { memo, useMemo, useState } from "react";
+import React, { memo, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   getMemberDisplayName,
   isValidMemberPhone,
   sanitizePhoneInput,
 } from "../utils/memberPhone";
-import { formatFnBCategory } from "../utils/streakGifts";
+import {
+  formatFnBCategory,
+  getSelectableInStockItems,
+  selectedItemsToPayload,
+  sumSelectedItemQty,
+} from "../utils/streakGifts";
 
 export interface ScheduleGiftDetail {
   name?: string;
@@ -81,8 +91,31 @@ interface ScheduleMemberSectionProps {
   isMemberNotFound?: boolean;
   availableGifts?: IAvailableStreakGift[];
   streakRewards?: IStreakRewardProgress[];
-  giftItemsById?: Record<string, GiftBundleItem[]>;
-  onServeGift?: (streakCount: number) => void;
+  selectableItems?: ISelectableStreakGiftItem[];
+  servedGifts?: IServedStreakGift[];
+  /** Claim soft — items có thể [] / partial */
+  onClaimGift?: (
+    streakCount: number,
+    items?: IClaimGiftItem[],
+  ) => void | Promise<void>;
+  /** Alias cũ của onClaimGift */
+  onServeGift?: (
+    streakCount: number,
+    items: IClaimGiftItem[],
+  ) => void | Promise<void>;
+  onAddGiftItems?: (
+    streakCount: number,
+    items: IClaimGiftItem[],
+  ) => void | Promise<void>;
+  onUpdateGiftItemQty?: (
+    streakCount: number,
+    itemId: string,
+    quantity: number,
+  ) => void | Promise<void>;
+  onRemoveGiftItem?: (
+    streakCount: number,
+    itemId: string,
+  ) => void | Promise<void>;
   isServingGift?: boolean;
   className?: string;
   inputId?: string;
@@ -119,63 +152,24 @@ const getTierColor = (tier?: string) => {
   }
 };
 
-const formatGiftType = (type?: string) => {
-  if (type === "snacks_drinks") return "Đồ ăn/Nước";
-  if (type === "discount") return "Giảm giá";
-  return type || "Quà tặng";
-};
-
 const getRewardLabel = (reward: IStreakRewardProgress) => {
-  if (reward.giftName) return reward.giftName;
-  if (reward.bonusPoints) return `+${reward.bonusPoints} điểm`;
-  return `Mốc streak ${reward.streakCount}`;
+  const parts: string[] = [];
+  if (reward.itemCount && reward.itemCount > 0) {
+    parts.push(`${reward.itemCount} món`);
+  }
+  if (reward.bonusPoints) {
+    parts.push(`+${reward.bonusPoints} điểm`);
+  }
+  return parts.length > 0
+    ? parts.join(" • ")
+    : `Mốc streak ${reward.streakCount}`;
 };
 
-const GiftBundleItemsList = memo(function GiftBundleItemsList({
-  items,
-  variant = "available",
-}: {
-  items: GiftBundleItem[];
-  variant?: "available" | "progress";
-}) {
-  if (items.length === 0) return null;
-
-  return (
-    <div
-      className={cn(
-        "mt-2 rounded-md border px-2 py-2 space-y-1.5",
-        variant === "available"
-          ? "border-pink-200 bg-white/90"
-          : "border-orange-100 bg-white/80",
-      )}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-wide text-gray-500">
-        Cần chuẩn bị
-      </p>
-      <ul className="space-y-1">
-        {items.map((item) => {
-          const categoryLabel = formatFnBCategory(item.category);
-          return (
-            <li
-              key={item.itemId}
-              className="flex items-start justify-between gap-2 text-xs text-gray-800"
-            >
-              <div className="min-w-0">
-                <span className="font-medium">{item.name}</span>
-                {categoryLabel && (
-                  <span className="text-gray-500"> • {categoryLabel}</span>
-                )}
-              </div>
-              <span className="shrink-0 font-semibold text-pink-700">
-                ×{item.quantity}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-});
+const formatAvailableGiftLabel = (gift: IAvailableStreakGift) => {
+  const parts = [`Chọn ${gift.itemCount} món`];
+  if (gift.bonusPoints) parts.push(`+${gift.bonusPoints} điểm`);
+  return parts.join(" • ");
+};
 
 const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   phone,
@@ -200,19 +194,112 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   isMemberNotFound = false,
   availableGifts = [],
   streakRewards = [],
-  giftItemsById = {},
+  selectableItems = [],
+  servedGifts = [],
+  onClaimGift,
   onServeGift,
+  onAddGiftItems,
+  onUpdateGiftItemQty,
+  onRemoveGiftItem,
   isServingGift = false,
   className,
   inputId = "schedule-member-phone",
 }) => {
+  const claimGift = onClaimGift ?? onServeGift;
   const [selectedStreakCount, setSelectedStreakCount] = useState<number | null>(
     null,
   );
-  const availableGiftIds = useMemo(
-    () => new Set(availableGifts.map((gift) => gift.giftId).filter(Boolean)),
-    [availableGifts],
+  const [selectedItemQty, setSelectedItemQty] = useState<
+    Record<string, number>
+  >({});
+  const [itemSearch, setItemSearch] = useState("");
+
+  const servedGiftForSelected = useMemo(
+    () =>
+      servedGifts.find((gift) => gift.streakCount === selectedStreakCount) ??
+      null,
+    [servedGifts, selectedStreakCount],
   );
+
+  // Bỏ chọn mốc đã claim mà không còn served trên schedule này
+  useEffect(() => {
+    if (selectedStreakCount === null) return;
+    const reward = streakRewards.find(
+      (r) => r.streakCount === selectedStreakCount,
+    );
+    if (!reward) return;
+    const isClaimed = reward.claimed || reward.isClaimed === true;
+    const served = servedGifts.some(
+      (g) => g.streakCount === selectedStreakCount,
+    );
+    if (isClaimed && !served) {
+      setSelectedStreakCount(null);
+      setSelectedItemQty({});
+      setItemSearch("");
+    }
+  }, [selectedStreakCount, streakRewards, servedGifts]);
+
+  const selectedMilestone = useMemo((): IAvailableStreakGift | null => {
+    if (selectedStreakCount === null) return null;
+    if (servedGiftForSelected) {
+      return {
+        streakCount: servedGiftForSelected.streakCount,
+        itemCount: servedGiftForSelected.itemCount,
+        usedQuantity: servedGiftForSelected.usedQuantity,
+        remainingQuantity: servedGiftForSelected.remainingQuantity,
+        bonusPoints: servedGiftForSelected.bonusPoints,
+      };
+    }
+    const fromAvailable = availableGifts.find(
+      (gift) => gift.streakCount === selectedStreakCount,
+    );
+    if (fromAvailable) return fromAvailable;
+
+    const fromReward = streakRewards.find(
+      (reward) => reward.streakCount === selectedStreakCount,
+    );
+    if (!fromReward) return null;
+
+    return {
+      streakCount: fromReward.streakCount,
+      itemCount: fromReward.itemCount ?? 0,
+      usedQuantity: fromReward.usedQuantity,
+      remainingQuantity: fromReward.remainingQuantity,
+      bonusPoints: fromReward.bonusPoints,
+    };
+  }, [
+    availableGifts,
+    selectedStreakCount,
+    servedGiftForSelected,
+    streakRewards,
+  ]);
+
+  const quotaMax = selectedMilestone?.itemCount ?? 0;
+  const remainingQuota = servedGiftForSelected
+    ? servedGiftForSelected.remainingQuantity
+    : Math.max(0, quotaMax - sumSelectedItemQty(selectedItemQty));
+  const inStockItems = useMemo(
+    () => getSelectableInStockItems(selectableItems),
+    [selectableItems],
+  );
+  const filteredInStockItems = useMemo(() => {
+    const keyword = itemSearch.trim().toLowerCase();
+    if (!keyword) return inStockItems;
+    return inStockItems.filter((item) => {
+      const name = item.name?.toLowerCase() ?? "";
+      const category = item.category?.toLowerCase() ?? "";
+      const categoryLabel =
+        formatFnBCategory(item.category)?.toLowerCase() ?? "";
+      return (
+        name.includes(keyword) ||
+        category.includes(keyword) ||
+        categoryLabel.includes(keyword)
+      );
+    });
+  }, [inStockItems, itemSearch]);
+  const selectedQtyTotal = sumSelectedItemQty(selectedItemQty);
+  // Claim soft: không bắt buộc chọn đủ quota
+  const canClaimGift = selectedMilestone !== null && !servedGiftForSelected;
 
   const isPhoneValid = isValidMemberPhone(phone);
   const showPhoneError = phone.length > 0 && !isPhoneValid;
@@ -241,10 +328,64 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
     }
   };
 
-  const handleServeGift = () => {
-    if (selectedStreakCount === null || !onServeGift) return;
-    onServeGift(selectedStreakCount);
-    setSelectedStreakCount(null);
+  const handleSelectMilestone = (streakCount: number) => {
+    setSelectedStreakCount((prev) => {
+      if (prev === streakCount) {
+        setSelectedItemQty({});
+        setItemSearch("");
+        return null;
+      }
+      setSelectedItemQty({});
+      setItemSearch("");
+      return streakCount;
+    });
+  };
+
+  const adjustDraftItemQty = (
+    item: ISelectableStreakGiftItem,
+    delta: number,
+  ) => {
+    setSelectedItemQty((prev) => {
+      const current = prev[item.itemId] ?? 0;
+      const nextQty = current + delta;
+      if (nextQty <= 0) {
+        const next = { ...prev };
+        delete next[item.itemId];
+        return next;
+      }
+      const otherTotal = sumSelectedItemQty(prev) - current;
+      if (quotaMax > 0 && otherTotal + nextQty > quotaMax) return prev;
+      if (nextQty > item.quantity) return prev;
+      return { ...prev, [item.itemId]: nextQty };
+    });
+  };
+
+  const handleClaimGift = () => {
+    if (!canClaimGift || selectedStreakCount === null || !claimGift) return;
+    void claimGift(
+      selectedStreakCount,
+      selectedItemsToPayload(selectedItemQty),
+    );
+    setSelectedItemQty({});
+  };
+
+  const handleAddOneItem = (itemId: string) => {
+    if (!selectedStreakCount || !onAddGiftItems) return;
+    if (remainingQuota <= 0) return;
+    void onAddGiftItems(selectedStreakCount, [{ itemId, quantity: 1 }]);
+  };
+
+  const handleChangeServedQty = (itemId: string, nextQty: number) => {
+    if (!selectedStreakCount) return;
+    if (nextQty <= 0) {
+      if (onRemoveGiftItem) {
+        void onRemoveGiftItem(selectedStreakCount, itemId);
+      } else if (onUpdateGiftItemQty) {
+        void onUpdateGiftItemQty(selectedStreakCount, itemId, 0);
+      }
+      return;
+    }
+    onUpdateGiftItemQty?.(selectedStreakCount, itemId, nextQty);
   };
 
   return (
@@ -536,25 +677,19 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
             <div className="rounded-lg border border-pink-200 bg-pink-50/60 px-3 py-3 space-y-2.5">
               <p className="text-sm font-semibold text-pink-900 flex items-center gap-2">
                 <Gift className="w-4 h-4 text-pink-600" />
-                Quà cần chuẩn bị ({availableGifts.length})
+                Quà cần phát ({availableGifts.length})
+              </p>
+              <p className="text-[11px] text-pink-800/80">
+                Click mốc bên dưới (Tiến độ streak) hoặc card này để chọn món.
               </p>
               <div className="space-y-2">
                 {availableGifts.map((gift) => {
                   const isSelected = selectedStreakCount === gift.streakCount;
-                  const bundleItems =
-                    gift.giftType === "snacks_drinks"
-                      ? (giftItemsById[gift.giftId] ?? [])
-                      : [];
-
                   return (
                     <button
-                      key={`${gift.giftId}-${gift.streakCount}`}
+                      key={gift.streakCount}
                       type="button"
-                      onClick={() =>
-                        setSelectedStreakCount(
-                          isSelected ? null : gift.streakCount,
-                        )
-                      }
+                      onClick={() => handleSelectMilestone(gift.streakCount)}
                       disabled={isServingGift}
                       className={cn(
                         "w-full text-left rounded-md border px-2.5 py-2.5 transition-colors",
@@ -563,56 +698,28 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                           : "border-pink-200 bg-white hover:bg-pink-50",
                       )}
                     >
-                      <div className="flex gap-3">
-                        {gift.giftImage && (
-                          <img
-                            src={gift.giftImage}
-                            alt={gift.giftName}
-                            className="w-12 h-12 rounded-md object-cover shrink-0"
-                          />
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <p className="font-semibold text-gray-900 truncate">
-                            {gift.giftName}
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">
+                            Mốc streak {gift.streakCount}
                           </p>
                           <p className="text-xs text-gray-600">
-                            {formatGiftType(gift.giftType)} • Streak{" "}
-                            {gift.streakCount}
+                            {formatAvailableGiftLabel(gift)}
                           </p>
-                          {gift.bonusPoints ? (
-                            <p className="text-xs text-emerald-600 font-medium mt-0.5">
-                              Thưởng: +{gift.bonusPoints} điểm
-                            </p>
-                          ) : null}
                         </div>
+                        {isSelected && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-pink-300 text-pink-700 bg-pink-50"
+                          >
+                            Đang chọn
+                          </Badge>
+                        )}
                       </div>
-                      {bundleItems.length > 0 && (
-                        <GiftBundleItemsList items={bundleItems} />
-                      )}
                     </button>
                   );
                 })}
               </div>
-              {onServeGift && (
-                <Button
-                  type="button"
-                  onClick={handleServeGift}
-                  disabled={selectedStreakCount === null || isServingGift}
-                  className="w-full bg-pink-600 hover:bg-pink-700"
-                >
-                  {isServingGift ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Đang phục vụ...
-                    </>
-                  ) : (
-                    <>
-                      <Gift className="w-4 h-4 mr-2" />
-                      Đã đưa quà
-                    </>
-                  )}
-                </Button>
-              )}
             </div>
           )}
 
@@ -624,37 +731,71 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
               </p>
               <div className="space-y-2">
                 {streakRewards.map((reward) => {
-                  const bundleItems =
-                    reward.giftType === "snacks_drinks" &&
-                    reward.giftId &&
-                    !availableGiftIds.has(reward.giftId)
-                      ? (giftItemsById[reward.giftId] ?? [])
-                      : [];
+                  const served = servedGifts.find(
+                    (gift) => gift.streakCount === reward.streakCount,
+                  );
+                  const isClaimed = reward.claimed || reward.isClaimed === true;
+                  // Đã claim: chỉ mở được nếu schedule này còn servedGifts (để sửa món/quota)
+                  const isDisabled = isServingGift || (isClaimed && !served);
+                  const isSelected =
+                    selectedStreakCount === reward.streakCount && !isDisabled;
+
+                  if (isClaimed && !served) {
+                    return (
+                      <div
+                        key={reward.streakCount}
+                        className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2 text-sm text-gray-500 opacity-80"
+                        aria-disabled
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold bg-emerald-100 text-emerald-700">
+                            <Check className="w-3.5 h-3.5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="font-medium truncate">
+                              {getRewardLabel(reward)}
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              Streak {reward.streakCount} • Đã claim
+                            </p>
+                          </div>
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50"
+                          >
+                            Đã nhận
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  }
 
                   return (
-                    <div
+                    <button
                       key={reward.streakCount}
+                      type="button"
+                      onClick={() => handleSelectMilestone(reward.streakCount)}
+                      disabled={isDisabled}
                       className={cn(
-                        "rounded-md border px-2.5 py-2 text-sm",
-                        reward.claimed
-                          ? "border-gray-200 bg-gray-50 text-gray-500"
-                          : reward.isNext
-                            ? "border-orange-300 bg-orange-50 text-orange-900"
-                            : "border-gray-200 bg-white text-gray-700",
+                        "w-full text-left rounded-md border px-2.5 py-2 text-sm transition-colors",
+                        isDisabled && "cursor-not-allowed opacity-60",
+                        isSelected
+                          ? "border-pink-400 bg-pink-100 ring-1 ring-pink-300 text-pink-950"
+                          : served
+                            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950 hover:bg-emerald-100"
+                            : "border-pink-200 bg-pink-50/80 text-pink-950 hover:bg-pink-100",
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <div
                           className={cn(
                             "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold",
-                            reward.claimed
-                              ? "bg-emerald-100 text-emerald-700"
-                              : reward.isNext
-                                ? "bg-orange-200 text-orange-800"
-                                : "bg-gray-100 text-gray-500",
+                            served
+                              ? "bg-emerald-200 text-emerald-800"
+                              : "bg-pink-200 text-pink-800",
                           )}
                         >
-                          {reward.claimed ? (
+                          {served ? (
                             <Check className="w-3.5 h-3.5" />
                           ) : (
                             reward.streakCount
@@ -664,46 +805,314 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                           <p className="font-medium truncate">
                             {getRewardLabel(reward)}
                           </p>
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs opacity-80">
                             Streak {reward.streakCount}
-                            {reward.giftType &&
-                              ` • ${formatGiftType(reward.giftType)}`}
+                            {served
+                              ? ` • Quota ${served.usedQuantity}/${served.itemCount}`
+                              : reward.isReached
+                                ? " • Click để claim / chọn món"
+                                : " • Click để claim"}
                           </p>
                         </div>
-                        {reward.claimed ? (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50"
-                          >
-                            Đã nhận
-                          </Badge>
-                        ) : reward.isNext ? (
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 border-orange-300 text-orange-700 bg-orange-100"
-                          >
-                            Mốc tiếp
-                          </Badge>
-                        ) : null}
+                        <Badge
+                          variant="outline"
+                          className={cn(
+                            "shrink-0",
+                            isSelected
+                              ? "border-pink-400 text-pink-800 bg-pink-50"
+                              : served
+                                ? "border-emerald-300 text-emerald-700 bg-white"
+                                : "border-pink-300 text-pink-700 bg-white",
+                          )}
+                        >
+                          {isSelected
+                            ? "Đang chọn"
+                            : served
+                              ? "Sửa món"
+                              : "Claim"}
+                        </Badge>
                       </div>
-                      {bundleItems.length > 0 && (
-                        <GiftBundleItemsList
-                          items={bundleItems}
-                          variant="progress"
-                        />
-                      )}
-                    </div>
+                    </button>
                   );
                 })}
               </div>
             </div>
           )}
 
-          {streakRewards.length === 0 && availableGifts.length === 0 && (
-            <div className="rounded-lg border border-gray-200 bg-white/80 px-3 py-2.5 text-sm text-gray-600 text-center">
-              Không có quà streak cần phục vụ lúc này.
+          {selectedMilestone && (
+            <div className="rounded-md border border-pink-200 bg-white px-2.5 py-2.5 space-y-2">
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-gray-500">
+                  {servedGiftForSelected
+                    ? `Quà đã phát — mốc ${selectedMilestone.streakCount}`
+                    : `Claim quà — mốc ${selectedMilestone.streakCount}`}
+                </p>
+                <p className="text-xs font-semibold text-pink-700">
+                  {servedGiftForSelected
+                    ? `${servedGiftForSelected.usedQuantity}/${servedGiftForSelected.itemCount} (còn ${servedGiftForSelected.remainingQuantity})`
+                    : quotaMax > 0
+                      ? `${selectedQtyTotal}/${quotaMax}`
+                      : "Không giới hạn món"}
+                </p>
+              </div>
+              <p className="text-[11px] text-gray-500">
+                {servedGiftForSelected
+                  ? "Thêm / giảm / xoá món như order thường — quota tự bù lại. Bill 0đ từ schedule.streakGifts."
+                  : "Claim soft: có thể claim trống hoặc chọn một phần, bổ sung món sau."}
+              </p>
+
+              {servedGiftForSelected && (
+                <ul className="space-y-1.5">
+                  {servedGiftForSelected.items.length === 0 ? (
+                    <li className="text-xs text-gray-500">
+                      Chưa có món — chọn bên dưới để thêm.
+                    </li>
+                  ) : (
+                    servedGiftForSelected.items.map((item) => {
+                      const categoryLabel = formatFnBCategory(item.category);
+                      const canIncrease = remainingQuota > 0;
+                      return (
+                        <li
+                          key={item.itemId}
+                          className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50/60 px-2 py-1.5"
+                        >
+                          <div className="min-w-0 flex-1">
+                            <p className="text-xs font-medium text-gray-900 truncate">
+                              {item.name || "Món"}
+                            </p>
+                            <p className="text-[11px] text-gray-500">
+                              {categoryLabel ?? item.category ?? "—"}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-1 shrink-0">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={isServingGift}
+                              onClick={() =>
+                                handleChangeServedQty(
+                                  item.itemId,
+                                  item.quantity - 1,
+                                )
+                              }
+                            >
+                              <Minus className="h-3.5 w-3.5" />
+                            </Button>
+                            <span className="w-5 text-center text-xs font-semibold">
+                              {item.quantity}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="icon"
+                              className="h-7 w-7"
+                              disabled={!canIncrease || isServingGift}
+                              onClick={() =>
+                                handleChangeServedQty(
+                                  item.itemId,
+                                  item.quantity + 1,
+                                )
+                              }
+                            >
+                              <Plus className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-red-600"
+                              disabled={isServingGift}
+                              onClick={() =>
+                                onRemoveGiftItem?.(
+                                  selectedMilestone.streakCount,
+                                  item.itemId,
+                                )
+                              }
+                            >
+                              <X className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        </li>
+                      );
+                    })
+                  )}
+                </ul>
+              )}
+
+              {/* Claim draft picker OR add-more when remaining > 0 */}
+              {((!servedGiftForSelected && quotaMax >= 0) ||
+                (servedGiftForSelected && remainingQuota > 0)) &&
+                (inStockItems.length === 0 ? (
+                  <p className="text-xs text-gray-500">
+                    Không còn món trong kho để chọn.
+                  </p>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray-400" />
+                      <Input
+                        value={itemSearch}
+                        onChange={(e) => setItemSearch(e.target.value)}
+                        placeholder="Tìm món (tên, loại)..."
+                        className="h-8 pl-8 pr-8 text-xs"
+                        disabled={isServingGift}
+                      />
+                      {itemSearch && (
+                        <button
+                          type="button"
+                          className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                          onClick={() => setItemSearch("")}
+                          aria-label="Xóa tìm kiếm"
+                        >
+                          <X className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+
+                    {filteredInStockItems.length === 0 ? (
+                      <p className="text-xs text-gray-500 text-center py-2">
+                        Không tìm thấy món phù hợp.
+                      </p>
+                    ) : (
+                      <ul className="space-y-1.5 max-h-56 overflow-y-auto">
+                        {filteredInStockItems.map((item) => {
+                          const qty = selectedItemQty[item.itemId] ?? 0;
+                          const categoryLabel = formatFnBCategory(
+                            item.category,
+                          );
+                          const alreadyServed =
+                            servedGiftForSelected?.items.some(
+                              (served) => served.itemId === item.itemId,
+                            );
+
+                          if (servedGiftForSelected) {
+                            return (
+                              <li
+                                key={item.itemId}
+                                className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-2 py-1.5"
+                              >
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-xs font-medium truncate">
+                                    {item.name}
+                                  </p>
+                                  <p className="text-[11px] text-gray-500">
+                                    {categoryLabel ?? item.category}
+                                    {" • Kho: "}
+                                    {item.quantity}
+                                  </p>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7"
+                                  disabled={
+                                    isServingGift ||
+                                    remainingQuota <= 0 ||
+                                    item.quantity <= 0
+                                  }
+                                  onClick={() => handleAddOneItem(item.itemId)}
+                                >
+                                  <Plus className="h-3.5 w-3.5 mr-1" />
+                                  {alreadyServed ? "Thêm 1" : "Thêm"}
+                                </Button>
+                              </li>
+                            );
+                          }
+
+                          const canIncrease =
+                            (quotaMax === 0 || selectedQtyTotal < quotaMax) &&
+                            qty < item.quantity;
+
+                          return (
+                            <li
+                              key={item.itemId}
+                              className={cn(
+                                "flex items-center gap-2 rounded-md border px-2 py-1.5",
+                                qty > 0
+                                  ? "border-pink-300 bg-pink-50"
+                                  : "border-gray-200 bg-white",
+                              )}
+                            >
+                              <div className="min-w-0 flex-1">
+                                <p className="text-xs font-medium truncate">
+                                  {item.name}
+                                </p>
+                                <p className="text-[11px] text-gray-500">
+                                  {categoryLabel ?? item.category}
+                                  {" • Kho: "}
+                                  {item.quantity}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-1 shrink-0">
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  disabled={qty <= 0 || isServingGift}
+                                  onClick={() => adjustDraftItemQty(item, -1)}
+                                >
+                                  <Minus className="h-3.5 w-3.5" />
+                                </Button>
+                                <span className="w-5 text-center text-xs font-semibold">
+                                  {qty}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="icon"
+                                  className="h-7 w-7"
+                                  disabled={!canIncrease || isServingGift}
+                                  onClick={() => adjustDraftItemQty(item, 1)}
+                                >
+                                  <Plus className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    )}
+                  </div>
+                ))}
+
+              {!servedGiftForSelected && claimGift && (
+                <div className="flex flex-col gap-2">
+                  <Button
+                    type="button"
+                    onClick={handleClaimGift}
+                    disabled={!canClaimGift || isServingGift}
+                    className="w-full bg-pink-600 hover:bg-pink-700"
+                  >
+                    {isServingGift ? (
+                      <>
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Đang claim...
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="w-4 h-4 mr-2" />
+                        {selectedQtyTotal > 0
+                          ? `Claim với ${selectedQtyTotal} món`
+                          : "Claim (chưa chọn món)"}
+                      </>
+                    )}
+                  </Button>
+                </div>
+              )}
             </div>
           )}
+
+          {streakRewards.length === 0 &&
+            availableGifts.length === 0 &&
+            servedGifts.length === 0 && (
+              <div className="rounded-lg border border-gray-200 bg-white/80 px-3 py-2.5 text-sm text-gray-600 text-center">
+                Không có quà streak cần phục vụ lúc này.
+              </div>
+            )}
         </>
       )}
     </section>

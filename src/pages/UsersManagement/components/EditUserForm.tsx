@@ -440,16 +440,31 @@ const EditUserForm = () => {
                           >
                             <div className="flex-1">
                               <div className="font-medium">
-                                {reward.gift ? (
+                                {reward.items && reward.items.length > 0 ? (
+                                  <span>
+                                    🎁{" "}
+                                    {reward.items
+                                      .map(
+                                        (item) =>
+                                          `${item.name} ×${item.quantity}`,
+                                      )
+                                      .join(", ")}
+                                  </span>
+                                ) : reward.gift?.giftName ? (
                                   <span>🎁 {reward.gift.giftName}</span>
                                 ) : (
-                                  <span>💰 {reward.points} điểm</span>
+                                  <span>
+                                    💰{" "}
+                                    {reward.bonusPoints ?? reward.points ?? 0}{" "}
+                                    điểm
+                                  </span>
                                 )}
                               </div>
                               <div className="text-sm text-muted-foreground">
                                 Streak: {reward.streakCount}
-                                {reward.gift &&
-                                  ` • Loại: ${reward.gift.giftType}`}
+                                {reward.itemCount
+                                  ? ` • ${reward.itemCount} món`
+                                  : ""}
                               </div>
                               <div className="text-xs text-muted-foreground">
                                 Nhận lúc:{" "}
@@ -464,37 +479,29 @@ const EditUserForm = () => {
                     </div>
                   )}
 
-                {/* Quà đang chờ claim */}
-                {pendingGiftsData?.pending &&
-                  pendingGiftsData.pending.length > 0 && (
+                {/* Quà sẵn sàng phát */}
+                {pendingGiftsData?.availableGifts &&
+                  pendingGiftsData.availableGifts.length > 0 && (
                     <div className="space-y-3">
                       <div className="text-base font-medium text-orange-600">
-                        Quà chờ nhận ({pendingGiftsData.pending.length})
+                        Quà sẵn sàng phát (
+                        {pendingGiftsData.availableGifts.length})
                       </div>
                       <div className="grid gap-3">
-                        {pendingGiftsData.pending.map((gift) => (
+                        {pendingGiftsData.availableGifts.map((gift) => (
                           <div
-                            key={gift.rewardHistoryId}
+                            key={gift.streakCount}
                             className="flex items-center gap-3 p-3 border rounded-lg bg-orange-50"
                           >
-                            {gift.giftImage && (
-                              <img
-                                src={gift.giftImage}
-                                alt={gift.giftName}
-                                className="h-12 w-12 rounded object-cover"
-                              />
-                            )}
                             <div className="flex-1">
-                              <div className="font-medium">{gift.giftName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                Loại: {gift.giftType} • Streak:{" "}
-                                {gift.streakCount}
+                              <div className="font-medium">
+                                Mốc streak {gift.streakCount}
                               </div>
-                              <div className="text-xs text-muted-foreground">
-                                Nhận lúc:{" "}
-                                {new Date(gift.assignedAt).toLocaleString(
-                                  "vi-VN",
-                                )}
+                              <div className="text-sm text-muted-foreground">
+                                Chọn {gift.itemCount} món
+                                {gift.bonusPoints
+                                  ? ` • +${gift.bonusPoints} điểm`
+                                  : ""}
                               </div>
                             </div>
                           </div>
@@ -503,38 +510,37 @@ const EditUserForm = () => {
                     </div>
                   )}
 
-                {/* Quà đủ điều kiện nhận */}
-                {pendingGiftsData?.eligible &&
-                  pendingGiftsData.eligible.length > 0 && (
+                {/* Tiến độ mốc streak */}
+                {pendingGiftsData?.streakRewards &&
+                  pendingGiftsData.streakRewards.length > 0 && (
                     <div className="space-y-3">
                       <div className="text-base font-medium text-green-600">
-                        Quà đủ điều kiện nhận (
-                        {pendingGiftsData.eligible.length})
+                        Tiến độ streak (
+                        {pendingGiftsData.streakRewards.length})
                       </div>
                       <div className="grid gap-3">
-                        {pendingGiftsData.eligible.map((gift, index) => (
+                        {pendingGiftsData.streakRewards.map((reward) => (
                           <div
-                            key={`${gift.giftId}-${index}`}
+                            key={reward.streakCount}
                             className="flex items-center gap-3 p-3 border rounded-lg bg-green-50"
                           >
-                            {gift.giftImage && (
-                              <img
-                                src={gift.giftImage}
-                                alt={gift.giftName}
-                                className="h-12 w-12 rounded object-cover"
-                              />
-                            )}
                             <div className="flex-1">
-                              <div className="font-medium">{gift.giftName}</div>
-                              <div className="text-sm text-muted-foreground">
-                                Loại: {gift.giftType} • Streak:{" "}
-                                {gift.streakCount}
+                              <div className="font-medium">
+                                Streak {reward.streakCount}
                               </div>
-                              {gift.bonusPoints && (
-                                <div className="text-xs text-green-600 font-medium">
-                                  Thưởng: +{gift.bonusPoints} điểm
-                                </div>
-                              )}
+                              <div className="text-sm text-muted-foreground">
+                                {reward.itemCount
+                                  ? `${reward.itemCount} món`
+                                  : "Không có món"}
+                                {reward.bonusPoints
+                                  ? ` • +${reward.bonusPoints} điểm`
+                                  : ""}
+                                {reward.claimed
+                                  ? " • Đã nhận"
+                                  : reward.isReached
+                                    ? " • Đã đạt"
+                                    : ""}
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -614,10 +620,10 @@ const EditUserForm = () => {
                 {/* Không có quà */}
                 {(!streakInfoData?.claimedRewards ||
                   streakInfoData.claimedRewards.length === 0) &&
-                  (!pendingGiftsData?.pending ||
-                    pendingGiftsData.pending.length === 0) &&
-                  (!pendingGiftsData?.eligible ||
-                    pendingGiftsData.eligible.length === 0) && (
+                  (!pendingGiftsData?.availableGifts ||
+                    pendingGiftsData.availableGifts.length === 0) &&
+                  (!pendingGiftsData?.streakRewards ||
+                    pendingGiftsData.streakRewards.length === 0) && (
                     <div className="text-center py-8 text-muted-foreground">
                       User hiện không có quà nào
                     </div>

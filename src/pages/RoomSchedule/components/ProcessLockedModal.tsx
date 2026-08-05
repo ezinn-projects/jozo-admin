@@ -159,9 +159,13 @@ const ProcessLockedModal: React.FC<ProcessLockedModalProps> = ({
               isMemberNotFound={member.isMemberNotFound}
               availableGifts={member.availableGifts}
               streakRewards={member.streakRewards}
-              giftItemsById={member.giftItemsById}
-              onServeGift={member.serveStreakGift}
-              isServingGift={member.isServingGift}
+              selectableItems={member.selectableItems}
+              servedGifts={member.servedGifts}
+              onClaimGift={member.claimStreakGift}
+              onAddGiftItems={member.addStreakGiftItems}
+              onUpdateGiftItemQty={member.updateStreakGiftItemQty}
+              onRemoveGiftItem={member.removeStreakGiftItem}
+              isServingGift={member.isMutatingGift}
             />
 
             <ScheduleRoomTypeSection
