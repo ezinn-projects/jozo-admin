@@ -71,6 +71,8 @@ const EditUserPage = lazy(
 const RecruitmentPage = lazy(() => import("@/pages/RecruitmentPage/index"));
 const StaffSchedulePage = lazy(() => import("@/pages/StaffSchedule"));
 const StaffSalaryConfigPage = lazy(() => import("@/pages/StaffSalaryConfig"));
+const StaffErrorLogsPage = lazy(() => import("@/pages/StaffErrorLogs"));
+const MyStaffErrorLogsPage = lazy(() => import("@/pages/MyStaffErrorLogs"));
 const StaffEarningsDetailPage = lazy(
   () => import("@/pages/StaffSchedule/StaffEarningsDetailPage")
 );
@@ -123,6 +125,7 @@ function useRoute() {
                 />
                 <Route path={PATHS.CALENDAR} element={<CalendarPage />} />
                 <Route path={PATHS.MY_SCHEDULE} element={<MySchedulePage />} />
+                <Route path={PATHS.MY_ERROR_LOGS} element={<MyStaffErrorLogsPage />} />
                 <Route
                   path={PATHS.MY_EARNINGS_DETAIL}
                   element={<MyEarningsDetailPage />}
@@ -197,6 +200,10 @@ function useRoute() {
                 <Route
                   path={PATHS.STAFF_SALARY_CONFIG}
                   element={<StaffSalaryConfigPage />}
+                />
+                <Route
+                  path={PATHS.STAFF_ERROR_LOGS}
+                  element={<StaffErrorLogsPage />}
                 />
                 <Route
                   path={PATHS.STAFF_EARNINGS_DETAIL}

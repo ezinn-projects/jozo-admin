@@ -1,6 +1,7 @@
 import staffScheduleApis, {
   IEmployeeSchedule,
   IEmployeeSchedulesResponse,
+  IEmployeeSchedulesSummary,
 } from "@/apis/staffSchedule.apis";
 import { PageHeader } from "@/components/shared";
 import { Badge } from "@/components/ui/badge";
@@ -70,6 +71,7 @@ const StaffEarningsDetailPage = () => {
   const { data: scheduleData, isLoading } = useQuery<{
     schedules: IEmployeeSchedule[];
     staffName: string;
+    summary?: IEmployeeSchedulesSummary;
   }>({
     queryKey: [
       "staff-schedules",
@@ -80,7 +82,7 @@ const StaffEarningsDetailPage = () => {
     ],
     queryFn: async () => {
       if (!userId) {
-        return { schedules: [], staffName: "Unknown" };
+        return { schedules: [], staffName: "Unknown", summary: undefined };
       }
 
       const response = await staffScheduleApis.getEmployeeSchedules({
@@ -111,13 +113,14 @@ const StaffEarningsDetailPage = () => {
         schedules[0]?.userName ||
         "Unknown Staff";
 
-      return { schedules, staffName };
+      return { schedules, staffName, summary: result.summary };
     },
     enabled: !!userId,
   });
 
   const schedules = scheduleData?.schedules;
   const staffName = scheduleData?.staffName || "Unknown Staff";
+  const serverSummary = scheduleData?.summary;
 
   // Calculate detailed earnings data for entire month
   const earningsData = useMemo(() => {
@@ -270,10 +273,13 @@ const StaffEarningsDetailPage = () => {
       (sum, item) => sum + item.hours,
       0,
     );
-    const totalSalary = completedItems.reduce(
+    const grossSalary = completedItems.reduce(
       (sum, item) => sum + item.salary,
       0,
     );
+    const totalDeductions = serverSummary?.totalDeductions ?? 0;
+    const deductionCount = serverSummary?.deductionCount ?? 0;
+    const totalSalary = serverSummary?.netSalary ?? Math.max(0, grossSalary - totalDeductions);
     const totalRegistered = data.filter(
       (item) => item.status !== "not-registered",
     ).length;
@@ -299,13 +305,28 @@ const StaffEarningsDetailPage = () => {
       items: data,
       totalHours: Math.round(totalHours * 100) / 100,
       totalSalary,
+      grossSalary,
+      totalDeductions,
+      deductionCount,
       totalShifts: completedItems.length,
       totalRegistered,
       expectedHours: Math.round(expectedHours * 100) / 100,
       expectedSalary,
       expectedShifts: expectedItems.length,
     };
-  }, [schedules, selectedMonth]);
+  }, [schedules, selectedMonth, serverSummary]);
+
+  const openStaffErrorLogs = () => {
+    if (!userId) return;
+    const params = new URLSearchParams({
+      userId,
+      type: "penalty",
+      status: "active",
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
+    });
+    navigate(`${PATHS.STAFF_ERROR_LOGS}?${params.toString()}`);
+  };
 
   // Generate month options (current month and 11 previous months)
   const monthOptions = useMemo(() => {
@@ -356,7 +377,30 @@ const StaffEarningsDetailPage = () => {
               {earningsData.totalSalary.toLocaleString("vi-VN")}₫
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {earningsData.totalShifts} ca đã hoàn thành
+              Sau khấu trừ {earningsData.totalDeductions.toLocaleString("vi-VN")}₫
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer border-red-200 bg-red-50/50 transition hover:bg-red-50 hover:shadow-sm"
+          role="button"
+          tabIndex={0}
+          onClick={openStaffErrorLogs}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") openStaffErrorLogs();
+          }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Lỗi / Khấu Trừ</CardTitle>
+            <DollarSign className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              -{earningsData.totalDeductions.toLocaleString("vi-VN")}₫
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {earningsData.deductionCount} lỗi phạt đang hiệu lực · Bấm để xem
             </p>
           </CardContent>
         </Card>

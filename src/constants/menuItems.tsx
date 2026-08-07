@@ -1,6 +1,7 @@
 import {
   BarChart3,
   BedDouble,
+  BellRing,
   Briefcase,
   Calendar,
   ClipboardList,
@@ -45,6 +46,12 @@ const MENU_ITEMS: MenuItem[] = [
     title: "My Schedule",
     url: PATHS.MY_SCHEDULE,
     icon: Briefcase,
+    roles: STAFF_AND_ADMIN,
+  },
+  {
+    title: "My Error Logs",
+    url: PATHS.MY_ERROR_LOGS,
+    icon: BellRing,
     roles: STAFF_AND_ADMIN,
   },
   {
@@ -167,6 +174,12 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Salary Configuration",
         url: PATHS.STAFF_SALARY_CONFIG,
         icon: DollarSign,
+        roles: ADMIN_ONLY,
+      },
+      {
+        title: "Staff Error Logs",
+        url: PATHS.STAFF_ERROR_LOGS,
+        icon: BellRing,
         roles: ADMIN_ONLY,
       },
       {

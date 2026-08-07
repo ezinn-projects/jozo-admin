@@ -72,10 +72,12 @@ const PATHS = {
   STAFF_SCHEDULE: "/staff-schedule",
   STAFF_EARNINGS_DETAIL: "/staff-schedule/:userId/earnings",
   STAFF_SALARY_CONFIG: "/staff-salary-config",
+  STAFF_ERROR_LOGS: "/staff-error-logs",
 
   // my schedule - employee view their own schedules
   MY_SCHEDULE: "/my-schedule",
   MY_EARNINGS_DETAIL: "/my-schedule/earnings",
+  MY_ERROR_LOGS: "/my-error-logs",
 
   // notifications
   NOTIFICATIONS: "/notifications",

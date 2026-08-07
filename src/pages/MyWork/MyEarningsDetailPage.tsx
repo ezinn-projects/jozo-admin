@@ -30,9 +30,11 @@ import StaffEarningsMobileView from "@/pages/StaffSchedule/components/StaffEarni
 import dayjs, { Dayjs } from "dayjs";
 import { Calendar as CalendarIcon, Clock, DollarSign } from "lucide-react";
 import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 const MyEarningsDetailPage = () => {
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(dayjs());
 
   const dayNames = [
@@ -52,9 +54,18 @@ const MyEarningsDetailPage = () => {
     [selectedMonth],
   );
   const endDate = useMemo(() => selectedMonth.endOf("month"), [selectedMonth]);
+  const openMyErrorLogs = () => {
+    const params = new URLSearchParams({
+      type: "penalty",
+      status: "active",
+      startDate: startDate.format("YYYY-MM-DD"),
+      endDate: endDate.format("YYYY-MM-DD"),
+    });
+    navigate(`${PATHS.MY_ERROR_LOGS}?${params.toString()}`);
+  };
 
   // Get all schedules for selected month (approved, completed, absent, etc.)
-  const { data: { schedules = [] } = { schedules: [] }, isLoading } =
+  const { data: { schedules = [], summary } = { schedules: [], summary: undefined }, isLoading } =
     useMySchedules({
       filterType: "month",
       startDate,
@@ -195,10 +206,13 @@ const MyEarningsDetailPage = () => {
       (sum, item) => sum + item.hours,
       0,
     );
-    const totalSalary = completedItems.reduce(
+    const grossSalary = completedItems.reduce(
       (sum, item) => sum + item.salary,
       0,
     );
+    const totalDeductions = summary?.totalDeductions ?? 0;
+    const deductionCount = summary?.deductionCount ?? 0;
+    const totalSalary = summary?.netSalary ?? Math.max(0, grossSalary - totalDeductions);
     const totalRegistered = data.filter(
       (item) => item.status !== "not-registered",
     ).length;
@@ -223,13 +237,16 @@ const MyEarningsDetailPage = () => {
       items: data,
       totalHours: Math.round(totalHours * 100) / 100,
       totalSalary,
+      grossSalary,
+      totalDeductions,
+      deductionCount,
       totalShifts: completedItems.length,
       totalRegistered,
       expectedHours: Math.round(expectedHours * 100) / 100,
       expectedSalary,
       expectedShifts: expectedItems.length,
     };
-  }, [schedules, selectedMonth]);
+  }, [schedules, selectedMonth, summary]);
 
   // Generate month options (current month and 11 previous months)
   const monthOptions = useMemo(() => {
@@ -265,7 +282,30 @@ const MyEarningsDetailPage = () => {
               {earningsData.totalSalary.toLocaleString("en-US")}₫
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {selectedMonth.format("MM/YYYY")}
+              After {earningsData.totalDeductions.toLocaleString("en-US")}₫ deductions
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card
+          className="cursor-pointer border-red-200 bg-red-50/50 transition hover:bg-red-50 hover:shadow-sm"
+          role="button"
+          tabIndex={0}
+          onClick={openMyErrorLogs}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") openMyErrorLogs();
+          }}
+        >
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Deductions</CardTitle>
+            <DollarSign className="h-4 w-4 text-red-600" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-red-600">
+              -{earningsData.totalDeductions.toLocaleString("en-US")}₫
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              {earningsData.deductionCount} active penalties · Click to view
             </p>
           </CardContent>
         </Card>
