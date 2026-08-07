@@ -54,9 +54,6 @@ interface BillItem {
 }
 
 const paymentMethodMap: Record<string, string> = {
-  cash: "Tiền mặt",
-  Cash: "Tiền mặt",
-  CASH: "Tiền mặt",
   bank_transfer: "Chuyển khoản",
   Bank_Transfer: "Chuyển khoản",
   BANK_TRANSFER: "Chuyển khoản",
@@ -66,6 +63,9 @@ const paymentMethodMap: Record<string, string> = {
   transfer: "Chuyển khoản",
   Transfer: "Chuyển khoản",
   TRANSFER: "Chuyển khoản",
+  cash: "Tiền mặt",
+  Cash: "Tiền mặt",
+  CASH: "Tiền mặt",
   momo: "MoMo",
   MoMo: "MoMo",
   MOMO: "MoMo",
@@ -262,7 +262,9 @@ const BillsTableSection = ({
                       {bill.invoiceCode || "N/A"}
                     </button>
                   </TableCell>
-                  <TableCell>{formatBillDate(bill.createdAt.toString())}</TableCell>
+                  <TableCell>
+                    {formatBillDate(bill.createdAt.toString())}
+                  </TableCell>
                   <TableCell>
                     {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
                   </TableCell>
@@ -319,13 +321,17 @@ const BillsTableSection = ({
                   <span className="text-[11px] text-muted-foreground">
                     Phòng
                   </span>
-                  <span>{roomsData?.[bill.roomId] || bill.roomId || "N/A"}</span>
+                  <span>
+                    {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
+                  </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[11px] text-muted-foreground">
                     PT thanh toán
                   </span>
-                  <span>{formatPaymentMethod(bill.paymentMethod || "N/A")}</span>
+                  <span>
+                    {formatPaymentMethod(bill.paymentMethod || "N/A")}
+                  </span>
                 </div>
                 <div className="flex flex-col">
                   <span className="text-[11px] text-muted-foreground">
@@ -706,9 +712,7 @@ const RevenueStatisticsPage = () => {
         <div className="mb-5 flex flex-col gap-2 sm:mb-6 sm:flex-row sm:items-center sm:justify-between">
           <TabsList
             className={
-              isStaff
-                ? "w-full sm:w-auto"
-                : "grid w-full grid-cols-3 sm:w-auto"
+              isStaff ? "w-full sm:w-auto" : "grid w-full grid-cols-3 sm:w-auto"
             }
           >
             <TabsTrigger value="daily">Ngày</TabsTrigger>
@@ -904,9 +908,7 @@ const RevenueStatisticsPage = () => {
                 </span>
               )}
             </DialogTitle>
-            <DialogDescription>
-              Thông tin chi tiết về hóa đơn
-            </DialogDescription>
+            <DialogDescription>Thông tin chi tiết về hóa đơn</DialogDescription>
           </DialogHeader>
           {isLoadingBillDetail ? (
             <div className="py-6 flex justify-center">

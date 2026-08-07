@@ -297,11 +297,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       return { previousSchedules, queryKey, newPromotionId };
     },
     onSuccess: (_data, newPromotionId) => {
-      persistSchedulePromotionInCache(
-        queryClient,
-        schedule,
-        newPromotionId,
-      );
+      persistSchedulePromotionInCache(queryClient, schedule, newPromotionId);
       setSelectedPromotion(newPromotionId || "");
     },
     onError: (_error, _variables, context) => {
@@ -337,29 +333,31 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     },
   });
 
-  const { mutate: updateScheduleTime, isPending: isUpdatingTime } = useMutation({
-    mutationFn: (payload: { startTime: string; endTime: string }) =>
-      roomsScheduleApis.updateSchedule(schedule._id, payload),
-    onSuccess: (_, variables) => {
-      patchScheduleInRoomSchedulesCache(queryClient, schedule, {
-        startTime: variables.startTime,
-        endTime: variables.endTime,
-      });
-      refetchSchedules?.();
-      queryClient.invalidateQueries({ queryKey: billQueryKey });
-      toast({
-        title: "Đã cập nhật giờ",
-        description: "Thời gian bắt đầu / kết thúc đã được lưu.",
-      });
+  const { mutate: updateScheduleTime, isPending: isUpdatingTime } = useMutation(
+    {
+      mutationFn: (payload: { startTime: string; endTime: string }) =>
+        roomsScheduleApis.updateSchedule(schedule._id, payload),
+      onSuccess: (_, variables) => {
+        patchScheduleInRoomSchedulesCache(queryClient, schedule, {
+          startTime: variables.startTime,
+          endTime: variables.endTime,
+        });
+        refetchSchedules?.();
+        queryClient.invalidateQueries({ queryKey: billQueryKey });
+        toast({
+          title: "Đã cập nhật giờ",
+          description: "Thời gian bắt đầu / kết thúc đã được lưu.",
+        });
+      },
+      onError: (mutationError) => {
+        toast({
+          title: "Không thể cập nhật giờ",
+          description: mutationError.message || "Vui lòng thử lại.",
+          variant: "destructive",
+        });
+      },
     },
-    onError: (mutationError) => {
-      toast({
-        title: "Không thể cập nhật giờ",
-        description: mutationError.message || "Vui lòng thử lại.",
-        variant: "destructive",
-      });
-    },
-  });
+  );
 
   // Mutation đổi phòng
   const { mutate: changeRoom, isPending: isChangingRoom } = useMutation({
@@ -756,7 +754,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     roomTotal,
     createdAt,
     fnbTotal,
-    paymentMethod = PaymentMethod.Cash,
+    paymentMethod = PaymentMethod.BankTransfer,
     note,
     gift,
     giftDiscountAmount = 0,
@@ -773,11 +771,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         membershipDiscount: billMembershipDiscount,
         membershipDiscountAmount: billMembershipDiscountAmount,
       }),
-    [
-      billMembership,
-      billMembershipDiscount,
-      billMembershipDiscountAmount,
-    ],
+    [billMembership, billMembershipDiscount, billMembershipDiscountAmount],
   );
   const membershipDiscountLabel = formatTierDiscountLabel(
     membershipDiscountDisplay,
@@ -789,10 +783,10 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       : 0;
   const hasMembershipDiscountUi = Boolean(
     membershipDiscountDisplay &&
-      (membershipDiscountLabel ||
-        membershipDiscountApplied > 0 ||
-        membershipDiscountDisplay.tier ||
-        membershipDiscountDisplay.name),
+    (membershipDiscountLabel ||
+      membershipDiscountApplied > 0 ||
+      membershipDiscountDisplay.tier ||
+      membershipDiscountDisplay.name),
   );
 
   const amountToThousands = (amount: number) => Math.round(amount / 1000);
@@ -1143,9 +1137,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                 )}
               </DialogTitle>
               <DialogDescription className="text-xs sm:text-sm">
-                Bắt đầu{" "}
-                {parseUTCToLocal(schedule.startTime).format("HH:mm")} · Kết thúc
-                dự kiến{" "}
+                Bắt đầu {parseUTCToLocal(schedule.startTime).format("HH:mm")} ·
+                Kết thúc dự kiến{" "}
                 {schedule.endTime
                   ? parseUTCToLocal(schedule.endTime).format("HH:mm")
                   : "—"}
@@ -1657,7 +1650,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                             Phương thức thanh toán
                           </Label>
                           <Select
-                            defaultValue={PaymentMethod.Cash}
+                            defaultValue={PaymentMethod.BankTransfer}
                             value={paymentMethod}
                             onValueChange={handlePaymentMethodChange}
                           >
@@ -1665,11 +1658,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               <SelectValue placeholder="Chọn phương thức" />
                             </SelectTrigger>
                             <SelectContent>
-                              <SelectItem value={PaymentMethod.Cash}>
-                                Cash
-                              </SelectItem>
                               <SelectItem value={PaymentMethod.BankTransfer}>
-                                Bank Transfer
+                                Chuyển khoản
+                              </SelectItem>
+                              <SelectItem value={PaymentMethod.Cash}>
+                                Tiền mặt
                               </SelectItem>
                               <SelectItem value={PaymentMethod.Momo}>
                                 Momo

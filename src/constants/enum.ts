@@ -68,9 +68,9 @@ export enum RoomStatus {
  * @property {string} ZaloPay - ZaloPay e-wallet payment
  */
 export enum PaymentMethod {
-  Cash = "cash",
-  BankTransfer = "bank transfer",
-  Momo = "momo",
+  Cash = "Tiền mặt",
+  BankTransfer = "Chuyển khoản",
+  Momo = "MoMo",
   ZaloPay = "zalo pay",
 }
 
