@@ -12,6 +12,20 @@ export interface IAddRoomRequestBody {
   description?: string;
 }
 
+export interface IPendingOrderNotification {
+  type: "new_order";
+  roomId: string;
+  message: string;
+  timestamp: number;
+  orderData: {
+    orderId: string;
+    items: Array<{ itemId: string; name: string; quantity: number; price: number }>;
+    totalAmount: number;
+    customerInfo: { roomName: string; roomScheduleId: string };
+    createdAt: string;
+  };
+}
+
 const roomApis = {
   createRoom: (payload: IRoom) => {
     return http.post<HTTPResponse<IRoom>>(
@@ -21,6 +35,11 @@ const roomApis = {
   },
   getRooms: () => {
     return http.get<HTTPResponse<IRoom[]>>(`${ROOM_CONTROLLER}`);
+  },
+  getPendingOrderNotifications: () => {
+    return http.get<HTTPResponse<IPendingOrderNotification[]>>(
+      `${ROOM_CONTROLLER}/order-notifications/pending`
+    );
   },
   updateRoom: (payload: IRoom) => {
     return http.put<HTTPResponse<IRoom>>(

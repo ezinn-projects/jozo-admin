@@ -42,6 +42,7 @@ import {
   mergeAggregatedIntoDetail,
   summarizeLineItemsQuick,
 } from "@/utils/coffeeSessionOrderBatch";
+import roomApis from "@/apis/room.apis";
 
 type SupportNotification = {
   roomId: string;
@@ -456,6 +457,10 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       timestamp: number;
       orderData: OrderData;
     }) => {
+      if (data.type === "order_served") {
+        clearOrderNotification(String(data.roomId));
+        return;
+      }
       if (data.type !== "new_order") return;
 
       console.log("data", data.orderData);
@@ -848,7 +853,46 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     playCoffeeBoardGameOrderAudio,
     playOnlineBookingAudio,
     clearCoffeeNewOrderAfterBatchServed,
+    clearOrderNotification,
   ]);
+
+  // Hydrate pending order notifications once on mount (do NOT put inside the
+  // socket subscription effect — useSocket helpers are new refs every render,
+  // which would re-run that effect and spam this API).
+  useEffect(() => {
+    let cancelled = false;
+
+    const hydratePendingOrderNotifications = async () => {
+      try {
+        const response = await roomApis.getPendingOrderNotifications();
+        const pending = response.data.result || [];
+        if (cancelled || pending.length === 0) return;
+
+        setOrderNotifications((prev) => {
+          const next = { ...prev };
+          pending.forEach((item) => {
+            next[item.roomId] = {
+              roomId: item.roomId,
+              message: item.message,
+              timestamp: item.timestamp,
+              orderData: item.orderData,
+            };
+          });
+          return next;
+        });
+      } catch (error) {
+        if (!cancelled) {
+          console.error("Failed to hydrate pending order notifications", error);
+        }
+      }
+    };
+
+    void hydratePendingOrderNotifications();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // Clear old notifications periodically
   useEffect(() => {

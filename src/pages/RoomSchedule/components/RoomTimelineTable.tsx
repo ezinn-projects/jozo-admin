@@ -695,19 +695,13 @@ const RoomTimelineTable: React.FC = () => {
     const orderNotification = orderNotifications[socketRoomId];
     if (orderNotification) {
       setOrderData(orderNotification.orderData);
-      setOrderRoomId(roomId);
+      setOrderRoomId(socketRoomId);
       setModal("orderDetails");
-      // Stop blinking when clicked
-      clearOrderNotification(socketRoomId);
     }
   };
 
-  const handleOrderServed = (roomId: string) => {
-    // Remove order notification after served
-    const socketRoomId = getSocketRoomId(roomId);
-    if (socketRoomId) {
-      clearOrderNotification(socketRoomId);
-    }
+  const handleOrderServed = (socketRoomId: string) => {
+    clearOrderNotification(socketRoomId);
   };
 
   const handleGiftClick = (roomId: string) => {
