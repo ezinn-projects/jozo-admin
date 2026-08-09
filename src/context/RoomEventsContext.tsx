@@ -170,6 +170,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onOrderServedNotification,
+    offOrderServedNotification,
     onNewBooking,
     offNewBooking,
     onScheduleChanged,
@@ -450,6 +452,10 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       playSupportBoxAudio(roomId, `Phòng ${roomId} ${data.message}`);
     };
 
+    const handleOrderServedNotification = (data: { roomId: string }) => {
+      clearOrderNotification(String(data.roomId));
+    };
+
     const handleNewOrderNotification = (data: {
       type: string;
       roomId: string;
@@ -457,10 +463,6 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       timestamp: number;
       orderData: OrderData;
     }) => {
-      if (data.type === "order_served") {
-        clearOrderNotification(String(data.roomId));
-        return;
-      }
       if (data.type !== "new_order") return;
 
       console.log("data", data.orderData);
@@ -802,6 +804,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
 
     onNotification(handleNotification);
     onNewOrderNotification(handleNewOrderNotification);
+    onOrderServedNotification(handleOrderServedNotification);
     onNewBooking(handleNewBooking);
     onScheduleChanged(handleScheduleChanged);
     onGiftClaimed(handleGiftClaimed);
@@ -813,6 +816,7 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     return () => {
       offNotification(handleNotification);
       offNewOrderNotification(handleNewOrderNotification);
+      offOrderServedNotification(handleOrderServedNotification);
       offNewBooking(handleNewBooking);
       offScheduleChanged(handleScheduleChanged);
       offGiftClaimed(handleGiftClaimed);
@@ -830,6 +834,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onOrderServedNotification,
+    offOrderServedNotification,
     onNewBooking,
     offNewBooking,
     onScheduleChanged,

@@ -152,6 +152,32 @@ export const useSocket = () => {
     socketRef.current?.off("new_order_notification", callback);
   };
 
+  const onOrderServedNotification = (
+    callback: (data: {
+      type: "order_served";
+      roomId: string;
+      notificationId?: string;
+      orderId?: string;
+      servedBy?: string;
+      servedAt?: string;
+    }) => void,
+  ) => {
+    socketRef.current?.on("order_served_notification", callback);
+  };
+
+  const offOrderServedNotification = (
+    callback: (data: {
+      type: "order_served";
+      roomId: string;
+      notificationId?: string;
+      orderId?: string;
+      servedBy?: string;
+      servedAt?: string;
+    }) => void,
+  ) => {
+    socketRef.current?.off("order_served_notification", callback);
+  };
+
   const onOrderNew = (
     callback: (data: ICoffeeOrderSocketPayload) => void,
   ) => {
@@ -377,6 +403,8 @@ export const useSocket = () => {
     offNotification,
     onNewOrderNotification,
     offNewOrderNotification,
+    onOrderServedNotification,
+    offOrderServedNotification,
     onOrderNew,
     offOrderNew,
     onOrderCreated,
