@@ -65,7 +65,7 @@ type GiftNotificationState = {
 };
 
 type SupportNotificationsMap = Record<string, SupportNotification>;
-type OrderNotificationsMap = Record<string, OrderNotificationState>;
+type OrderNotificationsMap = Record<string, OrderNotificationState[]>;
 type GiftNotificationsMap = Record<string, GiftNotificationState>;
 
 type BlinkingMap = Record<string, boolean>;
@@ -140,7 +140,7 @@ interface RoomEventsContextValue {
   coffeeNewOrderNotifications: CoffeeNewOrderNotificationsMap;
   blinkingCoffeeNewOrderTables: BlinkingMap;
   clearSupportNotification: (roomId: string) => void;
-  clearOrderNotification: (roomId: string) => void;
+  clearOrderNotification: (roomId: string, orderId?: string) => void;
   clearGiftNotification: (roomId: string) => void;
   clearCoffeeSupportNotification: (tableCode: string) => void;
   clearCoffeeNewOrderNotification: (tableCode: string) => void;
@@ -337,10 +337,15 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
     }));
   }, []);
 
-  const clearOrderNotification = useCallback((roomId: string) => {
+  const clearOrderNotification = useCallback((roomId: string, orderId?: string) => {
     setOrderNotifications((prev) => {
+      const current = prev[roomId] || [];
+      const remaining = orderId
+        ? current.filter((notification) => notification.orderData.orderId !== orderId)
+        : [];
       const next = { ...prev };
-      delete next[roomId];
+      if (remaining.length > 0) next[roomId] = remaining;
+      else delete next[roomId];
       return next;
     });
     setBlinkingOrderRooms((prev) => ({
@@ -452,8 +457,8 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
       playSupportBoxAudio(roomId, `Phòng ${roomId} ${data.message}`);
     };
 
-    const handleOrderServedNotification = (data: { roomId: string }) => {
-      clearOrderNotification(String(data.roomId));
+    const handleOrderServedNotification = (data: { roomId: string; orderId?: string }) => {
+      clearOrderNotification(String(data.roomId), data.orderId);
     };
 
     const handleNewOrderNotification = (data: {
@@ -469,15 +474,23 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
 
       const roomId = data.roomId;
 
-      setOrderNotifications((prev) => ({
-        ...prev,
-        [roomId]: {
+      setOrderNotifications((prev) => {
+        const current = prev[roomId] || [];
+        const notification = {
           roomId,
           message: data.message,
           timestamp: data.timestamp,
           orderData: data.orderData,
-        },
-      }));
+        };
+        const next = current.some(
+          (item) => item.orderData.orderId === data.orderData.orderId,
+        )
+          ? current.map((item) =>
+              item.orderData.orderId === data.orderData.orderId ? notification : item,
+            )
+          : [...current, notification];
+        return { ...prev, [roomId]: next };
+      });
 
       setBlinkingOrderRooms((prev) => ({
         ...prev,
@@ -877,12 +890,16 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
         setOrderNotifications((prev) => {
           const next = { ...prev };
           pending.forEach((item) => {
-            next[item.roomId] = {
+            const notification = {
               roomId: item.roomId,
               message: item.message,
               timestamp: item.timestamp,
               orderData: item.orderData,
             };
+            const current = next[item.roomId] || [];
+            if (!current.some((entry) => entry.orderData.orderId === item.orderData.orderId)) {
+              next[item.roomId] = [...current, notification];
+            }
           });
           return next;
         });
@@ -917,9 +934,12 @@ export const RoomEventsProvider: React.FC<RoomEventsProviderProps> = ({
 
       setOrderNotifications((prev) => {
         const next: OrderNotificationsMap = {};
-        Object.entries(prev).forEach(([roomId, notif]) => {
-          if (now - notif.timestamp < 10 * 60 * 1000) {
-            next[roomId] = notif;
+        Object.entries(prev).forEach(([roomId, notifications]) => {
+          const remaining = notifications.filter(
+            (notification) => now - notification.timestamp < 10 * 60 * 1000,
+          );
+          if (remaining.length > 0) {
+            next[roomId] = remaining;
           }
         });
         return next;

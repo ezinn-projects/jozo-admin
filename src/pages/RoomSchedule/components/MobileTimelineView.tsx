@@ -57,11 +57,11 @@ interface MobileTimelineViewProps {
   notifications: { [roomId: string]: { message: string; timestamp: number } };
   blinkingRooms: { [key: string]: boolean };
   orderNotifications: {
-    [roomId: string]: {
+    [roomId: string]: Array<{
       message: string;
       timestamp: number;
       orderData: any;
-    };
+    }>;
   };
   orderBlinkingRooms: { [key: string]: boolean };
   giftNotifications?: {
@@ -75,7 +75,7 @@ interface MobileTimelineViewProps {
   onRoomClick: (roomId: string) => void;
   onScheduleClick: (schedule: IRoomSchedule) => void;
   onResolveRequest: (roomId: string) => void;
-  onOrderClick: (roomId: string) => void;
+  onOrderClick: (roomId: string, orderId: string) => void;
   onGiftClick?: (roomId: string) => void;
 }
 
@@ -244,7 +244,8 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
         const roomSchedules = grouped[room._id] || [];
         const hasNotification = notifications[room._id];
         const isBlinking = blinkingRooms[room._id];
-        const hasOrderNotification = orderNotifications[room._id];
+        const orderNotificationsForRoom = orderNotifications[room._id] || [];
+        const hasOrderNotification = orderNotificationsForRoom.length > 0;
         const isOrderBlinking = orderBlinkingRooms[room._id];
         const hasGiftNotification = giftNotifications[room._id];
         const isGiftBlinking = giftBlinkingRooms[room._id];
@@ -358,26 +359,34 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         </TooltipContent>
                       </Tooltip>
                     )}
-                    {hasOrderNotification && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onOrderClick(room._id);
-                            }}
-                            className={`flex-shrink-0 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center active:opacity-70 ${
-                              isOrderBlinking ? "animate-pulse" : ""
-                            }`}
-                          >
-                            <UtensilsCrossed className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
-                          </button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>{hasOrderNotification.message}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
+                    {hasOrderNotification &&
+                      orderNotificationsForRoom.map((notification, orderIndex) => (
+                        <Tooltip key={notification.orderData.orderId}>
+                          <TooltipTrigger asChild>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onOrderClick(
+                                  room._id,
+                                  notification.orderData.orderId,
+                                );
+                              }}
+                              className={`flex-shrink-0 touch-manipulation min-w-[44px] min-h-[44px] flex items-center justify-center active:opacity-70 ${
+                                isOrderBlinking ? "animate-pulse" : ""
+                              }`}
+                              aria-label={`Đơn FNB ${orderIndex + 1} của ${room.roomName}`}
+                            >
+                              <UtensilsCrossed className="h-5 w-5 sm:h-6 sm:w-6 text-orange-500" />
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>{notification.message}</p>
+                            <p className="text-xs text-gray-500 mt-1">
+                              Đơn {orderIndex + 1}/{orderNotificationsForRoom.length}
+                            </p>
+                          </TooltipContent>
+                        </Tooltip>
+                      ))}
                     {scheduleGiftInfo && (
                       <Tooltip>
                         <TooltipTrigger asChild>

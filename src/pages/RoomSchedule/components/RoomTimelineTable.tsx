@@ -604,11 +604,11 @@ const RoomTimelineTable: React.FC = () => {
   } = {};
   const viewBlinkingRooms: { [roomId: string]: boolean } = {};
   const viewOrderNotifications: {
-    [roomId: string]: {
+    [roomId: string]: Array<{
       message: string;
       timestamp: number;
       orderData: OrderData;
-    };
+    }>;
   } = {};
   const viewOrderBlinkingRooms: { [roomId: string]: boolean } = {};
   const viewGiftNotifications: {
@@ -628,13 +628,13 @@ const RoomTimelineTable: React.FC = () => {
       viewBlinkingRooms[room._id] = !!blinkingSupportRooms[socketRoomId];
     }
 
-    const order = orderNotifications[socketRoomId];
-    if (order) {
-      viewOrderNotifications[room._id] = {
+    const orders = orderNotifications[socketRoomId];
+    if (orders?.length) {
+      viewOrderNotifications[room._id] = orders.map((order) => ({
         message: order.message,
         timestamp: order.timestamp,
         orderData: order.orderData,
-      };
+      }));
       viewOrderBlinkingRooms[room._id] = !!blinkingOrderRooms[socketRoomId];
     }
 
@@ -689,10 +689,12 @@ const RoomTimelineTable: React.FC = () => {
     setCoffeeNewOrderLineItemsCtx(null);
   };
 
-  const handleOrderClick = (roomId: string) => {
+  const handleOrderClick = (roomId: string, orderId: string) => {
     const socketRoomId = getSocketRoomId(roomId);
     if (!socketRoomId) return;
-    const orderNotification = orderNotifications[socketRoomId];
+    const orderNotification = orderNotifications[socketRoomId]?.find(
+      (notification) => notification.orderData.orderId === orderId,
+    );
     if (orderNotification) {
       setOrderData(orderNotification.orderData);
       setOrderRoomId(socketRoomId);
@@ -700,8 +702,8 @@ const RoomTimelineTable: React.FC = () => {
     }
   };
 
-  const handleOrderServed = (socketRoomId: string) => {
-    clearOrderNotification(socketRoomId);
+  const handleOrderServed = (socketRoomId: string, orderId: string) => {
+    clearOrderNotification(socketRoomId, orderId);
   };
 
   const handleGiftClick = (roomId: string) => {
@@ -1131,7 +1133,9 @@ const RoomTimelineTable: React.FC = () => {
                   const socketRoomId = (index + 1).toString();
                   const hasNotification = supportNotifications[socketRoomId];
                   const isBlinking = !!blinkingSupportRooms[socketRoomId];
-                  const hasOrderNotification = orderNotifications[socketRoomId];
+                  const orderNotificationsForRoom =
+                    orderNotifications[socketRoomId] || [];
+                  const hasOrderNotification = orderNotificationsForRoom.length > 0;
                   const isOrderBlinking = !!blinkingOrderRooms[socketRoomId];
                   const giftNotification = giftNotifications[socketRoomId];
                   const isMaintenance = isRoomUnderMaintenance(room);
@@ -1237,23 +1241,33 @@ const RoomTimelineTable: React.FC = () => {
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          {hasOrderNotification && (
-                            <Tooltip>
-                              <TooltipTrigger asChild>
-                                <button
-                                  onClick={() => handleOrderClick(room._id)}
-                                  className={`${
-                                    isOrderBlinking ? "animate-pulse" : ""
-                                  }`}
-                                >
-                                  <UtensilsCrossed className="h-5 w-5 text-orange-500" />
-                                </button>
-                              </TooltipTrigger>
-                              <TooltipContent>
-                                <p>{hasOrderNotification.message}</p>
-                              </TooltipContent>
-                            </Tooltip>
-                          )}
+                          {hasOrderNotification &&
+                            orderNotificationsForRoom.map((notification, orderIndex) => (
+                              <Tooltip key={notification.orderData.orderId}>
+                                <TooltipTrigger asChild>
+                                  <button
+                                    onClick={() =>
+                                      handleOrderClick(
+                                        room._id,
+                                        notification.orderData.orderId,
+                                      )
+                                    }
+                                    className={`${
+                                      isOrderBlinking ? "animate-pulse" : ""
+                                    }`}
+                                    aria-label={`Đơn FNB ${orderIndex + 1} của ${room.roomName}`}
+                                  >
+                                    <UtensilsCrossed className="h-5 w-5 text-orange-500" />
+                                  </button>
+                                </TooltipTrigger>
+                                <TooltipContent>
+                                  <p>{notification.message}</p>
+                                  <p className="text-xs text-gray-500 mt-1">
+                                    Đơn {orderIndex + 1}/{orderNotificationsForRoom.length}
+                                  </p>
+                                </TooltipContent>
+                              </Tooltip>
+                            ))}
                           {scheduleGiftInfo && (
                             <Tooltip>
                               <TooltipTrigger asChild>
@@ -2040,7 +2054,9 @@ const RoomTimelineTable: React.FC = () => {
           onClose={closeModal}
           orderData={orderData}
           roomId={orderRoomId}
-          onOrderServed={() => handleOrderServed(orderRoomId)}
+          onOrderServed={() =>
+            handleOrderServed(orderRoomId, orderData.orderId)
+          }
         />
       )}
       {modal === "giftDetails" && giftData && (

@@ -57,6 +57,7 @@ import {
   isScheduleRoomTypeEditable,
   normalizeRoomType,
 } from "@/pages/RoomSchedule/utils/scheduleRoomType";
+import { getDefaultBusinessDate } from "@/pages/RoomSchedule/utils/timelineHours";
 
 import {
   isValidMemberPhone,
@@ -314,30 +315,47 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     }
   }, [peopleCountValue, use4MicValue, room, setValue]);
 
-  // Set default date & time khi tạo mới schedule (chỉ chạy 1 lần)
+  // Reset init khi đóng modal để lần mở sau lấy đúng ngày/giờ hiện tại
   useEffect(() => {
-    if (!scheduleId && selectedDate && !isInitialized.current) {
-      const base = dayjs(selectedDate);
-      const dateStr = base.format("YYYY-MM-DD");
-      setValue("startDate", dateStr);
-      setValue("endDate", dateStr);
-
-      const now = dayjs();
-      const dateWithCurrentTime = base
-        .hour(now.hour())
-        .minute(now.minute())
-        .second(0)
-        .millisecond(0);
-      const startTimeStr = dateWithCurrentTime.format("HH:mm");
-      setValue("startTime", startTimeStr);
-
-      const endDateObj = dateWithCurrentTime.add(2, "hour");
-      const endTimeStr = endDateObj.format("HH:mm");
-      setValue("endTime", endTimeStr);
-
-      isInitialized.current = true;
+    if (!isOpen) {
+      isInitialized.current = false;
+      setIsEndTimeModified(false);
     }
-  }, [selectedDate, scheduleId, setValue]);
+  }, [isOpen]);
+
+  // Set default date & time khi tạo mới schedule
+  // - Ca hiện tại: dùng ngày lịch thực tế của "now" (qua 0h → ngày hôm nay, không giữ ngày kinh doanh)
+  // - Ngày khác: giữ selectedDate + giờ hiện tại
+  // - End luôn derive từ start + duration để qua nửa đêm nhảy đúng ngày
+  useEffect(() => {
+    if (!isOpen || scheduleId || !selectedDate || isInitialized.current) {
+      return;
+    }
+
+    const now = dayjs().second(0).millisecond(0);
+    const viewDate = dayjs(selectedDate).startOf("day");
+    const isCurrentBusinessDay = viewDate.isSame(
+      getDefaultBusinessDate(now),
+      "day",
+    );
+
+    const startDateTime = isCurrentBusinessDay
+      ? now
+      : viewDate
+          .hour(now.hour())
+          .minute(now.minute())
+          .second(0)
+          .millisecond(0);
+
+    const endDateTime = startDateTime.add(2, "hour");
+
+    setValue("startDate", startDateTime.format("YYYY-MM-DD"));
+    setValue("startTime", startDateTime.format("HH:mm"));
+    setValue("endDate", endDateTime.format("YYYY-MM-DD"));
+    setValue("endTime", endDateTime.format("HH:mm"));
+
+    isInitialized.current = true;
+  }, [isOpen, selectedDate, scheduleId, setValue]);
 
   // Cập nhật End Date & End Time tự động nếu người dùng chưa chỉnh sửa thủ công
   useEffect(() => {
@@ -479,9 +497,11 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     }
   };
 
-  const formattedDate = selectedDate
-    ? dayjs(selectedDate).format("DD/MM/YYYY")
-    : "Hôm nay";
+  const formattedDate = startDateValue
+    ? dayjs(startDateValue).format("DD/MM/YYYY")
+    : selectedDate
+      ? dayjs(selectedDate).format("DD/MM/YYYY")
+      : "Hôm nay";
 
   return (
     <>
