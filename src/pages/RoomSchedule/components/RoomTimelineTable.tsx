@@ -18,6 +18,16 @@ import GiftDetailsModal from "@/components/modules/RoomSchedule/GiftDetailsModal
 import OrderDetailsModal from "@/components/modules/RoomSchedule/OrderDetailsModal";
 import ScheduleModal from "@/components/modules/RoomSchedule/ScheduleModal";
 import { PageHeader } from "@/components/shared";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -277,6 +287,8 @@ const RoomTimelineTable: React.FC = () => {
   });
 
   const [modal, setModal] = useState<Modal>(null);
+  const [turnOffAllRoomsConfirmOpen, setTurnOffAllRoomsConfirmOpen] =
+    useState(false);
   const [selectedRoom, setSelectedRoom] = useState<IRoom | null>(null);
   const [lockedSchedule, setLockedSchedule] = useState<IRoomSchedule | null>(
     null,
@@ -383,7 +395,8 @@ const RoomTimelineTable: React.FC = () => {
   });
   */
 
-  const { mutate: turnOffAllRooms } = useTurnOffAllRooms();
+  const { mutate: turnOffAllRooms, isPending: isTurningOffAllRooms } =
+    useTurnOffAllRooms();
 
   // Mutation cho việc cập nhật schedule - TẠM THỜI DISABLED
   /*
@@ -1003,6 +1016,7 @@ const RoomTimelineTable: React.FC = () => {
   const handleTurnOffAllRooms = () => {
     turnOffAllRooms(undefined, {
       onSuccess: () => {
+        setTurnOffAllRoomsConfirmOpen(false);
         toast({
           title: "Success",
           description: "All rooms turned off",
@@ -1044,7 +1058,10 @@ const RoomTimelineTable: React.FC = () => {
             isBusinessToday={roomsIsToday}
             dateLabel="Phòng / Dorm"
             extraActions={
-              <Button variant="destructive" onClick={handleTurnOffAllRooms}>
+              <Button
+                variant="destructive"
+                onClick={() => setTurnOffAllRoomsConfirmOpen(true)}
+              >
                 Tắt video tất cả phòng
               </Button>
             }
@@ -2112,6 +2129,41 @@ const RoomTimelineTable: React.FC = () => {
           onOpenSession={handleOpenCoffeeSessionFromNewOrderPreview}
         />
       ) : null}
+
+      <AlertDialog
+        open={turnOffAllRoomsConfirmOpen}
+        onOpenChange={(open) => {
+          if (isTurningOffAllRooms) return;
+          setTurnOffAllRoomsConfirmOpen(open);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Tắt video tất cả phòng?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Hành động này sẽ tắt video khẩn cấp trên tất cả phòng. Bạn có chắc
+              chắn muốn tiếp tục?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isTurningOffAllRooms}>
+              Huỷ
+            </AlertDialogCancel>
+            <AlertDialogAction asChild>
+              <Button
+                variant="destructive"
+                onClick={(e) => {
+                  e.preventDefault();
+                  handleTurnOffAllRooms();
+                }}
+                disabled={isTurningOffAllRooms}
+              >
+                {isTurningOffAllRooms ? "Đang tắt..." : "Xác nhận tắt"}
+              </Button>
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };
