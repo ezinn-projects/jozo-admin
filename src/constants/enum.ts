@@ -64,14 +64,10 @@ export enum RoomStatus {
  * @enum {string}
  * @property {string} Cash - Cash payment
  * @property {string} BankTransfer - Bank transfer payment
- * @property {string} Momo - Momo e-wallet payment
- * @property {string} ZaloPay - ZaloPay e-wallet payment
  */
 export enum PaymentMethod {
-  Cash = "Tiền mặt",
-  BankTransfer = "Chuyển khoản",
-  Momo = "MoMo",
-  ZaloPay = "zalo pay",
+  Cash = "cash",
+  BankTransfer = "bank_transfer",
 }
 
 export enum FoodDrinkType {

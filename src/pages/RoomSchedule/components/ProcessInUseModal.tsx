@@ -1664,12 +1664,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               <SelectItem value={PaymentMethod.Cash}>
                                 Tiền mặt
                               </SelectItem>
-                              <SelectItem value={PaymentMethod.Momo}>
-                                Momo
-                              </SelectItem>
-                              <SelectItem value={PaymentMethod.ZaloPay}>
-                                ZaloPay
-                              </SelectItem>
                             </SelectContent>
                           </Select>
                         </div>
