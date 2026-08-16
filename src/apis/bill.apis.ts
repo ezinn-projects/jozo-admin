@@ -1,4 +1,8 @@
-import { IBill } from "@/@types/Bill";
+import {
+  BillPaymentMethod,
+  IBill,
+  IBillPaymentMethodHistory,
+} from "@/@types/Bill";
 import http from "@/utils/http";
 import dayjs, { toIsoStringWithZeroSubsecond } from "@/lib/dayjs";
 
@@ -157,6 +161,16 @@ const billAPis = {
       }>
     >(
       `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
+    ),
+  updatePaymentMethod: (billId: string, paymentMethod: BillPaymentMethod) =>
+    http.patch<HTTPResponse<{ bill: IBill; log: unknown }>>(
+      `/bill/${billId}/payment-method`,
+      { paymentMethod },
+    ),
+
+  getPaymentMethodHistory: (billId: string) =>
+    http.get<HTTPResponse<IBillPaymentMethodHistory>>(
+      `/bill/${billId}/payment-method-history`,
     ),
 };
 

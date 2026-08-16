@@ -1,10 +1,16 @@
 import { PageHeader } from "@/components/shared";
-import { useState, useEffect, useMemo, type ReactNode } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useCallback,
+  type ReactNode,
+} from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
-import { TrendingUp } from "lucide-react";
+import { TrendingUp, History, Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -17,7 +23,11 @@ import billAPis from "@/apis/bill.apis";
 import dayjs from "@/lib/dayjs";
 import type { Dayjs } from "dayjs";
 // import { formatCurrency } from "@/utils/formatters";
-import { IBill } from "@/@types/Bill";
+import {
+  IBill,
+  BillPaymentMethod,
+  IBillPaymentMethodHistoryLog,
+} from "@/@types/Bill";
 import {
   Popover,
   PopoverContent,
@@ -25,15 +35,17 @@ import {
 } from "@/components/ui/popover";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrency } from "@/utils/formatters";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import roomApis from "@/apis/room.apis";
-import { useIsStaff } from "@/hooks/usePermission";
+import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
+import { useToast } from "@/hooks/use-toast";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogDescription,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -219,7 +231,10 @@ interface BillsTableSectionProps {
   bills: RevenueBill[];
   roomsData?: Record<string, string>;
   isStaff: boolean;
+  isAdmin: boolean;
   onBillClick: (billId: string) => void;
+  onPaymentMethodEdit: (bill: RevenueBill) => void;
+  onPaymentMethodHistory: (bill: RevenueBill) => void;
 }
 
 /** Bảng hóa đơn: dạng bảng trên desktop, dạng thẻ trên mobile */
@@ -227,7 +242,10 @@ const BillsTableSection = ({
   bills,
   roomsData,
   isStaff,
+  isAdmin,
   onBillClick,
+  onPaymentMethodEdit,
+  onPaymentMethodHistory,
 }: BillsTableSectionProps) => (
   <Card>
     <CardHeader className="px-3 py-3 sm:px-6 sm:py-4">
@@ -249,6 +267,7 @@ const BillsTableSection = ({
                 {!isStaff && (
                   <TableHead className="text-right">Số tiền</TableHead>
                 )}
+                <TableHead className="text-right">Thao tác</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -278,6 +297,28 @@ const BillsTableSection = ({
                       {formatCurrency(bill.totalAmount)} VNĐ
                     </TableCell>
                   )}
+                  <TableCell>
+                    <div className="flex justify-end gap-1">
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => onPaymentMethodEdit(bill)}
+                        aria-label={`Đổi phương thức thanh toán ${bill.invoiceCode || "hóa đơn"}`}
+                      >
+                        <Pencil className="mr-1 h-4 w-4" /> Đổi
+                      </Button>
+                      {isAdmin && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => onPaymentMethodHistory(bill)}
+                          aria-label={`Xem lịch sử phương thức thanh toán ${bill.invoiceCode || "hóa đơn"}`}
+                        >
+                          <History className="mr-1 h-4 w-4" /> Log
+                        </Button>
+                      )}
+                    </div>
+                  </TableCell>
                 </TableRow>
               ))}
             </TableBody>
@@ -309,6 +350,26 @@ const BillsTableSection = ({
                     {formatCurrency(bill.totalAmount)} VNĐ
                   </span>
                 )}
+                <div className="flex gap-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2"
+                    onClick={() => onPaymentMethodEdit(bill)}
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
+                  {isAdmin && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-7 px-2"
+                      onClick={() => onPaymentMethodHistory(bill)}
+                    >
+                      <History className="h-3.5 w-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-1.5 text-xs">
                 <div className="flex flex-col">
@@ -366,6 +427,17 @@ const RevenueStatisticsPage = () => {
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("all");
   const isStaff = useIsStaff();
+  const isAdmin = useIsAdmin();
+  const { toast } = useToast();
+  const [paymentMethodBill, setPaymentMethodBill] =
+    useState<RevenueBill | null>(null);
+  const [paymentMethodDialogOpen, setPaymentMethodDialogOpen] = useState(false);
+  const [confirmPaymentMethodDialogOpen, setConfirmPaymentMethodDialogOpen] =
+    useState(false);
+  const [nextPaymentMethod, setNextPaymentMethod] =
+    useState<BillPaymentMethod>("cash");
+  const [historyBill, setHistoryBill] = useState<RevenueBill | null>(null);
+  const [historyDialogOpen, setHistoryDialogOpen] = useState(false);
 
   // Đảm bảo staff chỉ có thể xem tab "daily"
   useEffect(() => {
@@ -433,6 +505,16 @@ const RevenueStatisticsPage = () => {
     enabled: !!selectedBill,
   });
 
+  const {
+    data: paymentMethodHistory,
+    isLoading: isLoadingPaymentMethodHistory,
+  } = useQuery({
+    queryKey: ["billPaymentMethodHistory", historyBill?._id],
+    queryFn: () =>
+      historyBill ? billAPis.getPaymentMethodHistory(historyBill._id) : null,
+    enabled: isAdmin && historyDialogOpen && !!historyBill?._id,
+  });
+
   const handleBillClick = (billId: string) => {
     setSelectedBill(billId);
     setBillDetailOpen(true);
@@ -456,7 +538,7 @@ const RevenueStatisticsPage = () => {
     data: null,
   });
 
-  const fetchDailyRevenue = async () => {
+  const fetchDailyRevenue = useCallback(async () => {
     setDailyRevenue((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const d = calendarDateStartVn(selectedDate);
@@ -482,9 +564,9 @@ const RevenueStatisticsPage = () => {
         data: null,
       });
     }
-  };
+  }, [selectedDate]);
 
-  const fetchWeeklyRevenue = async () => {
+  const fetchWeeklyRevenue = useCallback(async () => {
     setWeeklyRevenue((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const mon = weekStartVn;
@@ -514,9 +596,9 @@ const RevenueStatisticsPage = () => {
         data: null,
       });
     }
-  };
+  }, [selectedEndDate, weekStartVn]);
 
-  const fetchMonthlyRevenue = async () => {
+  const fetchMonthlyRevenue = useCallback(async () => {
     setMonthlyRevenue((prev) => ({ ...prev, loading: true, error: null }));
     try {
       const { periodStart } = monthPeriod6To5;
@@ -547,6 +629,91 @@ const RevenueStatisticsPage = () => {
         data: null,
       });
     }
+  }, [monthPeriod6To5, selectedEndDate]);
+
+  useEffect(() => {
+    if (activeTab === "daily") {
+      fetchDailyRevenue();
+    } else if (activeTab === "weekly" && !isStaff) {
+      fetchWeeklyRevenue();
+    } else if (activeTab === "monthly" && !isStaff) {
+      fetchMonthlyRevenue();
+    }
+  }, [
+    activeTab,
+    fetchDailyRevenue,
+    fetchMonthlyRevenue,
+    fetchWeeklyRevenue,
+    isStaff,
+  ]);
+
+  const updatePaymentMethodMutation = useMutation({
+    mutationFn: ({
+      billId,
+      paymentMethod,
+    }: {
+      billId: string;
+      paymentMethod: BillPaymentMethod;
+    }) => billAPis.updatePaymentMethod(billId, paymentMethod),
+    onSuccess: () => {
+      setConfirmPaymentMethodDialogOpen(false);
+      setPaymentMethodDialogOpen(false);
+      toast({
+        title: "Thành công",
+        description: "Đã cập nhật phương thức thanh toán.",
+      });
+      if (activeTab === "daily") fetchDailyRevenue();
+      else if (activeTab === "weekly") fetchWeeklyRevenue();
+      else fetchMonthlyRevenue();
+    },
+    onError: (error: unknown) => {
+      toast({
+        title: "Không thể cập nhật",
+        description: error instanceof Error ? error.message : "Đã xảy ra lỗi.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const handlePaymentMethodEdit = (bill: RevenueBill) => {
+    if (!bill._id) return;
+    const current =
+      bill.paymentMethod === "bank_transfer" ? "bank_transfer" : "cash";
+    setPaymentMethodBill(bill);
+    setNextPaymentMethod(current);
+    setPaymentMethodDialogOpen(true);
+  };
+
+  const handlePaymentMethodHistory = (bill: RevenueBill) => {
+    if (!isAdmin || !bill._id) return;
+    setHistoryBill(bill);
+    setHistoryDialogOpen(true);
+  };
+
+  const handleContinuePaymentMethod = () => {
+    if (!paymentMethodBill?._id) return;
+    const current =
+      paymentMethodBill.paymentMethod === "bank_transfer"
+        ? "bank_transfer"
+        : "cash";
+    if (current === nextPaymentMethod) {
+      toast({
+        title: "Chưa có thay đổi",
+        description: "Vui lòng chọn phương thức khác.",
+      });
+      return;
+    }
+    setPaymentMethodDialogOpen(false);
+    setConfirmPaymentMethodDialogOpen(true);
+  };
+
+  const handleConfirmPaymentMethod = () => {
+    if (!paymentMethodBill?._id || updatePaymentMethodMutation.isPending)
+      return;
+    updatePaymentMethodMutation.mutate({
+      billId: paymentMethodBill._id,
+      paymentMethod: nextPaymentMethod,
+    });
   };
 
   const handleTabChange = (value: string) => {
@@ -700,7 +867,7 @@ const RevenueStatisticsPage = () => {
             else if (activeTab === "monthly") fetchMonthlyRevenue();
           }}
         >
-          Cập nhật dữ liệu
+          Làm mới
         </Button>
       </div>
 
@@ -782,14 +949,17 @@ const RevenueStatisticsPage = () => {
                     bills={filteredBills}
                     roomsData={roomsData}
                     isStaff={isStaff}
+                    isAdmin={isAdmin}
                     onBillClick={handleBillClick}
+                    onPaymentMethodEdit={handlePaymentMethodEdit}
+                    onPaymentMethodHistory={handlePaymentMethodHistory}
                   />
                 </div>
               );
             })()
           ) : (
             <div className="text-center p-8">
-              Chọn ngày và nhấn "Cập nhật dữ liệu" để xem thống kê
+              Dữ liệu sẽ tự động tải theo ngày đã chọn
             </div>
           )}
         </TabsContent>
@@ -829,15 +999,17 @@ const RevenueStatisticsPage = () => {
                     bills={filteredBills}
                     roomsData={roomsData}
                     isStaff={isStaff}
+                    isAdmin={isAdmin}
                     onBillClick={handleBillClick}
+                    onPaymentMethodEdit={handlePaymentMethodEdit}
+                    onPaymentMethodHistory={handlePaymentMethodHistory}
                   />
                 </div>
               );
             })()
           ) : (
             <div className="text-center p-8">
-              Chọn ngày (xác định thứ Hai đầu tuần), chỉnh ngày kết thúc nếu
-              cần, rồi nhấn nút Cập nhật dữ liệu để xem thống kê
+              Dữ liệu sẽ tự động tải theo khoảng thời gian đã chọn
             </div>
           )}
         </TabsContent>
@@ -881,22 +1053,149 @@ const RevenueStatisticsPage = () => {
                     bills={filteredBills}
                     roomsData={roomsData}
                     isStaff={isStaff}
+                    isAdmin={isAdmin}
                     onBillClick={handleBillClick}
+                    onPaymentMethodEdit={handlePaymentMethodEdit}
+                    onPaymentMethodHistory={handlePaymentMethodHistory}
                   />
                 </div>
               );
             })()
           ) : (
             <div className="text-center p-8">
-              Chọn một ngày để xác định kỳ (ngày 6 tháng này đến ngày 5 tháng
-              sau), chỉnh ngày kết thúc nếu cần, rồi nhấn nút Cập nhật dữ liệu
-              để xem thống kê
+              Dữ liệu sẽ tự động tải theo kỳ tháng đã chọn
             </div>
           )}
         </TabsContent>
       </Tabs>
 
       {/* Modal chi tiết hóa đơn */}
+      <Dialog
+        open={paymentMethodDialogOpen}
+        onOpenChange={setPaymentMethodDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Đổi phương thức thanh toán</DialogTitle>
+            <DialogDescription>
+              Hóa đơn {paymentMethodBill?.invoiceCode || "N/A"}. Chọn phương
+              thức mới rồi tiếp tục xác nhận.
+            </DialogDescription>
+          </DialogHeader>
+          <Select
+            value={nextPaymentMethod}
+            onValueChange={(value) =>
+              setNextPaymentMethod(value as BillPaymentMethod)
+            }
+          >
+            <SelectTrigger>
+              <SelectValue placeholder="Chọn phương thức" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="cash">Tiền mặt</SelectItem>
+              <SelectItem value="bank_transfer">Chuyển khoản</SelectItem>
+            </SelectContent>
+          </Select>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setPaymentMethodDialogOpen(false)}
+            >
+              Hủy
+            </Button>
+            <Button onClick={handleContinuePaymentMethod}>Tiếp tục</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog
+        open={confirmPaymentMethodDialogOpen}
+        onOpenChange={setConfirmPaymentMethodDialogOpen}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Xác nhận đổi phương thức</DialogTitle>
+            <DialogDescription>
+              Xác nhận đổi hóa đơn {paymentMethodBill?.invoiceCode || "N/A"}{" "}
+              sang {nextPaymentMethod === "cash" ? "Tiền mặt" : "Chuyển khoản"}?
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmPaymentMethodDialogOpen(false)}
+              disabled={updatePaymentMethodMutation.isPending}
+            >
+              Hủy
+            </Button>
+            <Button
+              onClick={handleConfirmPaymentMethod}
+              disabled={updatePaymentMethodMutation.isPending}
+            >
+              {updatePaymentMethodMutation.isPending
+                ? "Đang cập nhật..."
+                : "Xác nhận đổi"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={historyDialogOpen} onOpenChange={setHistoryDialogOpen}>
+        <DialogContent className="sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Lịch sử phương thức thanh toán</DialogTitle>
+            <DialogDescription>
+              Hóa đơn {historyBill?.invoiceCode || "N/A"} · Chuỗi hash:{" "}
+              {paymentMethodHistory?.data.result?.chainValid
+                ? "Hợp lệ"
+                : "Không hợp lệ"}
+            </DialogDescription>
+          </DialogHeader>
+          {isLoadingPaymentMethodHistory ? (
+            <div className="py-6 text-center">
+              <Spinner />
+            </div>
+          ) : (
+            <div className="max-h-[60vh] space-y-3 overflow-y-auto">
+              {(paymentMethodHistory?.data.result?.logs || []).length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Chưa có lịch sử thay đổi.
+                </p>
+              ) : (
+                (paymentMethodHistory?.data.result?.logs || []).map(
+                  (log: IBillPaymentMethodHistoryLog) => (
+                    <div
+                      key={log._id || log.hash}
+                      className="rounded-md border p-3 text-sm"
+                    >
+                      <div className="flex flex-wrap justify-between gap-2">
+                        <span>
+                          {log.fromPaymentMethod
+                            ? formatPaymentMethod(log.fromPaymentMethod)
+                            : "Khởi tạo"}{" "}
+                          → {formatPaymentMethod(log.toPaymentMethod)}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {formatBillDate(log.changedAt)}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-muted-foreground">
+                        Bởi: {log.changedByName || log.changedBy} (
+                        {log.changedByRole})
+                      </div>
+                      <div className="mt-2 break-all font-mono text-[11px]">
+                        hash: {log.hash}
+                        <br />
+                        previousHash: {log.previousHash || "null"}
+                      </div>
+                    </div>
+                  ),
+                )
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
       <Dialog open={billDetailOpen} onOpenChange={setBillDetailOpen}>
         <DialogContent className="grid-cols-1 sm:max-w-3xl max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader>

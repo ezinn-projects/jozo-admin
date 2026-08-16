@@ -94,6 +94,7 @@ import {
   formatTimelineHourLabel,
   getDefaultBusinessDate,
   getRoomRowHeight,
+  getScheduleTimelineEnd,
   getTimelineContentWidth,
   getTimelineDayEnd,
   getTimelineDayStart,
@@ -569,6 +570,13 @@ const RoomTimelineTable: React.FC = () => {
     return [...byId.values()].filter((schedule) => {
       const start = dayjs(schedule.startTime);
       let end = schedule.endTime ? dayjs(schedule.endTime) : null;
+      if (
+        (schedule.status.toLowerCase() === "finished" ||
+          schedule.status.toLowerCase() === "completed") &&
+        schedule.actualEndTime
+      ) {
+        end = dayjs(schedule.actualEndTime);
+      }
       if (!end) {
         const status = schedule.status.toLowerCase();
         if (status === "booked") end = start.add(120, "minute");
@@ -877,6 +885,12 @@ const RoomTimelineTable: React.FC = () => {
         durationMinutes = actualEnd.diff(eventStart, "minute");
         if (durationMinutes <= 0) durationMinutes = 1;
       }
+    } else if (status === "finished" || status === "completed") {
+      const eventEnd = getScheduleTimelineEnd(
+        schedule,
+        eventStart.add(120, "minute"),
+      );
+      durationMinutes = eventEnd.diff(eventStart, "minute");
     }
 
     if (offsetMinutes > TIMELINE_MINUTE_SPAN) {

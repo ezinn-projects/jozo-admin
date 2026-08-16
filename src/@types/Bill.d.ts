@@ -1,5 +1,26 @@
 import type { ITierDiscount } from "./Membership";
 
+export type BillPaymentMethod = "cash" | "bank_transfer";
+
+export interface IBillPaymentMethodHistoryLog {
+  _id?: string;
+  billId: string;
+  fromPaymentMethod?: string;
+  toPaymentMethod: BillPaymentMethod;
+  changedBy: string;
+  changedByName: string;
+  changedByRole: "admin" | "staff";
+  changedAt: string;
+  previousHash: string | null;
+  hash: string;
+}
+
+export interface IBillPaymentMethodHistory {
+  chainValid: boolean;
+  logs: IBillPaymentMethodHistoryLog[];
+}
+
+
 /** Membership snapshot BE trả kèm bill sau khi áp discount */
 export interface IBillMembership {
   name?: string;

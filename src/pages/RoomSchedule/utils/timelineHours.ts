@@ -1,4 +1,5 @@
 import dayjs, { Dayjs } from "dayjs";
+import { IRoomSchedule } from "@/@types/Room";
 
 /**
  * Ranh giới ngày kinh doanh: shop đóng lúc 03:00 sáng.
@@ -58,6 +59,18 @@ export const getTimelineDayStart = (viewDate: Dayjs) =>
 
 export const getTimelineDayEnd = (viewDate: Dayjs) =>
   getTimelineDayStart(viewDate).add(DAY_END_HOUR - DAY_START_HOUR, "hour");
+
+/** End time thực tế để vẽ schedule đã finish trên timeline. */
+export const getScheduleTimelineEnd = (
+  schedule: Pick<IRoomSchedule, "status" | "endTime" | "actualEndTime">,
+  fallback: Dayjs,
+) => {
+  const status = schedule.status.toLowerCase();
+  if ((status === "finished" || status === "completed") && schedule.actualEndTime) {
+    return dayjs(schedule.actualEndTime);
+  }
+  return schedule.endTime ? dayjs(schedule.endTime) : fallback;
+};
 
 /** Nhãn giờ: 3:00…23:00, rồi 0(+1)…3(+1). */
 export const formatTimelineHourLabel = (hour: number) => {

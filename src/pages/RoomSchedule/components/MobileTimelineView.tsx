@@ -34,6 +34,7 @@ import {
   DAY_START_HOUR,
   TIMELINE_MINUTE_SPAN,
   formatTimelineHourLabel,
+  getScheduleTimelineEnd,
   getTimelineDayEnd,
   getTimelineDayStart,
   packTimelineLanes,
@@ -137,6 +138,12 @@ const getVerticalMarkerStyle = (
       durationMinutes = actualEnd.diff(eventStart, "minute");
       if (durationMinutes <= 0) durationMinutes = 1;
     }
+  } else if (status === "finished" || status === "completed") {
+    const eventEnd = getScheduleTimelineEnd(
+      schedule,
+      eventStart.add(120, "minute"),
+    );
+    durationMinutes = eventEnd.diff(eventStart, "minute");
   }
 
   if (offsetMinutes > TIMELINE_MINUTE_SPAN) {
@@ -548,9 +555,10 @@ const MobileTimelineView: React.FC<MobileTimelineViewProps> = ({
                         const leftPct = 12 + lane * ((100 - 14) / laneCount);
                         const widthPct = (100 - 14) / laneCount - 1;
                         const eventStart = dayjs(schedule.startTime);
-                        const eventEnd = schedule.endTime
-                          ? dayjs(schedule.endTime)
-                          : eventStart.add(120, "minute");
+                        const eventEnd = getScheduleTimelineEnd(
+                          schedule,
+                          eventStart.add(120, "minute"),
+                        );
                         const status = schedule.status.toLowerCase();
                         const scheduleLabel = getScheduleTimelineLabel(
                           room.roomName,
