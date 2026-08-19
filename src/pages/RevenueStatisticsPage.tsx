@@ -1251,6 +1251,16 @@ const RevenueStatisticsPage = () => {
                 </div>
                 <div className="flex min-w-0 flex-col">
                   <span className="text-[11px] text-muted-foreground">
+                    Số điện thoại
+                  </span>
+                  <span className="break-words font-medium">
+                    {billDetail.data.result.phone ||
+                      billDetail.data.result.customerPhone ||
+                      "—"}
+                  </span>
+                </div>
+                <div className="flex min-w-0 flex-col">
+                  <span className="text-[11px] text-muted-foreground">
                     Bắt đầu
                   </span>
                   <span className="break-words font-medium">

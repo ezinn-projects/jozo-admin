@@ -86,4 +86,6 @@ export interface IBill {
   invoiceCode: string;
   completedBy?: string;
   createdBy?: string;
+  phone?: string;
+  customerPhone?: string;
 }
