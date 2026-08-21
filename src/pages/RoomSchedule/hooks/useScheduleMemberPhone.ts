@@ -291,7 +291,17 @@ export const useScheduleMemberPhone = ({
     string | null
   > => {
     if (!isPhoneDirty) {
-      return savedPhone.trim();
+      const value = savedPhone.trim();
+      if (value && !isValidMemberPhone(value)) {
+        toast({
+          title: "Số điện thoại không hợp lệ",
+          description:
+            "Vui lòng cập nhật số điện thoại thành 10–11 số trước khi kết thúc",
+          variant: "destructive",
+        });
+        return null;
+      }
+      return value;
     }
 
     const value = phone.trim();

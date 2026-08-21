@@ -55,6 +55,9 @@ export type MembershipConfigPayload = Omit<
 
 export interface IUserMembershipUser extends User {
   points?: number;
+  availablePoint?: number;
+  totalPoint?: number;
+  lifetimePoint?: number;
   loyalty_points?: number;
   loyalty?: number;
   streak?: number;

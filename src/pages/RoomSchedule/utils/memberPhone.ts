@@ -1,7 +1,13 @@
 export const PHONE_REGEX = /^0\d{9,10}$/;
+export const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export const isValidMemberPhone = (phone: string) =>
   PHONE_REGEX.test(phone.trim());
+
+export const isValidMemberEmail = (email?: string | null) => {
+  const value = email?.trim() || "";
+  return !value || EMAIL_REGEX.test(value);
+};
 
 /** Chỉ giữ chữ số, tối đa 11 ký tự (SĐT VN). */
 export const sanitizePhoneInput = (value: string) =>

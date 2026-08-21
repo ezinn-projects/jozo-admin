@@ -69,7 +69,7 @@ const updateUserSchema = z
 type UpdateUserFormData = z.infer<typeof updateUserSchema>;
 
 const updatePointsSchema = z.object({
-  points: z.coerce.number().positive("Điểm phải lớn hơn 0"),
+  points: z.coerce.number().int().min(0, "Điểm không được âm"),
   reason: z.string().optional(),
 });
 
@@ -111,6 +111,7 @@ const EditUserForm = () => {
     typeof value === "number" ? value.toLocaleString("vi-VN") : "—";
 
   const membershipPoints =
+    membershipDetail?.user?.availablePoint ??
     membershipDetail?.user?.points ??
     membershipDetail?.user?.loyalty_points ??
     membershipDetail?.user?.loyalty;
@@ -186,6 +187,13 @@ const EditUserForm = () => {
       });
     }
   }, [user, form]);
+
+  useEffect(() => {
+    const currentPoints = membershipDetail?.user?.availablePoint;
+    if (typeof currentPoints === "number") {
+      pointsForm.reset({ points: currentPoints, reason: "" });
+    }
+  }, [membershipDetail?.user?.availablePoint, pointsForm]);
 
   // Cập nhật streak form khi có dữ liệu membership
   useEffect(() => {
@@ -359,7 +367,7 @@ const EditUserForm = () => {
                     Cập nhật điểm thành viên
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Nhập số điểm cần cộng cho thành viên này (lớn hơn 0).
+                    Nhập tổng điểm mới của thành viên. Nhập 0 nếu muốn đưa điểm về 0.
                   </p>
                 </div>
                 <form
@@ -373,7 +381,7 @@ const EditUserForm = () => {
                       type="number"
                       step="1"
                       {...pointsForm.register("points")}
-                      placeholder="Nhập số điểm"
+                      placeholder="Nhập tổng điểm mới"
                     />
                     {pointsForm.formState.errors.points && (
                       <p className="text-sm text-red-500">

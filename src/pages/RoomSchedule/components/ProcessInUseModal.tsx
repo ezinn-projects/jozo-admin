@@ -25,7 +25,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import React, { useEffect, useMemo, useState } from "react";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
-import { getScheduleCustomerContact } from "../utils/memberPhone";
+import { getScheduleCustomerContact, isValidMemberEmail } from "../utils/memberPhone";
 import {
   formatTierDiscountLabel,
   resolveBillMembershipDiscount,
@@ -809,6 +809,20 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const handleCompleteSession = async () => {
     const actualEndTime = billDateTimePayload.actualEndTime;
     const actualStartTime = billDateTimePayload.actualStartTime;
+
+    const { customerEmail } = getScheduleCustomerContact({
+      memberInfo: member.memberInfo,
+      scheduleCustomerName: schedule.customerName,
+      scheduleCustomerEmail: schedule.customerEmail,
+    });
+    if (!isValidMemberEmail(customerEmail)) {
+      toast({
+        title: "Email không hợp lệ",
+        description: "Vui lòng cập nhật lại email thành viên trước khi kết thúc",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Auto-save SĐT nếu đang dirty (đã nhập nhưng chưa bấm Lưu)
     const ensuredPhone = await member.ensurePhoneSavedForSubmit();
