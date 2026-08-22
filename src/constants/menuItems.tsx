@@ -126,6 +126,12 @@ const MENU_ITEMS: MenuItem[] = [
         icon: BarChart3,
         roles: ADMIN_ONLY,
       },
+      {
+        title: "Membership Gift Bills",
+        url: PATHS.GIFT_APPLIED_BILLS,
+        icon: Gift,
+        roles: ADMIN_ONLY,
+      },
     ],
   },
   {

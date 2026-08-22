@@ -13,6 +13,10 @@ export const isValidMemberEmail = (email?: string | null) => {
 export const sanitizePhoneInput = (value: string) =>
   value.replace(/\D/g, "").slice(0, 11);
 
+/** Rỗng hoặc chỉ chứa ký tự kiểu SĐT → chế độ nhập số; có chữ → tìm theo tên. */
+export const isPhoneLikeInput = (value: string) =>
+  value.trim() === "" || /^[\d\s+().-]+$/.test(value.trim());
+
 export const getMemberDisplayName = (user: {
   full_name?: string | null;
   name?: string | null;

@@ -42,7 +42,10 @@ export const useUsers = (params: UsersQueryParams = {}) => {
   });
 
   // Lấy users từ response
-  const users = usersResponse?.data?.result?.items || [];
+  const users =
+    usersResponse?.data?.result?.items ||
+    usersResponse?.data?.result?.users ||
+    [];
   const pagination = usersResponse?.data?.result?.pagination;
 
   // Hook để lấy thông tin user theo ID

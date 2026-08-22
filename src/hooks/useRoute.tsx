@@ -50,6 +50,7 @@ const CustomizationGroupTemplatesPage = lazy(
   () => import("@/pages/FnB/CustomizationGroupTemplatesPage")
 );
 const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
+const GiftAppliedBillsPage = lazy(() => import("@/pages/GiftAppliedBillsPage"));
 const FnbShiftCountPage = lazy(() => import("@/pages/FnbShiftCount"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const GamesPage = lazy(() => import("@/pages/Games"));
@@ -188,6 +189,7 @@ function useRoute() {
                   element={<CustomizationGroupTemplatesPage />}
                 />
                 <Route path={PATHS.FNB_STATS} element={<FnbStatsPage />} />
+                <Route path={PATHS.GIFT_APPLIED_BILLS} element={<GiftAppliedBillsPage />} />
                 <Route path={PATHS.PROMOTION} element={<PromotionPage />} />
                 <Route
                   path={PATHS.MEMBERSHIP_CONFIG}

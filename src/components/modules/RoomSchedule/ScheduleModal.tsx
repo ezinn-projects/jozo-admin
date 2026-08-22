@@ -59,10 +59,8 @@ import {
 } from "@/pages/RoomSchedule/utils/scheduleRoomType";
 import { getDefaultBusinessDate } from "@/pages/RoomSchedule/utils/timelineHours";
 
-import {
-  isValidMemberPhone,
-  sanitizePhoneInput,
-} from "@/pages/RoomSchedule/utils/memberPhone";
+import { isValidMemberPhone } from "@/pages/RoomSchedule/utils/memberPhone";
+import MemberPhoneCombobox from "@/pages/RoomSchedule/components/MemberPhoneCombobox";
 import MemberPhoneLookupCard from "@/pages/RoomSchedule/components/MemberPhoneLookupCard";
 import {
   useMembershipConfig,
@@ -155,6 +153,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
   const peopleCountValue = watch("peopleCount");
   const use4MicValue = watch("use4Mic");
   const customerPhoneValue = watch("customerPhone") ?? "";
+  const [isNameSearchActive, setIsNameSearchActive] = useState(false);
   const parsedPeopleCount =
     typeof peopleCountValue === "number"
       ? peopleCountValue
@@ -658,22 +657,15 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       name="customerPhone"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-muted-foreground font-normal">
-                            SĐT member
-                          </FormLabel>
                           <FormControl>
-                            <Input
-                              type="tel"
-                              inputMode="numeric"
-                              autoComplete="tel"
-                              placeholder="VD: 0912345678"
-                              className="h-11"
-                              value={field.value ?? ""}
-                              onChange={(event) =>
-                                field.onChange(
-                                  sanitizePhoneInput(event.target.value),
-                                )
-                              }
+                            <MemberPhoneCombobox
+                              id="schedule-modal-member-phone"
+                              phone={field.value ?? ""}
+                              onPhoneChange={field.onChange}
+                              enabled={isOpen}
+                              onNameSearchActiveChange={setIsNameSearchActive}
+                              label="Thành viên (SĐT hoặc tên)"
+                              helperText="Nhập SĐT hoặc tên để tìm member và xem quà"
                             />
                           </FormControl>
                           <FormMessage />
@@ -681,19 +673,18 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
                       )}
                     />
                   </div>
-                  <p className="text-xs text-muted-foreground">
-                    Nhập SĐT để xem member và quà
-                  </p>
-                  <MemberPhoneLookupCard
-                    phone={customerPhoneValue}
-                    isLoading={isLoadingMemberLookup}
-                    isError={isMemberLookupError}
-                    isNotFound={isMemberLookupNotFound}
-                    memberInfo={memberLookupUser}
-                    availableGifts={streakGiftsData?.availableGifts}
-                    streakRewards={streakGiftsData?.streakRewards}
-                    configStreakRewards={membershipConfig?.streak?.rewards}
-                  />
+                  {!isNameSearchActive && (
+                    <MemberPhoneLookupCard
+                      phone={customerPhoneValue}
+                      isLoading={isLoadingMemberLookup}
+                      isError={isMemberLookupError}
+                      isNotFound={isMemberLookupNotFound}
+                      memberInfo={memberLookupUser}
+                      availableGifts={streakGiftsData?.availableGifts}
+                      streakRewards={streakGiftsData?.streakRewards}
+                      configStreakRewards={membershipConfig?.streak?.rewards}
+                    />
+                  )}
                 </div>
 
                 {!scheduleId && room && room.roomType !== RoomType.Dorm && (

@@ -1,7 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { cn } from "@/lib/utils";
 import {
@@ -34,7 +33,6 @@ import dayjs from "dayjs";
 import {
   getMemberDisplayName,
   isValidMemberPhone,
-  sanitizePhoneInput,
 } from "../utils/memberPhone";
 import {
   formatFnBCategory,
@@ -42,6 +40,7 @@ import {
   selectedItemsToPayload,
   sumSelectedItemQty,
 } from "../utils/streakGifts";
+import MemberPhoneCombobox from "./MemberPhoneCombobox";
 
 export interface ScheduleGiftDetail {
   name?: string;
@@ -213,6 +212,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
     Record<string, number>
   >({});
   const [itemSearch, setItemSearch] = useState("");
+  const [isNameSearchActive, setIsNameSearchActive] = useState(false);
 
   const servedGiftForSelected = useMemo(
     () =>
@@ -307,19 +307,19 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
     Boolean(onClearPhone) &&
     (phone.trim().length > 0 || savedPhone.trim().length > 0);
   const isActive = hasClaimedGift || (showGiftToggle && isGiftEnabled);
-  /** Hiện card member/quà ngay khi SĐT trên input hợp lệ (auto-lookup). */
+  /** Hiện card member/quà khi SĐT hợp lệ và không đang tìm theo tên. */
   const showMemberLookup =
+    !isNameSearchActive &&
     isPhoneValid &&
     (isLoadingMemberInfo ||
       memberInfo ||
       isMemberInfoError ||
       isMemberNotFound);
   const showScheduleCustomer =
-    (customerName || customerEmail) && !memberInfo && !isLoadingMemberInfo;
-
-  const handlePhoneChange = (value: string) => {
-    onPhoneChange(sanitizePhoneInput(value));
-  };
+    (customerName || customerEmail) &&
+    !memberInfo &&
+    !isLoadingMemberInfo &&
+    !isNameSearchActive;
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter" && isPhoneDirty && isPhoneValid && onSavePhone) {
@@ -327,6 +327,15 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       onSavePhone();
     }
   };
+
+  const phoneHelperText = showPhoneError ? null : isPhoneValid &&
+    isLoadingMemberInfo ? (
+    "Đang tìm..."
+  ) : hasSavedValidPhone && !isPhoneDirty ? (
+    `Đã lưu: ${savedPhone}`
+  ) : (
+    "Nhập SĐT hoặc tên để tìm member và xem quà"
+  );
 
   const handleSelectMilestone = (streakCount: number) => {
     setSelectedStreakCount((prev) => {
@@ -429,6 +438,42 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
           </Badge>
         )}
       </div>
+
+      <MemberPhoneCombobox
+        id={inputId}
+        phone={phone}
+        onPhoneChange={onPhoneChange}
+        disabled={isSavingPhone}
+        canClear={canClearPhone}
+        onClear={onClearPhone}
+        onKeyDown={handleKeyDown}
+        onNameSearchActiveChange={setIsNameSearchActive}
+        errorText={
+          showPhoneError
+            ? "SĐT không hợp lệ (10–11 số, bắt đầu bằng 0)"
+            : undefined
+        }
+        helperText={phoneHelperText}
+        trailing={
+          isPhoneDirty && onSavePhone ? (
+            <Button
+              type="button"
+              onClick={onSavePhone}
+              disabled={!isPhoneValid || isSavingPhone}
+              className="h-11 sm:min-w-[110px] bg-blue-600 hover:bg-blue-700"
+            >
+              {isSavingPhone ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <>
+                  <Save className="w-4 h-4 mr-1.5" />
+                  Lưu SĐT
+                </>
+              )}
+            </Button>
+          ) : null
+        }
+      />
 
       {showMemberLookup && isLoadingMemberInfo && (
         <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2.5 flex items-center gap-2 text-sm text-gray-600">
@@ -542,76 +587,6 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
           )}
         </div>
       )}
-
-      <div className="space-y-2">
-        <Label htmlFor={inputId} className="text-sm font-medium">
-          Số điện thoại thành viên
-        </Label>
-        <div className="flex flex-col gap-2 sm:flex-row">
-          <div className="flex-1 space-y-1">
-            <div className="relative">
-              <Input
-                id={inputId}
-                type="tel"
-                inputMode="numeric"
-                autoComplete="tel"
-                placeholder="VD: 0912345678"
-                value={phone}
-                onChange={(e) => handlePhoneChange(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={isSavingPhone}
-                className={cn(
-                  "h-11 text-base sm:text-lg tracking-wide",
-                  canClearPhone && "pr-10",
-                  showPhoneError && "border-red-500 focus-visible:ring-red-500",
-                )}
-              />
-              {canClearPhone && (
-                <button
-                  type="button"
-                  onClick={onClearPhone}
-                  disabled={isSavingPhone}
-                  aria-label="Bỏ thành viên"
-                  title="Bỏ thành viên"
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-            {showPhoneError ? (
-              <p className="text-xs text-red-600">
-                SĐT không hợp lệ (10–11 số, bắt đầu bằng 0)
-              </p>
-            ) : isPhoneValid && isLoadingMemberInfo ? (
-              <p className="text-xs text-muted-foreground">Đang tìm...</p>
-            ) : hasSavedValidPhone && !isPhoneDirty ? (
-              <p className="text-xs text-muted-foreground">Đã lưu: {savedPhone}</p>
-            ) : (
-              <p className="text-xs text-muted-foreground">
-                Nhập SĐT để xem member và quà
-              </p>
-            )}
-          </div>
-          {isPhoneDirty && onSavePhone && (
-            <Button
-              type="button"
-              onClick={onSavePhone}
-              disabled={!isPhoneValid || isSavingPhone}
-              className="h-11 sm:min-w-[110px] bg-blue-600 hover:bg-blue-700"
-            >
-              {isSavingPhone ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
-              ) : (
-                <>
-                  <Save className="w-4 h-4 mr-1.5" />
-                  Lưu SĐT
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-      </div>
 
       {showGiftToggle && onGiftEnabledChange && (
         <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/90 px-3 py-2.5">

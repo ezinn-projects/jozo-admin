@@ -162,6 +162,48 @@ const billAPis = {
     >(
       `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
     ),
+
+  getGiftAppliedBills: async (params: {
+    page?: number;
+    limit?: number;
+    startDate?: string;
+    endDate?: string;
+    kind?: "all" | "fnb" | "discount";
+    search?: string;
+  }) =>
+    http.get<
+      HTTPResponse<{
+        items: Array<{
+          _id: string;
+          invoiceCode: string;
+          roomName: string;
+          customerName: string;
+          customerPhone: string;
+          memberTier?: string;
+          appliedKind: "fnb" | "discount";
+          appliedSource: string;
+          giftName: string;
+          giftValue?: number;
+          giftDiscountAmount: number;
+          membershipDiscountAmount: number;
+          totalAmount: number;
+          endTime: string;
+          completedBy?: string;
+        }>;
+        summary: {
+          totalBills: number;
+          fnbBills: number;
+          discountBills: number;
+          totalGiftDiscountAmount: number;
+          totalMembershipDiscountAmount: number;
+        };
+        pagination: { page: number; limit: number; total: number; totalPages: number };
+      }>
+    >(`/bill/gift-applied?${new URLSearchParams(
+      Object.entries(params)
+        .filter(([, value]) => value !== undefined && value !== "")
+        .map(([key, value]) => [key, String(value)]),
+    ).toString()}`),
   updatePaymentMethod: (billId: string, paymentMethod: BillPaymentMethod) =>
     http.patch<HTTPResponse<{ bill: IBill; log: unknown }>>(
       `/bill/${billId}/payment-method`,
