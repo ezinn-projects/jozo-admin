@@ -506,7 +506,7 @@ const ScheduleModal: React.FC<ScheduleModalProps> = ({
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
-          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[640px]"
+          className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[720px]"
           style={{ WebkitOverflowScrolling: "touch" }}
         >
           <Form {...form}>
