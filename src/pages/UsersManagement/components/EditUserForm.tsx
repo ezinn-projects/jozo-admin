@@ -1,11 +1,18 @@
 import { PageHeader } from "@/components/shared";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CalendarIcon, UserCog, Gift } from "lucide-react";
+import {
+  Award,
+  CalendarIcon,
+  Gift,
+  Mail,
+  Phone,
+  UserCog,
+} from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { UpdateUserRequest, User } from "@/@types/user";
@@ -26,6 +33,12 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/utils";
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from "@/components/ui/tabs";
 
 const toDateTimeLocalValue = (iso?: string | null) => {
   if (!iso) return "";
@@ -84,6 +97,7 @@ type UpdateStreakFormData = z.infer<typeof updateStreakSchema>;
 const EditUserForm = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const [activeSection, setActiveSection] = useState("overview");
   const { updateUser, useUserById, useUserMembership, isUpdatingUser } =
     useUsers();
   const { mutate: updateMemberPoints, isPending: isUpdatingMemberPoints } =
@@ -280,12 +294,117 @@ const EditUserForm = () => {
     <div className="space-y-6">
       <PageHeader
         title="Chỉnh sửa User"
-        description="Cập nhật thông tin người dùng"
+        description="Ưu tiên kiểm tra trạng thái member trước, sau đó mới cập nhật hồ sơ"
         icon={UserCog}
         showBackButton
         backUrl={PATHS.USERS_MANAGEMENT}
       />
-      <Card className="max-w-2xl mx-auto">
+      <Tabs
+        value={activeSection}
+        onValueChange={setActiveSection}
+        className="mx-auto w-full max-w-5xl"
+      >
+        <TabsList className="grid h-auto w-full grid-cols-3">
+          <TabsTrigger value="overview" className="py-2.5">
+            Tổng quan
+          </TabsTrigger>
+          <TabsTrigger value="membership" className="py-2.5">
+            Membership & quà
+          </TabsTrigger>
+          <TabsTrigger value="profile" className="py-2.5">
+            Hồ sơ & thử việc
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Member</p>
+                  <h2 className="mt-1 text-2xl font-semibold">
+                    {user?.name || user?.full_name || "Đang tải thông tin..."}
+                  </h2>
+                  <div className="mt-2 flex flex-col gap-1 text-sm text-muted-foreground sm:flex-row sm:gap-4">
+                    <span className="inline-flex items-center gap-1.5">
+                      <Phone className="h-3.5 w-3.5" />
+                      {user?.phone_number || "Chưa có số điện thoại"}
+                    </span>
+                    {user?.email && (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Mail className="h-3.5 w-3.5" />
+                        {user.email}
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setActiveSection("membership")}
+                >
+                  <Gift className="mr-2 h-4 w-4" />
+                  Xem membership
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card>
+              <CardContent className="pt-5">
+                <div className="text-sm text-muted-foreground">Điểm hiện có</div>
+                <div className="mt-1 text-2xl font-semibold">
+                  {formatNumber(membershipPoints)}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <div className="text-sm text-muted-foreground">Hạng hiện tại</div>
+                <div className="mt-1 flex items-center gap-2 text-2xl font-semibold">
+                  <Award className="h-5 w-5 text-primary" />
+                  {membershipTier}
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="pt-5">
+                <div className="text-sm text-muted-foreground">Streak hiện tại</div>
+                <div className="mt-1 text-2xl font-semibold">
+                  {streakInfoData?.streak?.count ?? membershipStreak ?? "—"}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {streakInfoData?.streak?.isActive
+                    ? "Đang hoạt động"
+                    : "Kiểm tra trạng thái streak"}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <h3 className="font-semibold">Cần chú ý</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Xem nhanh mốc quà đã nhận và quà đang chờ phát trong tab Membership & quà.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  onClick={() => setActiveSection("membership")}
+                >
+                  Mở chi tiết
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="membership" className="space-y-6">
+          <Card>
         <CardContent className="pt-6">
           {isLoadingMembership ? (
             <div className="text-muted-foreground">
@@ -641,7 +760,10 @@ const EditUserForm = () => {
           </div>
         </CardContent>
       </Card>
-      <Card className="max-w-2xl mx-auto">
+          </TabsContent>
+
+          <TabsContent value="profile">
+            <Card>
         <CardContent className="pt-6">
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             {/* Tên */}
@@ -844,8 +966,10 @@ const EditUserForm = () => {
             </div>
           </form>
         </CardContent>
-      </Card>
-    </div>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
   );
 };
 
