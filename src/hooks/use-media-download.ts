@@ -1,5 +1,6 @@
 import {
   createMediaJob,
+  fetchDownloadedMedia,
   fetchMediaJob,
   isMediaJobActive,
   isMediaJobTerminal,
@@ -37,6 +38,9 @@ export const useMediaDownload = () => {
   const [startingVideoIds, setStartingVideoIds] = useState<Set<string>>(
     () => new Set(),
   );
+  const [downloadedVideoIds, setDownloadedVideoIds] = useState<Set<string>>(
+    () => new Set(),
+  );
   const notifiedReadyRef = useRef<Set<string>>(new Set());
   const downloadsRef = useRef(downloads);
   downloadsRef.current = downloads;
@@ -62,6 +66,12 @@ export const useMediaDownload = () => {
   const handleMediaJobFinished = useCallback(
     (videoId: string, job: MediaJob) => {
       applyMediaJob(videoId, job);
+      if (job.status === "ready") {
+        setDownloadedVideoIds((prev) => {
+          if (prev.has(videoId)) return prev;
+          return new Set(prev).add(videoId);
+        });
+      }
       if (!isMediaJobTerminal(job.status)) return;
 
       const notifyKey = `${videoId}:${job.id}:${job.status}`;
@@ -119,10 +129,6 @@ export const useMediaDownload = () => {
     [applyMediaJob, handleMediaJobFinished, toast],
   );
 
-  const activeDownloads = Object.entries(downloads).filter(([, entry]) =>
-    isMediaJobActive(entry.status),
-  );
-
   useEffect(() => {
     if (!activePollKey) return;
 
@@ -150,6 +156,28 @@ export const useMediaDownload = () => {
     return () => window.clearInterval(intervalId);
   }, [activePollKey, applyMediaJob, handleMediaJobFinished]);
 
+  useEffect(() => {
+    let cancelled = false;
+    void fetchDownloadedMedia()
+      .then((items) => {
+        if (cancelled) return;
+        setDownloadedVideoIds(
+          new Set(
+            items
+              .map((item) => item.videoId)
+              .filter((videoId): videoId is string => Boolean(videoId)),
+          ),
+        );
+      })
+      .catch(() => {
+        // Media service may be unavailable while the admin remains usable.
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const isStarting = (videoId: string) => startingVideoIds.has(videoId);
 
   const isBusy = (videoId: string) => {
@@ -162,6 +190,7 @@ export const useMediaDownload = () => {
 
   return {
     downloads,
+    downloadedVideoIds,
     startDownload,
     isStarting,
     isBusy,

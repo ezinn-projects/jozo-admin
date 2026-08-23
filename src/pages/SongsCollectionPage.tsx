@@ -191,6 +191,7 @@ const SongsCollectionPage = () => {
   const { toast } = useToast();
   const {
     startDownload,
+    downloadedVideoIds,
     isBusy: isMediaDownloadBusy,
     isStarting: isMediaDownloadStarting,
     getDownload: getMediaDownload,
@@ -891,9 +892,20 @@ const SongsCollectionPage = () => {
                       </div>
                       {(() => {
                         const download = getMediaDownload(song.video_id);
-                        if (!download) return null;
+                        if (!download) {
+                          return downloadedVideoIds.has(song.video_id) ? (
+                            <p className="text-xs text-green-600 font-medium">
+                              Đã tải local
+                            </p>
+                          ) : null;
+                        }
                         return (
                           <div className="text-xs text-muted-foreground space-y-0.5">
+                            {downloadedVideoIds.has(song.video_id) ? (
+                              <p className="text-green-600 font-medium">
+                                Đã tải local
+                              </p>
+                            ) : null}
                             <p>{getMediaStatusLabel(download.status)}</p>
                             {download.status === "ready" && download.hlsUrl ? (
                               <a

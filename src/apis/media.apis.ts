@@ -17,15 +17,24 @@ export interface MediaJob {
 }
 
 const parseMediaJob = (data: Record<string, unknown>): MediaJob => {
-  const id = String(data.id ?? data.mediaId ?? data._id ?? "");
-  const status = String(data.status ?? "pending") as MediaStatus;
+  const payload =
+    data.data && typeof data.data === "object" && !Array.isArray(data.data)
+      ? (data.data as Record<string, unknown>)
+      : data;
+  const id = String(payload.id ?? payload.mediaId ?? payload._id ?? "");
+  const status = String(payload.status ?? "pending") as MediaStatus;
 
   return {
     id,
-    videoId: data.videoId != null ? String(data.videoId) : undefined,
+    videoId: payload.videoId != null ? String(payload.videoId) : undefined,
     status,
-    hlsUrl: data.hlsUrl != null ? String(data.hlsUrl) : undefined,
-    error: data.error != null ? String(data.error) : undefined,
+    hlsUrl: payload.hlsUrl != null ? String(payload.hlsUrl) : undefined,
+    error:
+      payload.error != null
+        ? String(payload.error)
+        : payload.errorMessage != null
+          ? String(payload.errorMessage)
+          : undefined,
   };
 };
 
@@ -54,6 +63,32 @@ const mediaFetch = async (
   return parseMediaJob(body);
 };
 
+const mediaListFetch = async (path: string): Promise<MediaJob[]> => {
+  const response = await fetch(`${MEDIA_SERVICE_URL}${path}`, {
+    headers: { "Content-Type": "application/json" },
+  });
+  const body = (await response.json().catch(() => ({}))) as Record<
+    string,
+    unknown
+  >;
+
+  if (!response.ok) {
+    const message =
+      (typeof body.message === "string" && body.message) ||
+      (typeof body.error === "string" && body.error) ||
+      `HTTP ${response.status}`;
+    throw new Error(message);
+  }
+
+  const items = Array.isArray(body.data) ? body.data : [];
+  return items
+    .filter(
+      (item): item is Record<string, unknown> =>
+        item != null && typeof item === "object" && !Array.isArray(item),
+    )
+    .map(parseMediaJob);
+};
+
 export const createMediaJob = (videoId: string) =>
   mediaFetch("/api/media", {
     method: "POST",
@@ -62,6 +97,9 @@ export const createMediaJob = (videoId: string) =>
 
 export const fetchMediaJob = (mediaId: string) =>
   mediaFetch(`/api/media/${mediaId}`);
+
+export const fetchDownloadedMedia = () =>
+  mediaListFetch("/api/media?status=ready&limit=20000");
 
 export const isMediaJobActive = (status?: MediaStatus) =>
   status === "pending" ||
