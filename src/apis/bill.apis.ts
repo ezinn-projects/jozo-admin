@@ -169,6 +169,7 @@ const billAPis = {
     startDate?: string;
     endDate?: string;
     kind?: "all" | "fnb" | "discount";
+    source?: "all" | "membership" | "gift" | "streak";
     search?: string;
   }) =>
     http.get<
@@ -181,7 +182,9 @@ const billAPis = {
           customerPhone: string;
           memberTier?: string;
           appliedKind: "fnb" | "discount";
-          appliedSource: string;
+          appliedSource: "membership" | "gift" | "streak";
+          appliedReason: string;
+          streakGifts?: Array<{ streakCount: number; items: Array<{ name: string; quantity: number }> }>;
           giftName: string;
           giftValue?: number;
           giftDiscountAmount: number;
@@ -194,6 +197,9 @@ const billAPis = {
           totalBills: number;
           fnbBills: number;
           discountBills: number;
+          membershipBills: number;
+          giftBills: number;
+          streakBills: number;
           totalGiftDiscountAmount: number;
           totalMembershipDiscountAmount: number;
         };

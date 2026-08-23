@@ -51,6 +51,7 @@ const PATHS = {
   FNB_STATS: "/fnb-stats",
   GIFT_APPLIED_BILLS: "/gift-applied-bills",
   FNB_SHIFT_COUNT: "/fnb-shift-count",
+  RETAIL_SALES: "/retail-sales",
 
   // promotion management
   PROMOTION: "/promotion",

@@ -73,6 +73,7 @@ import {
 } from "@/hooks/room-schedule";
 import { useGetMenuItems } from "@/hooks/use-menu-items";
 import useAuth from "@/hooks/useAuth";
+import { showApiValidationErrorToast } from "@/utils/apiValidationError";
 import { buildBillDateTimeFromSchedule } from "@/utils/billDateTime";
 import { CalendarDays, Clock, Gift, Minus, Plus, Printer } from "lucide-react";
 
@@ -158,6 +159,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [targetRoomId, setTargetRoomId] = useState<string>("");
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const [customerPaidInput, setCustomerPaidInput] = useState<string>("");
+  const [activeTab, setActiveTab] = useState<"bill" | "member">("bill");
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -218,8 +220,15 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setIsEndDateManuallyAdjusted(false);
       setCustomerPaidInput("");
       setSelectedPromotion(schedule.promotionId || "");
+      setActiveTab("bill");
     }
   }, [isOpen, schedule._id, schedule.startTime, schedule.promotionId]);
+
+  const focusMemberTabOnContactError = (fieldErrors: Record<string, string>) => {
+    if (fieldErrors.customerEmail || fieldErrors.customerPhone) {
+      setActiveTab("member");
+    }
+  };
 
   const getAppliedPromotion = () => {
     if (!selectedPromotion) return null;
@@ -275,6 +284,16 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
         title: "Success",
         description: `Schedule updated to ${variables.status}`,
       });
+    },
+    onError: (error) => {
+      showApiValidationErrorToast(
+        error,
+        {
+          title: "Error",
+          description: "Không thể cập nhật lịch phòng",
+        },
+        { onFieldErrors: focusMemberTabOnContactError },
+      );
     },
   });
 
@@ -1120,10 +1139,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     onSuccess: () => {},
     onError: (error) => {
       console.error("Lỗi khi lưu hóa đơn:", error);
-      toast({
+      showApiValidationErrorToast(error, {
         title: "Error",
         description: "Có lỗi xảy ra khi lưu hóa đơn",
-        variant: "destructive",
       });
     },
   });
@@ -1159,7 +1177,11 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               </DialogDescription>
             </DialogHeader>
 
-            <Tabs defaultValue="bill" className="w-full">
+            <Tabs
+              value={activeTab}
+              onValueChange={(value) => setActiveTab(value as "bill" | "member")}
+              className="w-full"
+            >
               <TabsList className="grid w-full grid-cols-2 mb-4 h-11">
                 <TabsTrigger value="bill" className="text-sm sm:text-base">
                   Hóa đơn

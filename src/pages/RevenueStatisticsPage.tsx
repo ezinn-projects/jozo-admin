@@ -1,16 +1,8 @@
+import billAPis from "@/apis/bill.apis";
 import { PageHeader } from "@/components/shared";
-import {
-  useState,
-  useEffect,
-  useMemo,
-  useCallback,
-  type ReactNode,
-} from "react";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Spinner } from "@/components/ui/spinner";
-import { TrendingUp, History, Pencil } from "lucide-react";
 import {
   Table,
   TableBody,
@@ -19,34 +11,39 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import billAPis from "@/apis/bill.apis";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import dayjs from "@/lib/dayjs";
 import type { Dayjs } from "dayjs";
+import { TrendingUp, History, Pencil } from "lucide-react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 // import { formatCurrency } from "@/utils/formatters";
 import {
-  IBill,
   BillPaymentMethod,
+  IBill,
   IBillPaymentMethodHistoryLog,
 } from "@/@types/Bill";
+import roomApis from "@/apis/room.apis";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { formatCurrency } from "@/utils/formatters";
-import { useMutation, useQuery } from "@tanstack/react-query";
-import roomApis from "@/apis/room.apis";
-import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
-import { useToast } from "@/hooks/use-toast";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -54,6 +51,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useToast } from "@/hooks/use-toast";
+import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
+import { formatCurrency } from "@/utils/formatters";
+import { useMutation, useQuery } from "@tanstack/react-query";
 
 interface BillItem {
   description: string;
@@ -192,6 +193,93 @@ type RevenueData = {
 type RevenueBill = IBill & {
   completedBy?: string;
   createdBy?: string;
+  giftDiscountAmount?: number;
+  membershipDiscountAmount?: number;
+  gift?: {
+    name?: string;
+    type?: string;
+    discountPercentage?: number;
+    discountAmount?: number;
+    items?: Array<{ name: string; quantity?: number }>;
+  };
+  streakGifts?: Array<{
+    streakCount: number;
+    items?: Array<{ name: string; quantity: number }>;
+  }>;
+};
+
+type BenefitSource = "all" | "membership" | "gift" | "streak";
+
+const getBillBenefit = (
+  bill: RevenueBill,
+): {
+  source: Exclude<BenefitSource, "all">;
+  label: string;
+  reason: string;
+} | null => {
+  if (bill.streakGifts?.length) {
+    const gifts = bill.streakGifts
+      .flatMap((gift) => gift.items?.map((item) => `${item.name} x${item.quantity}`) || [])
+      .join(", ");
+    const milestones = bill.streakGifts
+      .map((gift) => `${gift.streakCount} lần`)
+      .join(", ");
+    return {
+      source: "streak",
+      label: "Streak",
+      reason: `Đạt streak ${milestones}${gifts ? ` — tặng ${gifts}` : ""}`,
+    };
+  }
+  const streakLines = (
+    bill as RevenueBill & {
+      items?: Array<{ isStreakGift?: boolean; streakCount?: number }>;
+    }
+  ).items?.filter((item) => item.isStreakGift);
+  if (streakLines?.length) {
+    const milestones = Array.from(
+      new Set(
+        streakLines
+          .map((item) => (item as { streakCount?: number }).streakCount)
+          .filter((count): count is number => count !== undefined),
+      ),
+    )
+      .map((count) => `${count} lần`)
+      .join(", ");
+    return {
+      source: "streak",
+      label: "Streak",
+      reason: `Tặng quà streak${milestones ? ` — mốc ${milestones}` : ""}`,
+    };
+  }
+  if (bill.gift || (bill.giftDiscountAmount || 0) > 0) {
+    const giftName = bill.gift?.name || "Quà membership";
+    const discount = bill.gift?.discountPercentage
+      ? `giảm ${bill.gift.discountPercentage}%`
+      : bill.gift?.discountAmount || bill.giftDiscountAmount
+        ? `giảm ${formatCurrency(bill.gift?.discountAmount || bill.giftDiscountAmount || 0)}đ`
+        : bill.gift?.items?.length
+          ? `tặng ${bill.gift.items.map((item) => item.name).join(", ")}`
+          : "được áp dụng";
+    return {
+      source: "gift",
+      label: "Quà tặng",
+      reason: `${giftName} — ${discount}`,
+    };
+  }
+  if (
+    bill.membershipDiscountAmount ||
+    bill.membership?.discountPercentage ||
+    bill.membership?.discountAmount
+  ) {
+    return {
+      source: "membership",
+      label: "Membership",
+      reason:
+        bill.membership?.note ||
+        `Ưu đãi hạng ${bill.membership?.tier || "member"}`,
+    };
+  }
+  return null;
 };
 
 const formatBillDate = (dateString: string) =>
@@ -261,6 +349,7 @@ const BillsTableSection = ({
                 <TableHead>Mã hóa đơn</TableHead>
                 <TableHead>Thời gian</TableHead>
                 <TableHead>Phòng</TableHead>
+                <TableHead>Ưu đãi</TableHead>
                 <TableHead>PT thanh toán</TableHead>
                 <TableHead>Người hoàn tất</TableHead>
                 <TableHead>Người tạo</TableHead>
@@ -286,6 +375,23 @@ const BillsTableSection = ({
                   </TableCell>
                   <TableCell>
                     {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
+                  </TableCell>
+                  <TableCell className="min-w-[180px]">
+                    {(() => {
+                      const benefit = getBillBenefit(bill);
+                      return benefit ? (
+                        <>
+                          <Badge variant={benefit.source === "streak" ? "outline" : "secondary"}>
+                            {benefit.label}
+                          </Badge>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {benefit.reason}
+                          </div>
+                        </>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell>
                     {formatPaymentMethod(bill.paymentMethod || "N/A")}
@@ -426,6 +532,7 @@ const RevenueStatisticsPage = () => {
   const [billDetailOpen, setBillDetailOpen] = useState<boolean>(false);
   const [selectedPaymentMethod, setSelectedPaymentMethod] =
     useState<string>("all");
+  const [benefitSource, setBenefitSource] = useState<BenefitSource>("all");
   const isStaff = useIsStaff();
   const isAdmin = useIsAdmin();
   const { toast } = useToast();
@@ -743,6 +850,13 @@ const RevenueStatisticsPage = () => {
     return bills.filter((bill) => methods.includes(bill.paymentMethod));
   };
 
+  const filterBillsByBenefitSource = (bills: RevenueBill[]) => {
+    if (benefitSource === "all") return bills;
+    return bills.filter(
+      (bill) => getBillBenefit(bill)?.source === benefitSource,
+    );
+  };
+
   // Lấy tất cả các payment methods để hiển thị trong filter (không phụ thuộc vào dữ liệu)
   const getAllPaymentMethodOptions = () => {
     const methods = [
@@ -780,7 +894,7 @@ const RevenueStatisticsPage = () => {
   // Tính lại tổng doanh thu và số lượng hóa đơn sau khi filter
   const calculateFilteredStats = (bills: RevenueBill[]) => {
     const filteredBills = sortBillsByEndTimeDesc(
-      filterBillsByPaymentMethod(bills),
+      filterBillsByBenefitSource(filterBillsByPaymentMethod(bills)),
     );
     const totalRevenue = filteredBills.reduce(
       (sum, bill) => sum + bill.totalAmount,
@@ -891,26 +1005,43 @@ const RevenueStatisticsPage = () => {
             )}
           </TabsList>
 
-          {/* Filter payment method */}
           {(dailyRevenue.data?.bills ||
             weeklyRevenue.data?.bills ||
             monthlyRevenue.data?.bills) && (
-            <Select
-              value={selectedPaymentMethod}
-              onValueChange={setSelectedPaymentMethod}
-            >
-              <SelectTrigger className="w-full sm:w-[200px]">
-                <SelectValue placeholder="Lọc theo PT thanh toán" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Tất cả</SelectItem>
-                {getAllPaymentMethodOptions().map((option) => (
-                  <SelectItem key={option.value} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div className="flex flex-col gap-2 sm:flex-row">
+              <Select
+                value={selectedPaymentMethod}
+                onValueChange={setSelectedPaymentMethod}
+              >
+                <SelectTrigger className="w-full sm:w-[200px]">
+                  <SelectValue placeholder="Lọc theo PT thanh toán" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả</SelectItem>
+                  {getAllPaymentMethodOptions().map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={benefitSource}
+                onValueChange={(value) =>
+                  setBenefitSource(value as BenefitSource)
+                }
+              >
+                <SelectTrigger className="w-full sm:w-[180px]">
+                  <SelectValue placeholder="Lọc ưu đãi" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tất cả ưu đãi</SelectItem>
+                  <SelectItem value="membership">Membership</SelectItem>
+                  <SelectItem value="gift">Quà tặng</SelectItem>
+                  <SelectItem value="streak">Streak</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           )}
         </div>
 

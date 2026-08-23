@@ -16,6 +16,7 @@ import {
   Music,
   PercentIcon,
   Settings2,
+  ShoppingCart,
   Sparkles,
   UtensilsCrossed,
   Users,
@@ -109,6 +110,12 @@ const MENU_ITEMS: MenuItem[] = [
         roles: STAFF_AND_ADMIN,
       },
       {
+        title: "Retail Sales",
+        url: PATHS.RETAIL_SALES,
+        icon: ShoppingCart,
+        roles: STAFF_AND_ADMIN,
+      },
+      {
         title: "Menu Catalog",
         url: PATHS.MENU_ITEMS,
         icon: UtensilsCrossed,
@@ -124,12 +131,6 @@ const MENU_ITEMS: MenuItem[] = [
         title: "Analytics",
         url: PATHS.FNB_STATS,
         icon: BarChart3,
-        roles: ADMIN_ONLY,
-      },
-      {
-        title: "Membership Gift Bills",
-        url: PATHS.GIFT_APPLIED_BILLS,
-        icon: Gift,
         roles: ADMIN_ONLY,
       },
     ],

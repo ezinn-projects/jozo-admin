@@ -50,8 +50,9 @@ const CustomizationGroupTemplatesPage = lazy(
   () => import("@/pages/FnB/CustomizationGroupTemplatesPage")
 );
 const FnbStatsPage = lazy(() => import("@/pages/FnB/FnbStatsPage"));
-const GiftAppliedBillsPage = lazy(() => import("@/pages/GiftAppliedBillsPage"));
+const GiftAppliedBillsPage = lazy(() => import("@/pages/GiftAppliedBills"));
 const FnbShiftCountPage = lazy(() => import("@/pages/FnbShiftCount"));
+const RetailSalesPage = lazy(() => import("@/pages/RetailSalesPage"));
 const GiftsPage = lazy(() => import("@/pages/Gifts"));
 const GamesPage = lazy(() => import("@/pages/Games"));
 const MembershipConfigPage = lazy(() => import("@/pages/Membership"));
@@ -143,6 +144,7 @@ function useRoute() {
                   path={PATHS.FNB_SHIFT_COUNT}
                   element={<FnbShiftCountPage />}
                 />
+                <Route path={PATHS.RETAIL_SALES} element={<RetailSalesPage />} />
                 <Route
                   path={PATHS.CHANGE_PASSWORD}
                   element={<ChangePasswordPage />}
