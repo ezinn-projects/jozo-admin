@@ -364,16 +364,12 @@ const BillsTableSection = ({
               {bills.map((bill) => (
                 <TableRow key={bill._id || "unknown"}>
                   <TableCell className="font-medium">
-                    {bill.source === "retail" ? (
-                      <span>{bill.invoiceCode || "N/A"}</span>
-                    ) : (
-                      <button
-                        className="text-blue-600 hover:underline focus:outline-none"
-                        onClick={() => bill._id && onBillClick(bill._id)}
-                      >
-                        {bill.invoiceCode || "N/A"}
-                      </button>
-                    )}
+                    <button
+                      className="text-blue-600 hover:underline focus:outline-none"
+                      onClick={() => bill._id && onBillClick(bill._id)}
+                    >
+                      {bill.invoiceCode || "N/A"}
+                    </button>
                   </TableCell>
                   <TableCell>
                     {formatBillDate(bill.createdAt.toString())}
@@ -452,16 +448,12 @@ const BillsTableSection = ({
               className="rounded-md border p-3 space-y-2"
             >
               <div className="flex items-center justify-between gap-2">
-                {bill.source === "retail" ? (
-                  <span className="font-medium">{bill.invoiceCode || "N/A"}</span>
-                ) : (
-                  <button
-                    className="font-medium text-blue-600 hover:underline focus:outline-none"
-                    onClick={() => bill._id && onBillClick(bill._id)}
-                  >
-                    {bill.invoiceCode || "N/A"}
-                  </button>
-                )}
+                <button
+                  className="font-medium text-blue-600 hover:underline focus:outline-none"
+                  onClick={() => bill._id && onBillClick(bill._id)}
+                >
+                  {bill.invoiceCode || "N/A"}
+                </button>
                 {!isStaff && (
                   <span className="font-semibold">
                     {formatCurrency(bill.totalAmount)} VNĐ
