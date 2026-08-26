@@ -49,6 +49,7 @@ export interface IBillMembershipDiscount {
 
 export interface IBill {
   _id: string;
+  source?: "karaoke" | "retail" | string;
   roomId: string;
   roomName: string;
   scheduleId: string;

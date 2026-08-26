@@ -191,6 +191,7 @@ type RevenueData = {
 };
 
 type RevenueBill = IBill & {
+  source?: "karaoke" | "retail" | string;
   completedBy?: string;
   createdBy?: string;
   giftDiscountAmount?: number;
@@ -363,18 +364,24 @@ const BillsTableSection = ({
               {bills.map((bill) => (
                 <TableRow key={bill._id || "unknown"}>
                   <TableCell className="font-medium">
-                    <button
-                      className="text-blue-600 hover:underline focus:outline-none"
-                      onClick={() => bill._id && onBillClick(bill._id)}
-                    >
-                      {bill.invoiceCode || "N/A"}
-                    </button>
+                    {bill.source === "retail" ? (
+                      <span>{bill.invoiceCode || "N/A"}</span>
+                    ) : (
+                      <button
+                        className="text-blue-600 hover:underline focus:outline-none"
+                        onClick={() => bill._id && onBillClick(bill._id)}
+                      >
+                        {bill.invoiceCode || "N/A"}
+                      </button>
+                    )}
                   </TableCell>
                   <TableCell>
                     {formatBillDate(bill.createdAt.toString())}
                   </TableCell>
                   <TableCell>
-                    {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
+                    {bill.source === "retail"
+                      ? "Bán lẻ"
+                      : roomsData?.[bill.roomId] || bill.roomId || "N/A"}
                   </TableCell>
                   <TableCell className="min-w-[180px]">
                     {(() => {
@@ -445,12 +452,16 @@ const BillsTableSection = ({
               className="rounded-md border p-3 space-y-2"
             >
               <div className="flex items-center justify-between gap-2">
-                <button
-                  className="font-medium text-blue-600 hover:underline focus:outline-none"
-                  onClick={() => bill._id && onBillClick(bill._id)}
-                >
-                  {bill.invoiceCode || "N/A"}
-                </button>
+                {bill.source === "retail" ? (
+                  <span className="font-medium">{bill.invoiceCode || "N/A"}</span>
+                ) : (
+                  <button
+                    className="font-medium text-blue-600 hover:underline focus:outline-none"
+                    onClick={() => bill._id && onBillClick(bill._id)}
+                  >
+                    {bill.invoiceCode || "N/A"}
+                  </button>
+                )}
                 {!isStaff && (
                   <span className="font-semibold">
                     {formatCurrency(bill.totalAmount)} VNĐ
@@ -489,7 +500,9 @@ const BillsTableSection = ({
                     Phòng
                   </span>
                   <span>
-                    {roomsData?.[bill.roomId] || bill.roomId || "N/A"}
+                    {bill.source === "retail"
+                      ? "Bán lẻ"
+                      : roomsData?.[bill.roomId] || bill.roomId || "N/A"}
                   </span>
                 </div>
                 <div className="flex flex-col">
