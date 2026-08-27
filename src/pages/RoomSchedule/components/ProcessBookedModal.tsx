@@ -5,6 +5,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -34,6 +35,7 @@ import {
   patchScheduleInRoomSchedulesCache,
   persistSchedulePromotionInCache,
 } from "@/hooks/room-schedule";
+import ScheduleDatePicker from "./ScheduleDatePicker";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
 import { getRoomTypeLabel } from "../utils/scheduleRoomType";
@@ -41,23 +43,14 @@ import fnbMenuApis from "@/apis/fnbMenu.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import { IAddRemoveItemRequestBody } from "@/apis/fnbOrder.apis";
 import { OrderDetail } from "@/@types/FnbOrder";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
-  Coffee,
-  Utensils,
   Plus,
   Minus,
-  User,
-  ArrowUpRight,
   Globe,
   UserCheck,
   Building,
-  Clock,
-  Pencil,
-  ArrowRightLeft,
-  Gift,
+  User,
 } from "lucide-react";
 import { useGetStandardPromotions } from "@/hooks/promotion";
 
@@ -745,438 +738,381 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={handleDialogOpenChange}>
       <DialogContent
-        className="max-w-full max-h-[100dvh] overflow-y-auto overscroll-y-contain gap-0 p-0 sm:max-h-[94vh] sm:max-w-[725px]"
+        className="flex h-[100dvh] max-h-[100dvh] flex-col gap-0 overflow-hidden p-0 sm:h-auto sm:max-h-[90vh] sm:max-w-[560px]"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        <div className="px-4 pt-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] sm:px-2 sm:pt-6 sm:pb-6">
-          <DialogHeader className="pr-10">
-            <DialogTitle className="flex items-center gap-2 text-lg">
-              <Clock className="w-5 h-5 text-muted-foreground" />
+        <div className="flex h-full min-h-0 flex-1 flex-col">
+          <DialogHeader className="shrink-0 gap-1 border-b px-4 pb-4 pt-[max(1rem,env(safe-area-inset-top))] pr-12 sm:px-6 sm:pt-5">
+            <DialogTitle className="text-lg font-semibold tracking-tight">
               Xử lý booking
             </DialogTitle>
-            <DialogDescription>
-              Xác nhận thông tin khách, kiểm tra giờ rồi mở phiên hoặc hủy
-              booking.
+            <DialogDescription className="text-sm text-muted-foreground">
+              {eventStart.format("HH:mm")} – {eventEnd.format("HH:mm")}
+              <span className="mx-1.5 text-border">·</span>
+              {getSourceInfo(schedule.source).label}
             </DialogDescription>
           </DialogHeader>
 
-          {/* Tóm tắt nhanh: giờ dự kiến + nguồn booking */}
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/40 px-3 py-2.5">
-            <div className="flex items-center gap-2 text-sm">
-              <Clock className="w-4 h-4 shrink-0 text-muted-foreground" />
-              <span>
-                Giờ dự kiến: <strong>{eventStart.format("HH:mm")}</strong> –{" "}
-                <strong>{eventEnd.format("HH:mm")}</strong>
-              </span>
-            </div>
-            <Badge variant="secondary" className="gap-1 font-normal">
-              {React.createElement(getSourceInfo(schedule.source).icon, {
-                className: "w-3.5 h-3.5",
-              })}
-              {getSourceInfo(schedule.source).label}
-            </Badge>
-          </div>
-
-          <ScheduleMemberSection
-            className="mt-4"
-            inputId="booked-member-phone"
-            phone={member.phone}
-            savedPhone={member.savedPhone}
-            onPhoneChange={member.setPhone}
-            isPhoneDirty={member.isPhoneDirty}
-            hasSavedValidPhone={member.hasSavedValidPhone}
-            isSavingPhone={member.isSavingPhone}
-            onSavePhone={member.savePhone}
-            onClearPhone={member.clearPhone}
-            showGiftToggle={false}
-            customerName={schedule.customerName}
-            customerEmail={schedule.customerEmail}
-            memberInfo={member.memberInfo}
-            isLoadingMemberInfo={member.isLoadingMemberInfo}
-            isMemberInfoError={member.isMemberInfoError}
-            isMemberNotFound={member.isMemberNotFound}
-            availableGifts={member.availableGifts}
-            streakRewards={member.streakRewards}
-            selectableItems={member.selectableItems}
-            servedGifts={member.servedGifts}
-            onClaimGift={member.claimStreakGift}
-            onAddGiftItems={member.addStreakGiftItems}
-            onUpdateGiftItemQty={member.updateStreakGiftItemQty}
-            onRemoveGiftItem={member.removeStreakGiftItem}
-            isServingGift={member.isMutatingGift}
-          />
-
-          <ScheduleRoomTypeSection
-            className="mt-4"
-            schedule={schedule}
-            physicalRoomType={currentRoom?.roomType}
-            onUpdated={refetchSchedules}
-          />
-
-          {/* Khuyến mãi */}
-          <div className="mt-4 space-y-2">
-            <h3 className="font-semibold flex items-center gap-1.5">
-              <Gift className="w-4 h-4 text-muted-foreground" />
-              Khuyến mãi
-            </h3>
-            <Select
-              open={promotionSelectOpen}
-              onOpenChange={setPromotionSelectOpen}
-              value={selectedPromotion || "none"}
-              onValueChange={handlePromotionChange}
-              disabled={isUpdatingPromotion}
-            >
-              <SelectTrigger className="h-10">
-                <SelectValue placeholder="Chọn khuyến mãi" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="none">Không áp dụng</SelectItem>
-                {promotionList.map((promotion) => (
-                  <SelectItem key={promotion._id} value={promotion._id}>
-                    {promotion.name} ({promotion.discountPercentage}%)
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <p className="text-xs text-muted-foreground">
-              Khuyến mãi được lưu vào booking và tự áp dụng khi thanh toán.
-            </p>
-          </div>
-
-          {/* Ghi chú */}
-          <div className="mt-4 space-y-2">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold">Ghi chú</h3>
-              {!isEditingNote && (
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-7 px-2 text-muted-foreground"
-                  onClick={handleEditNote}
-                  disabled={isUpdatingNote}
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-1" />
-                  {currentSchedule.note ? "Sửa" : "Thêm"}
-                </Button>
-              )}
-            </div>
-            {isEditingNote ? (
-              <div className="space-y-2">
-                <Input
-                  value={noteValue}
-                  onChange={(e) => setNoteValue(e.target.value)}
-                  placeholder="Nhập ghi chú..."
-                  className="w-full"
-                />
-                <div className="flex gap-2">
-                  <Button
-                    size="sm"
-                    onClick={handleSaveNote}
-                    loading={isUpdatingNote}
-                  >
-                    Lưu
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleCancelEditNote}
-                    disabled={isUpdatingNote}
-                  >
-                    Hủy
-                  </Button>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground break-words">
-                {currentSchedule.note || "Chưa có ghi chú"}
-              </p>
-            )}
-          </div>
-
-          {/* Thông tin nâng cấp phòng (nếu có) */}
-          {schedule.upgraded && schedule.originalRoomType && (
-            <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
-              <ArrowUpRight className="w-3.5 h-3.5 shrink-0" />
-              Đã nâng cấp từ phòng gốc:{" "}
-              <span className="font-medium text-foreground">
-                {schedule.originalRoomType}
-              </span>
-            </p>
-          )}
-
-          {/* Đổi phòng */}
-          <div className="mt-4 space-y-2 border-t pt-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <ArrowRightLeft className="w-4 h-4 text-muted-foreground" />
-              Đổi phòng
-            </h3>
-            <p className="text-xs text-muted-foreground">
-              Queue nhạc sẽ tự chuyển theo khi đổi phòng.
-            </p>
-            <div className="space-y-2">
-              <Select
-                open={roomSelectOpen}
-                onOpenChange={setRoomSelectOpen}
-                value={targetRoomId}
-                onValueChange={setTargetRoomId}
-                disabled={isLoadingRooms || availableRooms.length === 0}
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue
-                    placeholder={
-                      availableRooms.length === 0
-                        ? "Không còn phòng khác để đổi"
-                        : "Chọn phòng muốn chuyển"
-                    }
-                  />
-                </SelectTrigger>
-                <SelectContent>
-                  {availableRooms.map((room) => (
-                    <SelectItem key={String(room._id)} value={String(room._id)}>
-                      {room.roomName} - {getRoomTypeLabel(room.roomType)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-
-              <Textarea
-                placeholder="Lý do đổi phòng (tuỳ chọn)"
-                value={roomChangeNote}
-                onChange={(e) => setRoomChangeNote(e.target.value)}
-                className="min-h-[80px]"
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-4">
+              <ScheduleMemberSection
+                inputId="booked-member-phone"
+                phone={member.phone}
+                savedPhone={member.savedPhone}
+                onPhoneChange={member.setPhone}
+                isPhoneDirty={member.isPhoneDirty}
+                hasSavedValidPhone={member.hasSavedValidPhone}
+                isSavingPhone={member.isSavingPhone}
+                onSavePhone={member.savePhone}
+                onClearPhone={member.clearPhone}
+                showGiftToggle={false}
+                customerName={schedule.customerName}
+                customerEmail={schedule.customerEmail}
+                memberInfo={member.memberInfo}
+                isLoadingMemberInfo={member.isLoadingMemberInfo}
+                isMemberInfoError={member.isMemberInfoError}
+                isMemberNotFound={member.isMemberNotFound}
+                availableGifts={member.availableGifts}
+                streakRewards={member.streakRewards}
+                selectableItems={member.selectableItems}
+                servedGifts={member.servedGifts}
+                onClaimGift={member.claimStreakGift}
+                onAddGiftItems={member.addStreakGiftItems}
+                onUpdateGiftItemQty={member.updateStreakGiftItemQty}
+                onRemoveGiftItem={member.removeStreakGiftItem}
+                isServingGift={member.isMutatingGift}
               />
 
-              <Button
-                variant="secondary"
-                onClick={handleChangeRoom}
-                loading={isChangingRoom}
-                disabled={availableRooms.length === 0}
-              >
-                Chuyển sang phòng mới
-              </Button>
+              <ScheduleRoomTypeSection
+                schedule={schedule}
+                physicalRoomType={currentRoom?.roomType}
+                onUpdated={refetchSchedules}
+              />
+
+              <div className="flex flex-col gap-1.5">
+                <label className="text-sm font-medium">Khuyến mãi</label>
+                <Select
+                  open={promotionSelectOpen}
+                  onOpenChange={setPromotionSelectOpen}
+                  value={selectedPromotion || "none"}
+                  onValueChange={handlePromotionChange}
+                  disabled={isUpdatingPromotion}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Chọn khuyến mãi" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Không áp dụng</SelectItem>
+                    {promotionList.map((promotion) => (
+                      <SelectItem key={promotion._id} value={promotion._id}>
+                        {promotion.name} ({promotion.discountPercentage}%)
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <label className="text-sm font-medium">Ghi chú</label>
+                  {!isEditingNote && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="h-8 px-2 text-sm"
+                      onClick={handleEditNote}
+                      disabled={isUpdatingNote}
+                    >
+                      {currentSchedule.note ? "Sửa" : "Thêm"}
+                    </Button>
+                  )}
+                </div>
+                {isEditingNote ? (
+                  <div className="flex flex-col gap-2">
+                    <Input
+                      value={noteValue}
+                      onChange={(e) => setNoteValue(e.target.value)}
+                      placeholder="Nhập ghi chú..."
+                      className="h-9 w-full"
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        size="sm"
+                        className="h-8"
+                        onClick={handleSaveNote}
+                        loading={isUpdatingNote}
+                      >
+                        Lưu
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8"
+                        onClick={handleCancelEditNote}
+                        disabled={isUpdatingNote}
+                      >
+                        Hủy
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="break-words text-sm text-muted-foreground">
+                    {currentSchedule.note || "Chưa có ghi chú"}
+                  </p>
+                )}
+              </div>
+
+              {schedule.upgraded && schedule.originalRoomType && (
+                <p className="text-sm text-muted-foreground">
+                  Đã nâng cấp từ phòng gốc:{" "}
+                  <span className="font-medium text-foreground">
+                    {schedule.originalRoomType}
+                  </span>
+                </p>
+              )}
+
+              <div className="flex flex-col gap-2 border-t pt-4">
+                <p className="text-sm font-medium">Đổi phòng</p>
+                <Select
+                  open={roomSelectOpen}
+                  onOpenChange={setRoomSelectOpen}
+                  value={targetRoomId}
+                  onValueChange={setTargetRoomId}
+                  disabled={isLoadingRooms || availableRooms.length === 0}
+                >
+                  <SelectTrigger className="h-9 w-full">
+                    <SelectValue
+                      placeholder={
+                        availableRooms.length === 0
+                          ? "Không còn phòng khác để đổi"
+                          : "Chọn phòng muốn chuyển"
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableRooms.map((room) => (
+                      <SelectItem key={String(room._id)} value={String(room._id)}>
+                        {room.roomName} - {getRoomTypeLabel(room.roomType)}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Textarea
+                  placeholder="Lý do đổi phòng (tuỳ chọn)"
+                  value={roomChangeNote}
+                  onChange={(e) => setRoomChangeNote(e.target.value)}
+                  className="min-h-[64px] resize-y text-sm"
+                />
+
+                <Button
+                  variant="secondary"
+                  className="h-9 w-fit"
+                  onClick={handleChangeRoom}
+                  loading={isChangingRoom}
+                  disabled={availableRooms.length === 0}
+                >
+                  Chuyển sang phòng mới
+                </Button>
+              </div>
+
+              {hasOrders && (
+                <div className="flex flex-col gap-2 border-t pt-4">
+                  <p className="text-sm font-medium">Đồ ăn & nước đã đặt</p>
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    {orderDetailData?.items?.drinks &&
+                      orderDetailData.items.drinks.length > 0 && (
+                        <div className="rounded-md border p-3">
+                          <p className="mb-2 text-sm font-medium">Nước uống</p>
+                          <div className="flex flex-col gap-1.5">
+                            {orderDetailData.items.drinks.map((item) => (
+                              <div
+                                key={item.itemId}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span className="truncate text-sm">
+                                  {item.name}
+                                </span>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.itemId,
+                                        item.quantity,
+                                        -1,
+                                        "drinks",
+                                      )
+                                    }
+                                    disabled={isUpdatingQuantity}
+                                    className="size-7 p-0"
+                                  >
+                                    <Minus className="size-3" />
+                                  </Button>
+                                  <span className="w-5 text-center text-sm tabular-nums">
+                                    {item.quantity}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.itemId,
+                                        item.quantity,
+                                        1,
+                                        "drinks",
+                                      )
+                                    }
+                                    disabled={isUpdatingQuantity}
+                                    className="size-7 p-0"
+                                  >
+                                    <Plus className="size-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                    {orderDetailData?.items?.snacks &&
+                      orderDetailData.items.snacks.length > 0 && (
+                        <div className="rounded-md border p-3">
+                          <p className="mb-2 text-sm font-medium">Đồ ăn</p>
+                          <div className="flex flex-col gap-1.5">
+                            {orderDetailData.items.snacks.map((item) => (
+                              <div
+                                key={item.itemId}
+                                className="flex items-center justify-between gap-2"
+                              >
+                                <span className="truncate text-sm">
+                                  {item.name}
+                                </span>
+                                <div className="flex shrink-0 items-center gap-1.5">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.itemId,
+                                        item.quantity,
+                                        -1,
+                                        "snacks",
+                                      )
+                                    }
+                                    disabled={isUpdatingQuantity}
+                                    className="size-7 p-0"
+                                  >
+                                    <Minus className="size-3" />
+                                  </Button>
+                                  <span className="w-5 text-center text-sm tabular-nums">
+                                    {item.quantity}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleQuantityChange(
+                                        item.itemId,
+                                        item.quantity,
+                                        1,
+                                        "snacks",
+                                      )
+                                    }
+                                    disabled={isUpdatingQuantity}
+                                    className="size-7 p-0"
+                                  >
+                                    <Plus className="size-3" />
+                                  </Button>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                </div>
+              )}
+
+              <div className="flex flex-col gap-2 border-t pt-4">
+                <p className="text-sm font-medium">Điều chỉnh ngày & giờ</p>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="adjustedStartDate"
+                      className="text-sm font-medium"
+                    >
+                      Ngày bắt đầu
+                    </label>
+                    <ScheduleDatePicker
+                      id="adjustedStartDate"
+                      value={adjustedStartDate}
+                      onChange={setAdjustedStartDate}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="adjustedStartTime"
+                      className="text-sm font-medium"
+                    >
+                      Giờ bắt đầu
+                    </label>
+                    <Input
+                      id="adjustedStartTime"
+                      type="time"
+                      value={adjustedStartTime}
+                      onChange={(e) => setAdjustedStartTime(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="adjustedEndDate"
+                      className="text-sm font-medium"
+                    >
+                      Ngày kết thúc
+                    </label>
+                    <ScheduleDatePicker
+                      id="adjustedEndDate"
+                      value={adjustedEndDate}
+                      onChange={setAdjustedEndDate}
+                    />
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <label
+                      htmlFor="adjustedEndTime"
+                      className="text-sm font-medium"
+                    >
+                      Giờ kết thúc
+                    </label>
+                    <Input
+                      id="adjustedEndTime"
+                      type="time"
+                      value={adjustedEndTime}
+                      onChange={(e) => setAdjustedEndTime(e.target.value)}
+                      className="h-9"
+                    />
+                  </div>
+                </div>
+                <Button
+                  variant="secondary"
+                  className="h-9 w-fit"
+                  onClick={handleUpdateTime}
+                  loading={isPending}
+                >
+                  Cập nhật giờ
+                </Button>
+              </div>
             </div>
           </div>
 
-          {/* Đồ ăn & nước đã đặt */}
-          {hasOrders && (
-            <div className="mt-4 space-y-2 border-t pt-4">
-              <h3 className="font-semibold flex items-center gap-2">
-                <Utensils className="w-4 h-4 text-muted-foreground" />
-                Đồ ăn & nước đã đặt
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Drinks */}
-                {orderDetailData?.items?.drinks &&
-                  orderDetailData.items.drinks.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-sm">
-                          <Coffee className="w-4 h-4" />
-                          Nước uống
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-1">
-                          {orderDetailData.items.drinks.map((item) => (
-                            <div
-                              key={item.itemId}
-                              className="flex justify-between items-center"
-                            >
-                              <span className="text-sm">{item.name}</span>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.itemId,
-                                      item.quantity,
-                                      -1,
-                                      "drinks",
-                                    )
-                                  }
-                                  disabled={isUpdatingQuantity}
-                                  className="w-6 h-6 p-0"
-                                >
-                                  <Minus className="w-3 h-3" />
-                                </Button>
-                                <Badge variant="secondary">
-                                  {item.quantity}
-                                </Badge>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.itemId,
-                                      item.quantity,
-                                      1,
-                                      "drinks",
-                                    )
-                                  }
-                                  disabled={isUpdatingQuantity}
-                                  className="w-6 h-6 p-0"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-
-                {/* Snacks */}
-                {orderDetailData?.items?.snacks &&
-                  orderDetailData.items.snacks.length > 0 && (
-                    <Card>
-                      <CardHeader className="pb-2">
-                        <CardTitle className="flex items-center gap-2 text-sm">
-                          <Utensils className="w-4 h-4" />
-                          Đồ ăn
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent className="pt-0">
-                        <div className="space-y-1">
-                          {orderDetailData.items.snacks.map((item) => (
-                            <div
-                              key={item.itemId}
-                              className="flex justify-between items-center"
-                            >
-                              <span className="text-sm">{item.name}</span>
-                              <div className="flex items-center gap-2">
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.itemId,
-                                      item.quantity,
-                                      -1,
-                                      "snacks",
-                                    )
-                                  }
-                                  disabled={isUpdatingQuantity}
-                                  className="w-6 h-6 p-0"
-                                >
-                                  <Minus className="w-3 h-3" />
-                                </Button>
-                                <Badge variant="secondary">
-                                  {item.quantity}
-                                </Badge>
-                                <Button
-                                  variant="outline"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleQuantityChange(
-                                      item.itemId,
-                                      item.quantity,
-                                      1,
-                                      "snacks",
-                                    )
-                                  }
-                                  disabled={isUpdatingQuantity}
-                                  className="w-6 h-6 p-0"
-                                >
-                                  <Plus className="w-3 h-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )}
-              </div>
-            </div>
-          )}
-
-          {/* Điều chỉnh ngày & giờ */}
-          <div className="mt-4 space-y-3 border-t pt-4">
-            <h3 className="font-semibold flex items-center gap-2">
-              <Clock className="w-4 h-4 text-muted-foreground" />
-              Điều chỉnh ngày & giờ
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <label
-                  htmlFor="adjustedStartDate"
-                  className="text-xs text-muted-foreground"
-                >
-                  Ngày bắt đầu
-                </label>
-                <input
-                  id="adjustedStartDate"
-                  type="date"
-                  value={adjustedStartDate}
-                  onChange={(e) => setAdjustedStartDate(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="adjustedStartTime"
-                  className="text-xs text-muted-foreground"
-                >
-                  Giờ bắt đầu
-                </label>
-                <input
-                  id="adjustedStartTime"
-                  type="time"
-                  value={adjustedStartTime}
-                  onChange={(e) => setAdjustedStartTime(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="adjustedEndDate"
-                  className="text-xs text-muted-foreground"
-                >
-                  Ngày kết thúc
-                </label>
-                <input
-                  id="adjustedEndDate"
-                  type="date"
-                  value={adjustedEndDate}
-                  onChange={(e) => setAdjustedEndDate(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-              <div className="space-y-1">
-                <label
-                  htmlFor="adjustedEndTime"
-                  className="text-xs text-muted-foreground"
-                >
-                  Giờ kết thúc
-                </label>
-                <input
-                  id="adjustedEndTime"
-                  type="time"
-                  value={adjustedEndTime}
-                  onChange={(e) => setAdjustedEndTime(e.target.value)}
-                  className="h-9 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
-                />
-              </div>
-            </div>
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={handleUpdateTime}
-              loading={isPending}
-            >
-              Cập nhật giờ
-            </Button>
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 gap-2 border-t pt-4 sm:grid-cols-2">
+          <DialogFooter className="shrink-0 grid grid-cols-1 gap-2 border-t px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] sm:grid-cols-2 sm:px-6 sm:py-4">
             <Button
               variant="outline"
               onClick={() => setIsMenuModalOpen(true)}
-              className="h-11 justify-center"
+              className="h-9"
             >
-              <Utensils className="w-4 h-4 mr-2" />
               Đặt đồ ăn / uống
             </Button>
             <Button
@@ -1184,14 +1120,10 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 handleUpdate(RoomStatus.InUse);
               }}
               loading={isPending}
-              className="h-11"
+              className="h-9"
             >
               Bắt đầu sử dụng
-              {adjustedStartTime && (
-                <span className="text-xs ml-1 opacity-70">
-                  ({adjustedStartTime})
-                </span>
-              )}
+              {adjustedStartTime ? ` (${adjustedStartTime})` : ""}
             </Button>
             <Button
               variant="destructive"
@@ -1199,18 +1131,17 @@ const ProcessBookedModal: React.FC<ProcessBookedModalProps> = ({
                 handleUpdate(RoomStatus.Cancelled);
               }}
               loading={isPending}
-              className="h-11"
+              className="h-9"
             >
               Hủy booking
             </Button>
-            <Button variant="ghost" onClick={onClose} className="h-11">
+            <Button variant="ghost" onClick={onClose} className="h-9">
               Đóng
             </Button>
-          </div>
+          </DialogFooter>
         </div>
       </DialogContent>
 
-      {/* Modal đặt đồ ăn */}
       <MenuItemsModal
         isOpen={isMenuModalOpen}
         onClose={() => setIsMenuModalOpen(false)}

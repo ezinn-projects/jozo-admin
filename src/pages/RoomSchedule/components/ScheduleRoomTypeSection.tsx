@@ -80,16 +80,9 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
   const physicalTypeHint =
     normalizedPhysicalType &&
     normalizedPhysicalType !== effectiveRoomType ? (
-      <p
-        className={
-          isInline
-            ? "text-[11px] text-muted-foreground"
-            : "text-xs text-muted-foreground"
-        }
-      >
+      <p className="text-sm text-muted-foreground">
         {isInline ? "Gốc: " : "Size gốc: "}
         {getRoomTypeLabel(normalizedPhysicalType).toLowerCase()}
-        {!isInline && "."}
       </p>
     ) : null;
 
@@ -141,16 +134,15 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
 
   return (
     <div className={className}>
-      <h3 className="font-semibold mb-2">Size đang dùng</h3>
       {editable ? (
-        <div className="space-y-2">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Size</Label>
+        <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1.5">
+            <Label className="text-sm font-medium">Size</Label>
             <Select
               value={selectedType}
               onValueChange={(value) => setSelectedType(value as RoomType)}
             >
-              <SelectTrigger className="w-full">
+              <SelectTrigger className="h-9 w-full">
                 <SelectValue placeholder="Chọn size" />
               </SelectTrigger>
               <SelectContent>
@@ -169,17 +161,21 @@ const ScheduleRoomTypeSection: React.FC<ScheduleRoomTypeSectionProps> = ({
             onClick={() => updateRoomType(selectedType)}
             loading={isPending}
             disabled={!hasTypeChanged}
+            className="h-9 w-fit"
           >
             Lưu size
           </Button>
         </div>
       ) : (
-        <p className="text-sm">
-          {getRoomTypeLabel(effectiveRoomType)}
-          {normalizedPhysicalType &&
-            normalizedPhysicalType !== effectiveRoomType &&
-            ` (size gốc: ${getRoomTypeLabel(normalizedPhysicalType).toLowerCase()})`}
-        </p>
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">Size</p>
+          <p className="text-sm text-muted-foreground">
+            {getRoomTypeLabel(effectiveRoomType)}
+            {normalizedPhysicalType &&
+              normalizedPhysicalType !== effectiveRoomType &&
+              ` (gốc: ${getRoomTypeLabel(normalizedPhysicalType).toLowerCase()})`}
+          </p>
+        </div>
       )}
     </div>
   );

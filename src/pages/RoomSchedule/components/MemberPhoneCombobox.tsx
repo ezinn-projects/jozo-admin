@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { Role } from "@/constants/enum";
 import { useDebounce } from "@/hooks/use-debounce";
 import { useUsers } from "@/hooks/use-users";
-import { Loader2, Search, X } from "lucide-react";
+import { Loader2, X } from "lucide-react";
 import React, { useEffect, useId, useRef, useState } from "react";
 import {
   isPhoneLikeInput,
@@ -133,22 +133,21 @@ const MemberPhoneCombobox: React.FC<MemberPhoneComboboxProps> = ({
   };
 
   return (
-    <div className={cn("space-y-2", className)} ref={containerRef}>
+    <div className={cn("flex flex-col gap-1.5", className)} ref={containerRef}>
       {label ? (
         <Label htmlFor={inputId} className="text-sm font-medium">
           {label}
         </Label>
       ) : null}
-      <div className="flex flex-col gap-2 sm:flex-row">
-        <div className="flex-1 space-y-1">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
+        <div className="min-w-0 flex-1 flex flex-col gap-1">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground pointer-events-none" />
             <Input
               id={inputId}
               type="text"
               inputMode={isNameMode ? "text" : "tel"}
               autoComplete="off"
-              placeholder="SĐT hoặc tên member..."
+              placeholder="SĐT hoặc tên member"
               value={query}
               onChange={(e) => handleQueryChange(e.target.value)}
               onFocus={() => setIsOpen(true)}
@@ -156,9 +155,9 @@ const MemberPhoneCombobox: React.FC<MemberPhoneComboboxProps> = ({
               onKeyDown={onKeyDown}
               disabled={disabled}
               className={cn(
-                "h-11 pl-9 text-base sm:text-lg tracking-wide",
-                canClear && "pr-10",
-                errorText && "border-red-500 focus-visible:ring-red-500",
+                "h-9 text-sm",
+                canClear && "pr-9",
+                errorText && "border-destructive focus-visible:ring-destructive",
                 inputClassName,
               )}
             />
@@ -169,23 +168,23 @@ const MemberPhoneCombobox: React.FC<MemberPhoneComboboxProps> = ({
                 disabled={disabled}
                 aria-label="Bỏ thành viên"
                 title="Bỏ thành viên"
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 disabled:opacity-50"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-50"
               >
-                <X className="h-4 w-4" />
+                <X className="size-3.5" />
               </button>
             )}
             {(isSearching || isFetching) && debouncedSearch.length >= 2 && (
               <Loader2
                 className={cn(
-                  "absolute top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-blue-500",
-                  canClear ? "right-10" : "right-3",
+                  "absolute top-1/2 size-3.5 -translate-y-1/2 animate-spin text-muted-foreground",
+                  canClear ? "right-9" : "right-3",
                 )}
               />
             )}
           </div>
 
           {showDropdown && !isSearching && !isFetching && (
-            <div className="rounded-lg border bg-white shadow-sm overflow-hidden">
+            <div className="overflow-hidden rounded-md border bg-popover text-popover-foreground shadow-sm">
               {results.length > 0 ? (
                 results.map((result) => (
                   <button
@@ -194,21 +193,21 @@ const MemberPhoneCombobox: React.FC<MemberPhoneComboboxProps> = ({
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => handleSelect(result.phone_number)}
                     disabled={!result.phone_number?.trim()}
-                    className="w-full px-3 py-2.5 text-left hover:bg-blue-50 border-b last:border-b-0 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full border-b px-3 py-2 text-left last:border-b-0 hover:bg-muted disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    <div className="font-medium text-gray-900">
+                    <div className="text-sm font-medium">
                       {result.name ||
                         result.full_name ||
                         result.username ||
                         "Member"}
                     </div>
-                    <div className="text-xs text-gray-500">
-                      SĐT: {result.phone_number || "Chưa có SĐT"}
+                    <div className="text-sm text-muted-foreground">
+                      {result.phone_number || "Chưa có SĐT"}
                     </div>
                   </button>
                 ))
               ) : (
-                <div className="px-3 py-2.5 text-sm text-gray-500">
+                <div className="px-3 py-2 text-sm text-muted-foreground">
                   Không tìm thấy member
                 </div>
               )}
@@ -216,9 +215,9 @@ const MemberPhoneCombobox: React.FC<MemberPhoneComboboxProps> = ({
           )}
 
           {errorText ? (
-            <p className="text-xs text-red-600">{errorText}</p>
+            <p className="text-sm text-destructive">{errorText}</p>
           ) : helperText ? (
-            <div className="text-xs text-muted-foreground">{helperText}</div>
+            <div className="text-sm text-muted-foreground">{helperText}</div>
           ) : null}
         </div>
         {trailing}

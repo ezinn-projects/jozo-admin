@@ -4,7 +4,7 @@ import {
   IStreakRewardProgress,
 } from "@/@types/Membership";
 import { cn } from "@/lib/utils";
-import { Flame, Gift, Loader2, Star, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import React, { useMemo } from "react";
 import {
   getMemberDisplayName,
@@ -92,7 +92,7 @@ const MemberPhoneLookupCard: React.FC<MemberPhoneLookupCardProps> = ({
           className,
         )}
       >
-        <Loader2 className="h-4 w-4 animate-spin" />
+        <Loader2 className="size-4 animate-spin" />
         Đang tìm...
       </div>
     );
@@ -102,7 +102,7 @@ const MemberPhoneLookupCard: React.FC<MemberPhoneLookupCardProps> = ({
     return (
       <div
         className={cn(
-          "rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800",
+          "rounded-md border px-3 py-2 text-sm text-muted-foreground",
           className,
         )}
       >
@@ -112,43 +112,30 @@ const MemberPhoneLookupCard: React.FC<MemberPhoneLookupCardProps> = ({
   }
 
   return (
-    <div className={cn("rounded-md border px-3 py-2.5 space-y-2.5", className)}>
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex items-center gap-2 min-w-0">
-          <User className="h-4 w-4 shrink-0 text-muted-foreground" />
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium">
-              {getMemberDisplayName(memberInfo)}
-              {memberInfo.tier ? (
-                <span className="ml-1.5 font-normal text-muted-foreground">
-                  · {memberInfo.tier}
-                </span>
-              ) : null}
-            </p>
-            <p className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-              <span className="inline-flex items-center gap-1">
-                <Flame className="h-3.5 w-3.5 text-orange-500" />
-                Streak {streakCount}
-              </span>
-              <span className="inline-flex items-center gap-1">
-                <Star className="h-3.5 w-3.5 text-yellow-500" />
-                {(memberInfo.availablePoint ?? 0).toLocaleString()} điểm
-              </span>
-            </p>
-          </div>
-        </div>
+    <div className={cn("flex flex-col gap-2 rounded-md border px-3 py-2.5", className)}>
+      <div className="min-w-0">
+        <p className="truncate text-sm font-medium">
+          {getMemberDisplayName(memberInfo)}
+          {memberInfo.tier ? (
+            <span className="ml-1.5 font-normal text-muted-foreground">
+              · {memberInfo.tier}
+            </span>
+          ) : null}
+        </p>
+        <p className="mt-0.5 text-sm text-muted-foreground">
+          Streak {streakCount}
+          <span className="mx-1.5 text-border">·</span>
+          {(memberInfo.availablePoint ?? 0).toLocaleString()} điểm
+        </p>
       </div>
 
       {claimableRows.length > 0 ? (
-        <div className="space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-            <Gift className="h-3.5 w-3.5" />
-            Quà chưa nhận
-          </p>
+        <div className="flex flex-col gap-1.5">
+          <p className="text-sm text-muted-foreground">Quà chưa nhận</p>
           {claimableRows.map((row) => (
             <div
               key={row.streakCount}
-              className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-2 text-sm"
+              className="flex items-center justify-between gap-2 rounded-md bg-muted/50 px-2.5 py-1.5 text-sm"
             >
               <span>Streak {row.streakCount}</span>
               <span className="font-medium">
@@ -158,12 +145,11 @@ const MemberPhoneLookupCard: React.FC<MemberPhoneLookupCardProps> = ({
           ))}
         </div>
       ) : nextReward ? (
-        <p className="text-xs text-muted-foreground">
-          Chưa tới mốc. Còn streak {nextReward.count} (
-          {formatStreakRewardLabel(nextReward)}).
+        <p className="text-sm text-muted-foreground">
+          Còn streak {nextReward.count} ({formatStreakRewardLabel(nextReward)})
         </p>
       ) : (
-        <p className="text-xs text-muted-foreground">Không còn quà.</p>
+        <p className="text-sm text-muted-foreground">Không còn quà</p>
       )}
     </div>
   );

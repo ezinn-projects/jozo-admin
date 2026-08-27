@@ -12,20 +12,10 @@ import {
 } from "@/@types/Membership";
 import {
   Check,
-  Gift,
   Loader2,
   Minus,
-  Phone,
   Plus,
-  Save,
   Search,
-  User,
-  Award,
-  Star,
-  Flame,
-  Mail,
-  Cake,
-  Target,
   X,
 } from "lucide-react";
 import React, { memo, useEffect, useMemo, useState } from "react";
@@ -133,22 +123,6 @@ const formatDateOfBirth = (date?: string | null) => {
   if (!date) return null;
   const parsed = dayjs(date);
   return parsed.isValid() ? parsed.format("DD/MM/YYYY") : null;
-};
-
-const getTierColor = (tier?: string) => {
-  switch (tier?.toLowerCase()) {
-    case "vip":
-    case "diamond":
-      return "text-purple-700 bg-purple-100 border-purple-200";
-    case "gold":
-      return "text-yellow-700 bg-yellow-100 border-yellow-200";
-    case "silver":
-      return "text-gray-700 bg-gray-100 border-gray-200";
-    case "bronze":
-      return "text-orange-700 bg-orange-100 border-orange-200";
-    default:
-      return "text-blue-700 bg-blue-100 border-blue-200";
-  }
 };
 
 const getRewardLabel = (reward: IStreakRewardProgress) => {
@@ -306,7 +280,6 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   const canClearPhone =
     Boolean(onClearPhone) &&
     (phone.trim().length > 0 || savedPhone.trim().length > 0);
-  const isActive = hasClaimedGift || (showGiftToggle && isGiftEnabled);
   /** Hiện card member/quà khi SĐT hợp lệ và không đang tìm theo tên. */
   const showMemberLookup =
     !isNameSearchActive &&
@@ -398,42 +371,18 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   };
 
   return (
-    <section
-      className={cn(
-        "rounded-xl border p-4 space-y-4",
-        isActive
-          ? "border-pink-200 bg-gradient-to-br from-blue-50 via-white to-pink-50"
-          : "border-blue-200 bg-blue-50/60",
-        className,
-      )}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-            <Phone className="w-4 h-4 text-blue-600" />
-            {showGiftToggle ? "Thành viên & quà tặng" : "Thành viên"}
-          </h3>
-        </div>
+    <section className={cn("flex flex-col gap-3", className)}>
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="text-sm font-medium">
+          {showGiftToggle ? "Thành viên & quà tặng" : "Thành viên"}
+        </h3>
         {showGiftToggle && (
-          <Badge
-            variant="outline"
-            className={cn(
-              "shrink-0",
-              hasClaimedGift
-                ? "border-pink-300 text-pink-700 bg-pink-50"
-                : isGiftEnabled
-                  ? "border-emerald-300 text-emerald-700 bg-emerald-50"
-                  : "border-gray-300 text-gray-600 bg-white",
-            )}
-          >
+          <Badge variant="secondary" className="shrink-0 font-normal">
             {getGiftStatusLabel(hasClaimedGift, isGiftEnabled)}
           </Badge>
         )}
         {!showGiftToggle && hasClaimedGift && (
-          <Badge
-            variant="outline"
-            className="shrink-0 border-pink-300 text-pink-700 bg-pink-50"
-          >
+          <Badge variant="secondary" className="shrink-0 font-normal">
             Đã nhận quà
           </Badge>
         )}
@@ -448,6 +397,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         onClear={onClearPhone}
         onKeyDown={handleKeyDown}
         onNameSearchActiveChange={setIsNameSearchActive}
+        label={undefined}
         errorText={
           showPhoneError
             ? "SĐT không hợp lệ (10–11 số, bắt đầu bằng 0)"
@@ -458,17 +408,15 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
           isPhoneDirty && onSavePhone ? (
             <Button
               type="button"
+              variant="secondary"
               onClick={onSavePhone}
               disabled={!isPhoneValid || isSavingPhone}
-              className="h-11 sm:min-w-[110px] bg-blue-600 hover:bg-blue-700"
+              className="h-9 shrink-0 sm:min-w-[88px]"
             >
               {isSavingPhone ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="size-3.5 animate-spin" />
               ) : (
-                <>
-                  <Save className="w-4 h-4 mr-1.5" />
-                  Lưu SĐT
-                </>
+                "Lưu"
               )}
             </Button>
           ) : null
@@ -476,91 +424,53 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       />
 
       {showMemberLookup && isLoadingMemberInfo && (
-        <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2.5 flex items-center gap-2 text-sm text-gray-600">
-          <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
-          <span>Đang tìm member...</span>
+        <div className="flex items-center gap-2 rounded-md border px-3 py-2 text-sm text-muted-foreground">
+          <Loader2 className="size-3.5 animate-spin" />
+          Đang tìm member...
         </div>
       )}
 
       {showMemberLookup && !isLoadingMemberInfo && memberInfo && (
-        <div className="rounded-lg border border-blue-100 bg-white/90 px-3 py-3 space-y-3">
+        <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
           <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2 min-w-0">
-              <div className="w-9 h-9 rounded-full bg-blue-100 flex items-center justify-center shrink-0">
-                <User className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="min-w-0">
-                <p className="font-semibold text-gray-900 truncate">
-                  {getMemberDisplayName(memberInfo)}
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">
+                {getMemberDisplayName(memberInfo)}
+              </p>
+              {memberInfo.name && memberInfo.username && (
+                <p className="truncate text-sm text-muted-foreground">
+                  @{memberInfo.username}
                 </p>
-                {memberInfo.name && memberInfo.username && (
-                  <p className="text-xs text-gray-500 truncate">
-                    @{memberInfo.username}
-                  </p>
-                )}
-              </div>
+              )}
             </div>
             {memberInfo.tier && (
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold border shrink-0",
-                  getTierColor(memberInfo.tier),
-                )}
-              >
-                <Award className="w-3 h-3" />
-                {memberInfo.tier.toUpperCase()}
-              </span>
+              <Badge variant="secondary" className="shrink-0 font-normal">
+                {memberInfo.tier}
+              </Badge>
             )}
           </div>
 
-          <div className="space-y-1.5 text-sm">
-            <div className="flex items-center gap-2 text-gray-700 min-w-0">
-              <User className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="text-gray-500 w-20 shrink-0">Tên</span>
-              <span className="font-medium truncate">
-                {memberInfo.full_name?.trim() || memberInfo.name?.trim() || "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <Phone className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="text-gray-500 w-20 shrink-0">SĐT</span>
-              <span className="font-medium">{memberInfo.phone_number}</span>
-            </div>
-            <div className="flex items-center gap-2 text-gray-700 min-w-0">
-              <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="text-gray-500 w-20 shrink-0">Email</span>
-              <span className="font-medium truncate">
-                {memberInfo.email?.trim() || "—"}
-              </span>
-            </div>
-            <div className="flex items-center gap-2 text-gray-700">
-              <Cake className="w-3.5 h-3.5 text-blue-500 shrink-0" />
-              <span className="text-gray-500 w-20 shrink-0">Ngày sinh</span>
-              <span className="font-medium">
-                {formatDateOfBirth(memberInfo.date_of_birth) || "—"}
-              </span>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-md bg-yellow-50 border border-yellow-100 px-2.5 py-2">
-              <div className="flex items-center gap-1 text-xs text-gray-600 mb-0.5">
-                <Star className="w-3 h-3 text-yellow-600" />
-                Điểm
-              </div>
-              <p className="text-base font-bold text-yellow-700">
-                {(memberInfo.availablePoint ?? 0).toLocaleString()}
-              </p>
-            </div>
-            <div className="rounded-md bg-orange-50 border border-orange-100 px-2.5 py-2">
-              <div className="flex items-center gap-1 text-xs text-gray-600 mb-0.5">
-                <Flame className="w-3 h-3 text-orange-600" />
-                Streak
-              </div>
-              <p className="text-base font-bold text-orange-700">
-                {memberInfo.streakCount ?? 0}
-              </p>
-            </div>
+          <div className="grid grid-cols-[4.5rem_1fr] gap-x-3 gap-y-1 text-sm">
+            <span className="text-muted-foreground">Tên</span>
+            <span className="min-w-0 truncate font-medium">
+              {memberInfo.full_name?.trim() || memberInfo.name?.trim() || "—"}
+            </span>
+            <span className="text-muted-foreground">SĐT</span>
+            <span className="font-medium">{memberInfo.phone_number}</span>
+            <span className="text-muted-foreground">Email</span>
+            <span className="min-w-0 truncate font-medium">
+              {memberInfo.email?.trim() || "—"}
+            </span>
+            <span className="text-muted-foreground">Ngày sinh</span>
+            <span className="font-medium">
+              {formatDateOfBirth(memberInfo.date_of_birth) || "—"}
+            </span>
+            <span className="text-muted-foreground">Điểm</span>
+            <span className="font-medium">
+              {(memberInfo.availablePoint ?? 0).toLocaleString()}
+            </span>
+            <span className="text-muted-foreground">Streak</span>
+            <span className="font-medium">{memberInfo.streakCount ?? 0}</span>
           </div>
         </div>
       )}
@@ -569,43 +479,25 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
         !isLoadingMemberInfo &&
         !memberInfo &&
         (isMemberInfoError || isMemberNotFound) && (
-          <div className="rounded-lg border border-amber-200 bg-amber-50/80 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-md border px-3 py-2 text-sm text-muted-foreground">
             Không tìm thấy tài khoản thành viên với SĐT này.
           </div>
         )}
 
       {showScheduleCustomer && (
-        <div className="rounded-lg border border-blue-100 bg-white/80 px-3 py-2 text-sm space-y-1">
+        <div className="rounded-md border px-3 py-2 text-sm">
           {customerName && (
-            <div className="flex items-center gap-2 text-gray-700">
-              <User className="w-3.5 h-3.5 text-blue-500" />
-              <span className="font-medium">{customerName}</span>
-            </div>
+            <p className="font-medium">{customerName}</p>
           )}
           {customerEmail && (
-            <p className="text-xs text-gray-500 pl-5">{customerEmail}</p>
+            <p className="text-muted-foreground">{customerEmail}</p>
           )}
         </div>
       )}
 
       {showGiftToggle && onGiftEnabledChange && (
-        <div className="flex items-center justify-between rounded-lg border border-gray-200 bg-white/90 px-3 py-2.5">
-          <div className="flex items-center gap-2 min-w-0">
-            <Gift
-              className={cn(
-                "w-4 h-4 shrink-0",
-                isGiftEnabled ? "text-pink-500" : "text-gray-400",
-              )}
-            />
-            <div className="min-w-0">
-              <p className="text-sm font-medium text-gray-800">
-                Cho phép nhận quà
-              </p>
-              <p className="text-xs text-gray-500 truncate">
-                Bật khi khách đủ điều kiện nhận quà trong phiên
-              </p>
-            </div>
-          </div>
+        <div className="flex h-9 items-center justify-between gap-3 rounded-md border px-3">
+          <p className="text-sm font-medium">Cho phép nhận quà</p>
           <Switch
             checked={isGiftEnabled}
             onCheckedChange={(checked) => onGiftEnabledChange(checked === true)}
@@ -615,24 +507,24 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       )}
 
       {giftDetail && (
-        <div className="rounded-lg border border-pink-200 bg-pink-50/80 px-3 py-2.5 space-y-1.5 text-sm">
-          <p className="font-medium text-pink-800">
+        <div className="flex flex-col gap-1 rounded-md border px-3 py-2.5 text-sm">
+          <p className="font-medium">
             Quà đã gán: {giftDetail.name || "Quà tặng"}
           </p>
           {giftDetail.status && (
-            <p className="text-xs text-gray-600">
+            <p className="text-muted-foreground">
               Trạng thái: {giftDetail.status}
             </p>
           )}
           {giftDetail.type === "discount" && giftDetail.discountPercentage && (
-            <p className="text-green-700 font-semibold">
+            <p className="font-medium">
               Giảm {giftDetail.discountPercentage}%
             </p>
           )}
           {giftDetail.type === "snacks_drinks" &&
             giftDetail.items &&
             giftDetail.items.length > 0 && (
-              <ul className="list-disc pl-4 space-y-0.5 text-xs text-gray-700">
+              <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
                 {giftDetail.items.map((item, index) => (
                   <li key={item.itemId || index}>
                     {item.name || "Món"}
@@ -647,9 +539,8 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       {showMemberLookup && !isLoadingMemberInfo && memberInfo && (
         <>
           {availableGifts.length > 0 && (
-            <div className="rounded-lg border border-pink-200 bg-pink-50/60 px-3 py-3 space-y-2.5">
-              <p className="text-sm font-semibold text-pink-900 flex items-center gap-2">
-                <Gift className="w-4 h-4 text-pink-600" />
+            <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
+              <p className="text-sm font-medium">
                 Quà ({availableGifts.length})
               </p>
               <div className="space-y-2">
@@ -694,11 +585,8 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
           )}
 
           {streakRewards.length > 0 && (
-            <div className="rounded-lg border border-orange-100 bg-white/90 px-3 py-3 space-y-2.5">
-              <p className="text-sm font-semibold text-gray-900 flex items-center gap-2">
-                <Target className="w-4 h-4 text-orange-600" />
-                Tiến độ streak
-              </p>
+            <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
+              <p className="text-sm font-medium">Tiến độ streak</p>
               <div className="space-y-2">
                 {streakRewards.map((reward) => {
                   const served = servedGifts.find(
@@ -1050,20 +938,17 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                     type="button"
                     onClick={handleClaimGift}
                     disabled={!canClaimGift || isServingGift}
-                    className="w-full bg-pink-600 hover:bg-pink-700"
+                    className="h-9 w-full"
                   >
                     {isServingGift ? (
                       <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        <Loader2 className="mr-2 size-3.5 animate-spin" />
                         Đang phát...
                       </>
+                    ) : selectedQtyTotal > 0 ? (
+                      `Phát quà (${selectedQtyTotal} món)`
                     ) : (
-                      <>
-                        <Gift className="w-4 h-4 mr-2" />
-                        {selectedQtyTotal > 0
-                          ? `Phát quà (${selectedQtyTotal} món)`
-                          : "Phát quà"}
-                      </>
+                      "Phát quà"
                     )}
                   </Button>
                 </div>
