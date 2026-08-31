@@ -52,7 +52,6 @@ const toDateTimeLocalValue = (iso?: string | null) => {
 const updateUserSchema = z
   .object({
     name: z.string().min(1, "Tên là bắt buộc"),
-    username: z.string().min(3, "Username phải có ít nhất 3 ký tự"),
     email: z.string().email("Email không hợp lệ").optional().or(z.literal("")),
     date_of_birth: z.coerce.date({
       required_error: "Ngày sinh là bắt buộc",
@@ -153,7 +152,7 @@ const EditUserForm = () => {
     resolver: zodResolver(updateUserSchema),
     defaultValues: {
       name: "",
-      username: "",
+
       email: "",
       date_of_birth: undefined,
       phone_number: "",
@@ -182,7 +181,7 @@ const EditUserForm = () => {
     if (user && user._id) {
       form.reset({
         name: user.name || user.full_name || "",
-        username: user.username || "",
+
         email: user.email || "",
         date_of_birth: new Date(user.date_of_birth),
         phone_number: user.phone_number,
@@ -237,7 +236,7 @@ const EditUserForm = () => {
 
     const updateData: UpdateUserRequest = {
       name: data.name,
-      username: data.username,
+
       email: data.email || undefined,
       date_of_birth: data.date_of_birth,
       phone_number: data.phone_number,
@@ -781,20 +780,6 @@ const EditUserForm = () => {
               )}
             </div>
 
-            {/* Username */}
-            <div className="space-y-2">
-              <Label htmlFor="username">Username *</Label>
-              <Input
-                id="username"
-                {...form.register("username")}
-                placeholder="Nhập username (dùng để đăng nhập)"
-              />
-              {form.formState.errors.username && (
-                <p className="text-sm text-red-500">
-                  {form.formState.errors.username.message}
-                </p>
-              )}
-            </div>
 
             {/* Email */}
             <div className="space-y-2">

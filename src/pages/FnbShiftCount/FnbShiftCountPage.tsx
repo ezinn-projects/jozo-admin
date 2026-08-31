@@ -205,7 +205,7 @@ const FnbShiftCountPage = () => {
             </CardContent>
           </Card>
 
-          <ShiftCountSummary summary={shiftCount?.summary} />
+          <ShiftCountSummary summary={shiftCount?.summary} isAdmin={isAdmin} />
 
           <Card>
             <CardHeader className="pb-3">
@@ -216,6 +216,7 @@ const FnbShiftCountPage = () => {
                 items={formItems}
                 shifts={resolvedShifts}
                 dayItemsEditable={dayItemsEditable}
+                isAdmin={isAdmin}
                 search={queryConfig.search}
                 isLoading={isLoading}
                 lockingShiftNo={lockingShiftNo}
