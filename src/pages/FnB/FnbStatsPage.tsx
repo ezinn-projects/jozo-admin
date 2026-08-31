@@ -118,16 +118,22 @@ const CATEGORY_LABELS: Record<string, string> = {
   snacks: "Snacks",
 };
 
+const FNB_DAY_CUTOFF_HOUR = 3;
+
+const getCurrentBusinessDate = (value: Dayjs): Dayjs =>
+  value.hour() < FNB_DAY_CUTOFF_HOUR ? value.subtract(1, "day") : value;
+
 function getCategoryLabel(category: string): string {
   return CATEGORY_LABELS[category?.toLowerCase()] ?? category;
 }
 
 const FnbStatsPage = () => {
   const today = useMemo(() => dayjs(), []);
+  const currentBusinessDate = useMemo(() => getCurrentBusinessDate(today), [today]);
   const monthOptions = useMemo(() => buildMonthOptions(), []);
 
   const [period, setPeriod] = useState<FnbStatsPeriod>("day");
-  const [date, setDate] = useState<Date | undefined>(today.toDate());
+  const [date, setDate] = useState<Date | undefined>(currentBusinessDate.toDate());
   const [selectedMonth, setSelectedMonth] = useState<Dayjs>(today.startOf("month"));
   const [selectedWeekIndex, setSelectedWeekIndex] = useState<number>(() =>
     getCurrentWeekIndex(getWeeksInMonth(today.startOf("month")), today),
@@ -150,18 +156,21 @@ const FnbStatsPage = () => {
 
   const apiDate = useMemo(() => {
     if (period === "day") {
-      return date ? format(date, "yyyy-MM-dd") : undefined;
+      // Không truyền date vẫn phải giữ cùng ngày kinh doanh hiện tại.
+      return date
+        ? format(date, "yyyy-MM-dd")
+        : currentBusinessDate.format("YYYY-MM-DD");
     }
     if (period === "week") {
       return selectedWeek?.start.format("YYYY-MM-DD");
     }
     return selectedMonth.startOf("month").format("YYYY-MM-DD");
-  }, [period, date, selectedWeek, selectedMonth]);
+  }, [period, date, selectedWeek, selectedMonth, currentBusinessDate]);
 
   const handlePeriodChange = (nextPeriod: FnbStatsPeriod) => {
     setPeriod(nextPeriod);
     if (nextPeriod === "day") {
-      setDate(today.toDate());
+      setDate(currentBusinessDate.toDate());
       return;
     }
     const currentMonth = today.startOf("month");
