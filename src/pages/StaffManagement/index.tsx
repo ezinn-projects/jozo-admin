@@ -24,7 +24,7 @@ const StaffManagementPage = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [deleteUserId, setDeleteUserId] = useState<string | null>(null);
-  const { users, isLoadingUsers, isFetchingUsers, deleteUser, isDeletingUser } =
+  const { users, isLoadingUsers, deleteUser, isDeletingUser } =
     useUsers({
       page: 1,
       limit: 10000,
@@ -129,7 +129,6 @@ const StaffManagementPage = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
-              disabled={isFetchingUsers}
             />
           </div>
         </CardContent>

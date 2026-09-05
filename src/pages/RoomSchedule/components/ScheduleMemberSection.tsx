@@ -11,7 +11,6 @@ import {
   IStreakRewardProgress,
 } from "@/@types/Membership";
 import {
-  Check,
   Loader2,
   Minus,
   Plus,
@@ -194,6 +193,19 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       null,
     [servedGifts, selectedStreakCount],
   );
+
+  const nextStreakReward = useMemo(() => {
+    const currentStreak = Number(memberInfo?.streakCount ?? 0) || 0;
+
+    return [...streakRewards]
+      .filter((reward) => !reward.claimed && reward.isClaimed !== true)
+      .sort((a, b) => a.streakCount - b.streakCount)
+      .map((reward) => ({
+        reward,
+        isReached:
+          reward.isReached === true || currentStreak >= reward.streakCount,
+      }))[0];
+  }, [memberInfo?.streakCount, streakRewards]);
 
   // Bỏ chọn mốc đã claim mà không còn served trên schedule này
   useEffect(() => {
@@ -584,49 +596,18 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
             </div>
           )}
 
-          {streakRewards.length > 0 && (
+          {nextStreakReward && (
             <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
-              <p className="text-sm font-medium">Tiến độ streak</p>
+              <p className="text-sm font-medium">Mốc streak tiếp theo</p>
               <div className="space-y-2">
-                {streakRewards.map((reward) => {
+                {(() => {
+                  const { reward, isReached } = nextStreakReward;
                   const served = servedGifts.find(
                     (gift) => gift.streakCount === reward.streakCount,
                   );
-                  const isClaimed = reward.claimed || reward.isClaimed === true;
-                  // Đã claim: chỉ mở được nếu schedule này còn servedGifts (để sửa món/quota)
-                  const isDisabled = isServingGift || (isClaimed && !served);
+                  const isDisabled = isServingGift || !isReached;
                   const isSelected =
                     selectedStreakCount === reward.streakCount && !isDisabled;
-
-                  if (isClaimed && !served) {
-                    return (
-                      <div
-                        key={reward.streakCount}
-                        className="rounded-md border border-gray-200 bg-gray-50 px-2.5 py-2 text-sm text-gray-500 opacity-80"
-                        aria-disabled
-                      >
-                        <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold bg-emerald-100 text-emerald-700">
-                            <Check className="w-3.5 h-3.5" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium truncate">
-                              {getRewardLabel(reward)}
-                            </p>
-                            <p className="text-xs text-gray-500">
-                              Streak {reward.streakCount} · Đã nhận
-                            </p>
-                          </div>
-                          <Badge
-                            variant="outline"
-                            className="shrink-0 border-emerald-200 text-emerald-700 bg-emerald-50"
-                          >
-                            Đã nhận
-                          </Badge>
-                        </div>
-                      </div>
-                    );
-                  }
 
                   return (
                     <button
@@ -640,24 +621,20 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                         isSelected
                           ? "border-pink-400 bg-pink-100 ring-1 ring-pink-300 text-pink-950"
                           : served
-                            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950 hover:bg-emerald-100"
-                            : "border-pink-200 bg-pink-50/80 text-pink-950 hover:bg-pink-100",
+                            ? "border-emerald-200 bg-emerald-50/80 text-emerald-950"
+                            : "border-pink-200 bg-pink-50/80 text-pink-950",
                       )}
                     >
                       <div className="flex items-center gap-2">
                         <div
                           className={cn(
                             "w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-xs font-bold",
-                            served
-                              ? "bg-emerald-200 text-emerald-800"
-                              : "bg-pink-200 text-pink-800",
+                            isReached
+                              ? "bg-pink-200 text-pink-800"
+                              : "bg-gray-200 text-gray-600",
                           )}
                         >
-                          {served ? (
-                            <Check className="w-3.5 h-3.5" />
-                          ) : (
-                            reward.streakCount
-                          )}
+                          {reward.streakCount}
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium truncate">
@@ -665,34 +642,26 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                           </p>
                           <p className="text-xs opacity-80">
                             Streak {reward.streakCount}
-                            {served
-                              ? ` • ${served.usedQuantity}/${served.itemCount} món`
-                              : reward.isReached
-                                ? " • Chọn để nhận"
-                                : ""}
+                            {isReached
+                              ? " • Đủ streak, có thể nhận"
+                              : ` • Còn ${reward.streakCount - (Number(memberInfo?.streakCount ?? 0) || 0)} streak`}
                           </p>
                         </div>
                         <Badge
                           variant="outline"
                           className={cn(
                             "shrink-0",
-                            isSelected
-                              ? "border-pink-400 text-pink-800 bg-pink-50"
-                              : served
-                                ? "border-emerald-300 text-emerald-700 bg-white"
-                                : "border-pink-300 text-pink-700 bg-white",
+                            isReached
+                              ? "border-pink-300 text-pink-700 bg-white"
+                              : "border-gray-300 text-gray-500 bg-white",
                           )}
                         >
-                          {isSelected
-                            ? "Đang chọn"
-                            : served
-                              ? "Sửa món"
-                              : "Nhận"}
+                          {isReached ? "Nhận" : "Chưa đủ"}
                         </Badge>
                       </div>
                     </button>
                   );
-                })}
+                })()}
               </div>
             </div>
           )}

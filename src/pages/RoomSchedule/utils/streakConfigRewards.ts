@@ -92,7 +92,7 @@ export const getClaimableStreakRows = (options: {
   // availableGifts từ API = còn nhận được → luôn hiện
   for (const gift of availableGifts) {
     const count = toCount(gift.streakCount);
-    if (count <= 0) continue;
+    if (count <= 0 || claimed.has(count)) continue;
     const fromConfig = (configRewards ?? []).find(
       (r) => toCount(r.count) === count,
     );
