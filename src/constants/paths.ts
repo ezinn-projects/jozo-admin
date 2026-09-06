@@ -89,6 +89,8 @@ const PATHS = {
 
   // room music
   SONGS_COLLECTION: "/songs-collection",
+  MUSIC_CATEGORIES: "/music-categories",
+  MUSIC_CATEGORY_DETAIL: "/music-categories/:categoryId",
 } as const;
 
 export default PATHS;

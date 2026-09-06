@@ -88,6 +88,10 @@ const NotificationsPage = lazy(() => import("@/pages/NotificationsPage"));
 const SongsCollectionPage = lazy(
   () => import("@/pages/SongsCollectionPage")
 );
+const MusicCategoriesPage = lazy(() => import("@/pages/MusicCategories"));
+const MusicCategoryDetailPage = lazy(
+  () => import("@/pages/MusicCategories/MusicCategoryDetailPage")
+);
 const RoomDeviceConnectionsPage = lazy(
   () => import("@/pages/RoomDeviceConnections")
 );
@@ -200,6 +204,14 @@ function useRoute() {
                 <Route path={PATHS.RECRUITMENT} element={<RecruitmentPage />} />
                 <Route path={PATHS.GIFTS} element={<GiftsPage />} />
                 <Route path={PATHS.GAMES} element={<GamesPage />} />
+                <Route
+                  path={PATHS.MUSIC_CATEGORIES}
+                  element={<MusicCategoriesPage />}
+                />
+                <Route
+                  path={PATHS.MUSIC_CATEGORY_DETAIL}
+                  element={<MusicCategoryDetailPage />}
+                />
                 <Route path={PATHS.STAFF_SCHEDULE} element={<StaffSchedulePage />} />
                 <Route
                   path={PATHS.STAFF_SALARY_CONFIG}
