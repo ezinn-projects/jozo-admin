@@ -232,6 +232,12 @@ const MENU_ITEMS: MenuItem[] = [
         icon: Music,
         roles: ADMIN_ONLY,
       },
+      {
+        title: "Danh mục nhạc",
+        url: PATHS.MUSIC_CATEGORIES,
+        icon: Music,
+        roles: ADMIN_ONLY,
+      },
     ],
   },
 ];
