@@ -2,6 +2,7 @@ import {
   BillPaymentMethod,
   IBill,
   IBillPaymentMethodHistory,
+  IRevenueResult,
 } from "@/@types/Bill";
 import http from "@/utils/http";
 import dayjs, { toIsoStringWithZeroSubsecond } from "@/lib/dayjs";
@@ -149,17 +150,7 @@ const billAPis = {
     }),
   /** GET /bill/revenue — FE tự tính startDate/endDate (ISO), gửi lên một endpoint duy nhất */
   getBillRevenue: async (startDate: string, endDate: string) =>
-    http.get<
-      HTTPResponse<{
-        timeRange?: string;
-        dateRange: string;
-        startDate: string;
-        endDate: string;
-        totalRevenue: number;
-        billCount: number;
-        bills: IBill[];
-      }>
-    >(
+    http.get<HTTPResponse<IRevenueResult>>(
       `/bill/revenue?startDate=${encodeURIComponent(startDate)}&endDate=${encodeURIComponent(endDate)}`,
     ),
 
