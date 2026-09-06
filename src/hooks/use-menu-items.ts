@@ -11,6 +11,7 @@ import fnbOrderApis, {
   ICompleteOrderRequestBody,
   ICompleteOrderResult,
 } from "@/apis/fnbOrder.apis";
+import { FnbRevenueCategory } from "@/@types/Bill";
 import { FnBCategory } from "@/constants/enum";
 
 // Interface cho menu item theo cấu trúc cũ (để tương thích)
@@ -24,6 +25,8 @@ export interface FnBMenuItem {
   image?: string;
   isActive?: boolean;
   isAvailable?: boolean;
+  revenueCategory?: FnbRevenueCategory;
+  inventoryTracked?: boolean;
   inventory: {
     quantity: number;
     minStock?: number;
@@ -102,6 +105,8 @@ export const parseNestedVariants = (parent: FnBMenuItem): FnBMenuItem[] => {
     ...variant,
     parentId: variant.parentId || parent._id || null,
     category: variant.category || parent.category,
+    revenueCategory: variant.revenueCategory || parent.revenueCategory,
+    inventoryTracked: variant.inventoryTracked ?? parent.inventoryTracked,
     hasVariant: false,
     inventory: {
       quantity: variant.inventory?.quantity ?? 0,

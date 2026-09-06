@@ -27,6 +27,8 @@ import {
   BillPaymentMethod,
   IBill,
   IBillPaymentMethodHistoryLog,
+  IRevenueResult,
+  RevenueBreakdown,
 } from "@/@types/Bill";
 import roomApis from "@/apis/room.apis";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -54,6 +56,13 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { useIsAdmin, useIsStaff } from "@/hooks/usePermission";
 import { formatCurrency } from "@/utils/formatters";
+import {
+  getFnbRevenue,
+  normalizeRevenueBreakdown,
+  REVENUE_CATEGORY_LABELS,
+  resolveBillRevenueBreakdown,
+  sumBillRevenueBreakdowns,
+} from "@/utils/revenueBreakdown";
 import { useMutation, useQuery } from "@tanstack/react-query";
 
 interface BillItem {
@@ -150,23 +159,19 @@ const localDateFromYmd = (ymd: string): Date => {
 const localDateFromDayjsVnDay = (d: Dayjs): Date =>
   localDateFromYmd(d.format("YYYY-MM-DD"));
 
-type BillRevenueApiResult = {
-  timeRange?: string;
-  dateRange: string;
-  startDate: string;
-  endDate: string;
-  totalRevenue: number;
-  billCount: number;
-  bills: RevenueBill[];
-};
-
-const mapBillRevenueToState = (result: BillRevenueApiResult) => {
+const mapBillRevenueToState = (result: IRevenueResult) => {
   const startVn = dayjs.utc(result.startDate).tz(VN_TZ);
   const endVn = dayjs.utc(result.endDate).tz(VN_TZ);
+  const byCategory = result.byCategory
+    ? normalizeRevenueBreakdown(result.byCategory)
+    : sumBillRevenueBreakdowns(result.bills);
   return {
     totalRevenue: result.totalRevenue,
+    serviceRoomRevenue: result.serviceRoomRevenue ?? byCategory.SERVICE_ROOM,
+    fnbRevenue: result.fnbRevenue ?? getFnbRevenue(byCategory),
+    byCategory,
     billCount: result.billCount,
-    bills: result.bills,
+    bills: result.bills as RevenueBill[],
     dateInfo: {
       timeRange: result.timeRange,
       dateRange: result.dateRange,
@@ -179,15 +184,20 @@ const mapBillRevenueToState = (result: BillRevenueApiResult) => {
   };
 };
 
+type RevenueSummary = {
+  totalRevenue: number;
+  serviceRoomRevenue: number;
+  fnbRevenue: number;
+  byCategory: RevenueBreakdown;
+  billCount: number;
+  bills: RevenueBill[];
+  dateInfo: DateInfo;
+};
+
 type RevenueData = {
   loading: boolean;
   error: string | null;
-  data: {
-    totalRevenue: number;
-    billCount: number;
-    bills: RevenueBill[];
-    dateInfo: DateInfo;
-  } | null;
+  data: RevenueSummary | null;
 };
 
 type RevenueBill = IBill & {
@@ -292,10 +302,12 @@ const formatPaymentMethod = (method: string) =>
 const StatCard = ({
   label,
   children,
+  hint,
   accent,
 }: {
   label: string;
   children: ReactNode;
+  hint?: ReactNode;
   accent?: boolean;
 }) => (
   <Card>
@@ -312,8 +324,85 @@ const StatCard = ({
       >
         {children}
       </p>
+      {hint ? (
+        <p className="mt-1 text-[11px] font-normal text-muted-foreground sm:text-xs">
+          {hint}
+        </p>
+      ) : null}
     </CardContent>
   </Card>
+);
+
+const formatBreakdownAmount = (value: number) =>
+  `${formatCurrency(value)} VNĐ`;
+
+const BillRevenueBreakdownText = ({ bill }: { bill: RevenueBill }) => {
+  const breakdown = resolveBillRevenueBreakdown(bill);
+  return (
+    <div className="mt-1 space-y-0.5 text-[11px] font-normal text-muted-foreground">
+      <div>
+        {REVENUE_CATEGORY_LABELS.SERVICE_ROOM}{" "}
+        {formatCurrency(breakdown.SERVICE_ROOM)}
+      </div>
+      <div>
+        F&B {formatCurrency(getFnbRevenue(breakdown))}
+        {breakdown.FNB_RETAIL > 0 || breakdown.FNB_PREPARED > 0
+          ? ` · ${REVENUE_CATEGORY_LABELS.FNB_RETAIL} ${formatCurrency(breakdown.FNB_RETAIL)} · ${REVENUE_CATEGORY_LABELS.FNB_PREPARED} ${formatCurrency(breakdown.FNB_PREPARED)}`
+          : ""}
+      </div>
+      {breakdown.OTHER > 0 ? (
+        <div>
+          {REVENUE_CATEGORY_LABELS.OTHER} {formatCurrency(breakdown.OTHER)}
+        </div>
+      ) : null}
+    </div>
+  );
+};
+
+const RevenueSummaryCards = ({
+  periodCards,
+  stats,
+  isStaff,
+}: {
+  periodCards: ReactNode;
+  stats: Pick<
+    RevenueSummary,
+    | "totalRevenue"
+    | "serviceRoomRevenue"
+    | "fnbRevenue"
+    | "byCategory"
+    | "billCount"
+  >;
+  isStaff: boolean;
+}) => (
+  <div
+    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
+      isStaff ? "md:grid-cols-2" : "md:grid-cols-3 lg:grid-cols-5"
+    }`}
+  >
+    {periodCards}
+    {!isStaff && (
+      <>
+        <StatCard label="Tổng doanh thu" accent>
+          {formatBreakdownAmount(stats.totalRevenue)}
+        </StatCard>
+        <StatCard label="Phí thu âm">
+          {formatBreakdownAmount(stats.serviceRoomRevenue)}
+        </StatCard>
+        <StatCard
+          label="F&B"
+          hint={`${REVENUE_CATEGORY_LABELS.FNB_RETAIL} ${formatCurrency(stats.byCategory.FNB_RETAIL)} · ${REVENUE_CATEGORY_LABELS.FNB_PREPARED} ${formatCurrency(stats.byCategory.FNB_PREPARED)}${
+            stats.byCategory.OTHER > 0
+              ? ` · ${REVENUE_CATEGORY_LABELS.OTHER} ${formatCurrency(stats.byCategory.OTHER)}`
+              : ""
+          }`}
+        >
+          {formatBreakdownAmount(stats.fnbRevenue)}
+        </StatCard>
+      </>
+    )}
+    <StatCard label="Số lượng hóa đơn">{stats.billCount}</StatCard>
+  </div>
 );
 
 interface BillsTableSectionProps {
@@ -403,7 +492,8 @@ const BillsTableSection = ({
                   <TableCell>{bill.createdBy || "N/A"}</TableCell>
                   {!isStaff && (
                     <TableCell className="text-right">
-                      {formatCurrency(bill.totalAmount)} VNĐ
+                      <div>{formatCurrency(bill.totalAmount)} VNĐ</div>
+                      <BillRevenueBreakdownText bill={bill} />
                     </TableCell>
                   )}
                   <TableCell>
@@ -455,9 +545,12 @@ const BillsTableSection = ({
                   {bill.invoiceCode || "N/A"}
                 </button>
                 {!isStaff && (
-                  <span className="font-semibold">
-                    {formatCurrency(bill.totalAmount)} VNĐ
-                  </span>
+                  <div className="text-right">
+                    <span className="font-semibold">
+                      {formatCurrency(bill.totalAmount)} VNĐ
+                    </span>
+                    <BillRevenueBreakdownText bill={bill} />
+                  </div>
                 )}
                 <div className="flex gap-1">
                   <Button
@@ -897,16 +990,36 @@ const RevenueStatisticsPage = () => {
   };
 
   // Tính lại tổng doanh thu và số lượng hóa đơn sau khi filter
-  const calculateFilteredStats = (bills: RevenueBill[]) => {
+  const calculateFilteredStats = (data: RevenueSummary) => {
     const filteredBills = sortBillsByEndTimeDesc(
-      filterBillsByBenefitSource(filterBillsByPaymentMethod(bills)),
+      filterBillsByBenefitSource(filterBillsByPaymentMethod(data.bills)),
     );
-    const totalRevenue = filteredBills.reduce(
-      (sum, bill) => sum + bill.totalAmount,
-      0,
-    );
-    const billCount = filteredBills.length;
-    return { filteredBills, totalRevenue, billCount };
+    const isUnfiltered =
+      selectedPaymentMethod === "all" && benefitSource === "all";
+
+    if (isUnfiltered) {
+      return {
+        filteredBills,
+        totalRevenue: data.totalRevenue,
+        serviceRoomRevenue: data.serviceRoomRevenue,
+        fnbRevenue: data.fnbRevenue,
+        byCategory: data.byCategory,
+        billCount: data.billCount,
+      };
+    }
+
+    const byCategory = sumBillRevenueBreakdowns(filteredBills);
+    return {
+      filteredBills,
+      totalRevenue: filteredBills.reduce(
+        (sum, bill) => sum + bill.totalAmount,
+        0,
+      ),
+      serviceRoomRevenue: byCategory.SERVICE_ROOM,
+      fnbRevenue: getFnbRevenue(byCategory),
+      byCategory,
+      billCount: filteredBills.length,
+    };
   };
 
   return (
@@ -1061,25 +1174,19 @@ const RevenueStatisticsPage = () => {
             </div>
           ) : dailyRevenue.data ? (
             (() => {
-              const { filteredBills, totalRevenue, billCount } =
-                calculateFilteredStats(dailyRevenue.data.bills);
+              const { filteredBills, ...stats } =
+                calculateFilteredStats(dailyRevenue.data);
               return (
                 <div className="space-y-4 sm:space-y-6">
-                  <div
-                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-                      isStaff ? "md:grid-cols-2" : "md:grid-cols-3"
-                    }`}
-                  >
-                    <StatCard label="Ngày">
-                      {dailyRevenue.data.dateInfo.formattedDate}
-                    </StatCard>
-                    {!isStaff && (
-                      <StatCard label="Tổng doanh thu" accent>
-                        {formatCurrency(totalRevenue)} VNĐ
+                  <RevenueSummaryCards
+                    isStaff={isStaff}
+                    stats={stats}
+                    periodCards={
+                      <StatCard label="Ngày">
+                        {dailyRevenue.data.dateInfo.formattedDate}
                       </StatCard>
-                    )}
-                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
-                  </div>
+                    }
+                  />
 
                   <BillsTableSection
                     bills={filteredBills}
@@ -1111,25 +1218,19 @@ const RevenueStatisticsPage = () => {
             </div>
           ) : weeklyRevenue.data ? (
             (() => {
-              const { filteredBills, totalRevenue, billCount } =
-                calculateFilteredStats(weeklyRevenue.data.bills);
+              const { filteredBills, ...stats } =
+                calculateFilteredStats(weeklyRevenue.data);
               return (
                 <div className="space-y-4 sm:space-y-6">
-                  <div
-                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-                      isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
-                    }`}
-                  >
-                    <StatCard label="Khoảng thời gian">
-                      {weeklyRevenue.data.dateInfo.dateRange}
-                    </StatCard>
-                    {!isStaff && (
-                      <StatCard label="Tổng doanh thu" accent>
-                        {formatCurrency(totalRevenue)} VNĐ
+                  <RevenueSummaryCards
+                    isStaff={isStaff}
+                    stats={stats}
+                    periodCards={
+                      <StatCard label="Khoảng thời gian">
+                        {weeklyRevenue.data.dateInfo.dateRange}
                       </StatCard>
-                    )}
-                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
-                  </div>
+                    }
+                  />
 
                   <BillsTableSection
                     bills={filteredBills}
@@ -1161,29 +1262,25 @@ const RevenueStatisticsPage = () => {
             </div>
           ) : monthlyRevenue.data ? (
             (() => {
-              const { filteredBills, totalRevenue, billCount } =
-                calculateFilteredStats(monthlyRevenue.data.bills);
+              const { filteredBills, ...stats } =
+                calculateFilteredStats(monthlyRevenue.data);
               return (
                 <div className="space-y-4 sm:space-y-6">
-                  <div
-                    className={`grid grid-cols-2 gap-3 sm:gap-4 ${
-                      isStaff ? "md:grid-cols-3" : "md:grid-cols-4"
-                    }`}
-                  >
-                    <StatCard label="Kỳ / nhãn">
-                      {monthlyRevenue.data.dateInfo.timeRange ??
-                        `${monthlyRevenue.data.dateInfo.month} ${monthlyRevenue.data.dateInfo.year}`}
-                    </StatCard>
-                    <StatCard label="Khoảng thời gian">
-                      {monthlyRevenue.data.dateInfo.dateRange}
-                    </StatCard>
-                    {!isStaff && (
-                      <StatCard label="Tổng doanh thu" accent>
-                        {formatCurrency(totalRevenue)} VNĐ
-                      </StatCard>
-                    )}
-                    <StatCard label="Số lượng hóa đơn">{billCount}</StatCard>
-                  </div>
+                  <RevenueSummaryCards
+                    isStaff={isStaff}
+                    stats={stats}
+                    periodCards={
+                      <>
+                        <StatCard label="Kỳ / nhãn">
+                          {monthlyRevenue.data.dateInfo.timeRange ??
+                            `${monthlyRevenue.data.dateInfo.month} ${monthlyRevenue.data.dateInfo.year}`}
+                        </StatCard>
+                        <StatCard label="Khoảng thời gian">
+                          {monthlyRevenue.data.dateInfo.dateRange}
+                        </StatCard>
+                      </>
+                    }
+                  />
 
                   <BillsTableSection
                     bills={filteredBills}

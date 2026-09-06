@@ -47,6 +47,32 @@ export interface IBillMembershipDiscount {
   appliedAmount?: number;
 }
 
+export type RevenueCategory =
+  | "SERVICE_ROOM"
+  | "FNB_RETAIL"
+  | "FNB_PREPARED"
+  | "OTHER";
+
+export type FnbRevenueCategory = Extract<
+  RevenueCategory,
+  "FNB_RETAIL" | "FNB_PREPARED"
+>;
+
+export type RevenueBreakdown = Record<RevenueCategory, number>;
+
+export interface IRevenueResult {
+  timeRange?: string;
+  dateRange: string;
+  startDate: string;
+  endDate: string;
+  totalRevenue: number;
+  serviceRoomRevenue: number;
+  fnbRevenue: number;
+  byCategory: RevenueBreakdown;
+  billCount: number;
+  bills: IBill[];
+}
+
 export interface IBill {
   _id: string;
   source?: "karaoke" | "retail" | string;
@@ -70,6 +96,7 @@ export interface IBill {
   fnbTotal: number;
   roomTotal: number;
   totalAmount: number;
+  revenueBreakdown?: RevenueBreakdown;
   freeHourPromotion?: {
     freeMinutesApplied?: number;
     freeAmount?: number;
