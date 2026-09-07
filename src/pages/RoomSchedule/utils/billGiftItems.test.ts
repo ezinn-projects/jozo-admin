@@ -117,6 +117,24 @@ describe("toPaidBillItems", () => {
 
     expect(paid[0]?.quantity).toBe(1);
   });
+
+  it("hides the bill line when itemId differs but the name is the same gift", () => {
+    const paid = toPaidBillItems(
+      [{ itemId: "menu-coca", description: "Coca", quantity: 1, price: 15000 }],
+      buildInvoiceGiftLines([servedGift()]),
+    );
+
+    expect(paid).toEqual([]);
+  });
+
+  it("hides a longer bill description that still refers to the gift", () => {
+    const paid = toPaidBillItems(
+      [{ description: "Coca lon 330ml", quantity: 1, price: 0 }],
+      buildInvoiceGiftLines([servedGift()]),
+    );
+
+    expect(paid).toEqual([]);
+  });
 });
 
 describe("getServedGiftRemainingQuota", () => {

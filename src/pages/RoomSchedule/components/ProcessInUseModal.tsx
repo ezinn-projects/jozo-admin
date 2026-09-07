@@ -1643,7 +1643,9 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         </Select>
                       </div>
 
-                      {(gift || giftLines.length > 0) && (
+                      {((gift?.type === "discount" &&
+                        gift.discountPercentage) ||
+                        giftDiscountAmount > 0) && (
                         <div className="space-y-1 rounded-md border bg-muted/40 p-2 text-xs">
                           <div className="flex items-center gap-2 font-medium">
                             <Gift className="h-3.5 w-3.5" />
@@ -1663,19 +1665,6 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               Trị giá giảm: {formatVnd(giftDiscountAmount)}
                             </p>
                           )}
-                          {giftLines.length > 0 ? (
-                            <p className="text-muted-foreground">
-                              Cộng/trừ suất ngay trên danh sách món phía trên.
-                              {giftRemainingQuota > 0
-                                ? ` Còn ${giftRemainingQuota} suất để thêm.`
-                                : ""}
-                            </p>
-                          ) : giftRemainingQuota > 0 ? (
-                            <p className="text-muted-foreground">
-                              Còn {giftRemainingQuota} suất — bấm Thêm món tặng
-                              để chọn món.
-                            </p>
-                          ) : null}
                         </div>
                       )}
 

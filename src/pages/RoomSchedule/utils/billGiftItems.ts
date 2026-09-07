@@ -14,19 +14,29 @@ export type InvoiceGiftLine = {
 
 const normalizeName = (value?: string) => value?.trim().toLowerCase() ?? "";
 
+export const isSameGiftProduct = (
+  item: { itemId?: string; description: string },
+  line: Pick<InvoiceGiftLine, "itemId" | "name">,
+): boolean => {
+  if (item.itemId && line.itemId && item.itemId === line.itemId) return true;
+  const itemName = normalizeName(item.description);
+  const giftName = normalizeName(line.name);
+  if (!itemName || !giftName) return false;
+  if (itemName === giftName) return true;
+  return (
+    giftName.length >= 3 &&
+    (itemName.includes(giftName) || giftName.includes(itemName))
+  );
+};
+
 const giftQuantityForBillItem = (
   item: { itemId?: string; description: string },
   giftLines: InvoiceGiftLine[],
 ): number =>
-  giftLines.reduce((sum, line) => {
-    if (item.itemId && line.itemId) {
-      return item.itemId === line.itemId ? sum + line.quantity : sum;
-    }
-    if (normalizeName(item.description) === normalizeName(line.name)) {
-      return sum + line.quantity;
-    }
-    return sum;
-  }, 0);
+  giftLines.reduce(
+    (sum, line) => (isSameGiftProduct(item, line) ? sum + line.quantity : sum),
+    0,
+  );
 
 /** Dòng món tặng trên hóa đơn — ưu tiên servedGifts (có streakCount để gọi API). */
 export function buildInvoiceGiftLines(
@@ -96,9 +106,13 @@ export function toPaidBillItems<
   if (!giftLines.length) return billItems;
 
   return billItems.flatMap((item) => {
-    const paidQty = item.quantity - giftQuantityForBillItem(item, giftLines);
-    if (paidQty <= 0) return [];
-    return [{ ...item, quantity: paidQty }];
+    const giftQty = giftQuantityForBillItem(item, giftLines);
+    if (giftQty <= 0) return [item];
+
+    const price = "price" in item ? Number(item.price) : undefined;
+    if (price === 0 || item.quantity <= giftQty) return [];
+
+    return [{ ...item, quantity: item.quantity - giftQty }];
   });
 }
 
