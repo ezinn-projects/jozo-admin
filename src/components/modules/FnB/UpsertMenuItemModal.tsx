@@ -33,6 +33,7 @@ import {
   FNB_REVENUE_CATEGORIES,
   FNB_REVENUE_CATEGORY_HINTS,
   REVENUE_CATEGORY_LABELS,
+  getRevenueCategoryUpdateFields,
   resolveMenuItemRevenueCategory,
   shouldRequireRevenueCategoryReason,
 } from "@/utils/revenueBreakdown";
@@ -273,7 +274,9 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
         customizationTemplateRefs: processedTemplateRefs,
         customizationOverrides: processedOverrides,
         customizationGroups: processedCustomizationGroups,
-        revenueCategory: resolveMenuItemRevenueCategory(detail.revenueCategory),
+        revenueCategory: resolveMenuItemRevenueCategory(
+          detail.revenueCategory ?? item?.revenueCategory,
+        ),
         inventoryTracked: detail.inventoryTracked ?? false,
         reason: "",
       });
@@ -572,46 +575,49 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
       );
 
       const isSelling = data.isActive !== false;
-      if (isSelling || data.revenueCategory) {
-        submitFormData.append(
-          "revenueCategory",
-          data.revenueCategory || "FNB_RETAIL",
-        );
-      }
-      if (isSelling || data.inventoryTracked !== undefined) {
-        submitFormData.append(
-          "inventoryTracked",
-          (data.inventoryTracked ?? false).toString(),
-        );
+      const originalRevenueCategory =
+        itemDetail?.data?.result?.revenueCategory ?? item?.revenueCategory;
+      const nextRevenueCategory = data.revenueCategory || "FNB_RETAIL";
+
+      if (!isEdit && (isSelling || data.revenueCategory)) {
+        submitFormData.append("revenueCategory", nextRevenueCategory);
       }
 
-      const originalRevenueCategory = isEdit
-        ? resolveMenuItemRevenueCategory(
-            itemDetail?.data?.result?.revenueCategory ?? item?.revenueCategory,
-          )
-        : undefined;
-      if (
-        isEdit &&
-        shouldRequireRevenueCategoryReason(
+      if (isEdit) {
+        const revenueCategoryUpdate = getRevenueCategoryUpdateFields(
           originalRevenueCategory,
-          data.revenueCategory,
-        )
-      ) {
-        const reason = data.reason?.trim() || "";
-        if (!reason) {
+          nextRevenueCategory,
+          data.reason,
+        );
+
+        if (revenueCategoryUpdate.kind === "error") {
           form.setError("reason", {
             type: "manual",
-            message: "Thay đổi revenueCategory yêu cầu Admin và lý do",
+            message: revenueCategoryUpdate.message,
           });
           toast({
             title: "Lỗi",
-            description: "Thay đổi revenueCategory yêu cầu Admin và lý do",
+            description: revenueCategoryUpdate.message,
             variant: "destructive",
           });
           setIsLoading(false);
           return;
         }
-        submitFormData.append("reason", reason);
+
+        if (revenueCategoryUpdate.kind === "include") {
+          submitFormData.append(
+            "revenueCategory",
+            revenueCategoryUpdate.revenueCategory,
+          );
+          submitFormData.append("reason", revenueCategoryUpdate.reason);
+        }
+      }
+
+      if (isSelling || data.inventoryTracked !== undefined) {
+        submitFormData.append(
+          "inventoryTracked",
+          (data.inventoryTracked ?? false).toString(),
+        );
       }
 
       const response =
@@ -876,10 +882,8 @@ const UpsertMenuItemModal: React.FC<UpsertMenuItemModalProps> = ({
 
                 {isEdit &&
                   shouldRequireRevenueCategoryReason(
-                    resolveMenuItemRevenueCategory(
-                      itemDetail?.data?.result?.revenueCategory ??
-                        item?.revenueCategory,
-                    ),
+                    itemDetail?.data?.result?.revenueCategory ??
+                      item?.revenueCategory,
                     form.watch("revenueCategory"),
                   ) && (
                     <div className="space-y-2">

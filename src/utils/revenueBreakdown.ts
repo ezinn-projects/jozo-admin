@@ -104,3 +104,41 @@ export const shouldRequireRevenueCategoryReason = (
   const previous = resolveMenuItemRevenueCategory(original);
   return previous !== next;
 };
+
+export type RevenueCategoryUpdateFields =
+  | { kind: "omit" }
+  | { kind: "error"; message: string }
+  | {
+      kind: "include";
+      revenueCategory: FnbRevenueCategory;
+      reason: string;
+    };
+
+const REVENUE_CATEGORY_REASON_ERROR =
+  "Thay đổi revenueCategory yêu cầu Admin và lý do";
+
+/**
+ * Edit payload: only send revenueCategory when it actually changed.
+ * Always sending the current/defaulted value makes PUT /fnb-menu-item treat a
+ * quantity-only update as a category change and return 400.
+ */
+export const getRevenueCategoryUpdateFields = (
+  original?: string | null,
+  next?: string | null,
+  reason?: string | null,
+): RevenueCategoryUpdateFields => {
+  if (!shouldRequireRevenueCategoryReason(original, next)) {
+    return { kind: "omit" };
+  }
+
+  const trimmedReason = reason?.trim() || "";
+  if (!trimmedReason) {
+    return { kind: "error", message: REVENUE_CATEGORY_REASON_ERROR };
+  }
+
+  return {
+    kind: "include",
+    revenueCategory: next as FnbRevenueCategory,
+    reason: trimmedReason,
+  };
+};

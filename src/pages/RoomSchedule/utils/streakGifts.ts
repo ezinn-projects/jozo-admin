@@ -148,3 +148,29 @@ export const selectedItemsToPayload = (
   Object.entries(selected)
     .filter(([, quantity]) => quantity > 0)
     .map(([itemId, quantity]) => ({ itemId, quantity }));
+
+/** Mốc đã phát trên schedule này không hiện lại ở list "chọn quà". */
+export function getClaimableAvailableGifts(
+  availableGifts: IAvailableStreakGift[] = [],
+  servedGifts: IServedStreakGift[] = [],
+  previouslyServedStreaks: Iterable<number> = [],
+): IAvailableStreakGift[] {
+  const blocked = new Set<number>([
+    ...servedGifts.map((gift) => gift.streakCount),
+    ...previouslyServedStreaks,
+  ]);
+  return availableGifts.filter((gift) => !blocked.has(gift.streakCount));
+}
+
+export function shouldShowGiftItemPicker({
+  hasServedGift,
+  remainingQuota,
+  showAddPicker,
+}: {
+  hasServedGift: boolean;
+  remainingQuota: number;
+  showAddPicker: boolean;
+}): boolean {
+  if (!hasServedGift) return true;
+  return remainingQuota > 0 && showAddPicker;
+}

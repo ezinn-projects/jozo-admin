@@ -10,6 +10,7 @@ import billAPis from "@/apis/bill.apis";
 import fnbOrderApis from "@/apis/fnbOrder.apis";
 import roomsScheduleApis, { IChangeRoomRequest } from "@/apis/roomSchedule.api";
 import MenuItemsModal from "@/components/modules/RoomSchedule/MenuItemsModal";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -25,7 +26,10 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { AxiosResponse } from "axios";
 import React, { useEffect, useMemo, useState } from "react";
 import { useScheduleMemberPhone } from "../hooks/useScheduleMemberPhone";
-import { getScheduleCustomerContact, isValidMemberEmail } from "../utils/memberPhone";
+import {
+  getScheduleCustomerContact,
+  isValidMemberEmail,
+} from "../utils/memberPhone";
 import {
   formatTierDiscountLabel,
   resolveBillMembershipDiscount,
@@ -34,6 +38,12 @@ import { isRoomUnderMaintenance } from "../utils/roomStatus";
 import ScheduleMemberSection from "./ScheduleMemberSection";
 import ScheduleRoomTypeSection from "./ScheduleRoomTypeSection";
 import { getRoomTypeLabel } from "../utils/scheduleRoomType";
+import {
+  buildInvoiceGiftLines,
+  getServedGiftRemainingQuota,
+  toPaidBillItems,
+  type InvoiceGiftLine,
+} from "../utils/billGiftItems";
 // import BillPreviewModal from "./BillPreviewModal";
 // import { ApiResponse } from "@/@types/ApiResponse";
 import { IBillMembership, IBillMembershipDiscount } from "@/@types/Bill";
@@ -160,6 +170,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const [roomChangeNote, setRoomChangeNote] = useState<string>("");
   const [customerPaidInput, setCustomerPaidInput] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"bill" | "member">("bill");
+  const [expandMemberGiftPicker, setExpandMemberGiftPicker] = useState(false);
   const { data: menuItems } = useGetMenuItems();
   const { user } = useAuth();
   const { data: standardPromotions } = useGetStandardPromotions();
@@ -221,10 +232,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
       setCustomerPaidInput("");
       setSelectedPromotion(schedule.promotionId || "");
       setActiveTab("bill");
+      setExpandMemberGiftPicker(false);
     }
   }, [isOpen, schedule._id, schedule.startTime, schedule.promotionId]);
 
-  const focusMemberTabOnContactError = (fieldErrors: Record<string, string>) => {
+  const focusMemberTabOnContactError = (
+    fieldErrors: Record<string, string>,
+  ) => {
     if (fieldErrors.customerEmail || fieldErrors.customerPhone) {
       setActiveTab("member");
     }
@@ -782,6 +796,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     membershipDiscount: billMembershipDiscount,
   } = billResult;
   const items = itemsWithDetails;
+  const giftLines = useMemo(
+    () => buildInvoiceGiftLines(member.servedGifts, gift),
+    [member.servedGifts, gift],
+  );
+  const paidItems = useMemo(
+    () => toPaidBillItems(items, giftLines),
+    [items, giftLines],
+  );
+  const giftRemainingQuota = useMemo(
+    () => getServedGiftRemainingQuota(member.servedGifts),
+    [member.servedGifts],
+  );
+  const hasBillRows = paidItems.length > 0 || giftLines.length > 0;
 
   const membershipDiscountDisplay = useMemo(
     () =>
@@ -837,7 +864,8 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
     if (!isValidMemberEmail(customerEmail)) {
       toast({
         title: "Email không hợp lệ",
-        description: "Vui lòng cập nhật lại email thành viên trước khi kết thúc",
+        description:
+          "Vui lòng cập nhật lại email thành viên trước khi kết thúc",
         variant: "destructive",
       });
       return;
@@ -1103,7 +1131,38 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
   const adjustItemQuantity = (item: BillItem, change: number) => {
     const target = resolveItemTarget(item);
     if (!target) return;
-    handleQuantityChange(target.itemId, item.quantity, change, target.category);
+    const currentOrderQty = getOrderItemQuantity(
+      orderDetailData,
+      target.itemId,
+    );
+    handleQuantityChange(
+      target.itemId,
+      currentOrderQty,
+      change,
+      target.category,
+    );
+  };
+
+  const goToMemberTabForGift = () => {
+    setActiveTab("member");
+    toast({
+      title: "Sửa món tặng ở tab Member",
+      description: "Nhập SĐT thành viên rồi cộng/trừ suất quà tại đó",
+    });
+  };
+
+  const adjustGiftLineQuantity = (line: InvoiceGiftLine, change: number) => {
+    if (!line.canEdit || !line.itemId) {
+      goToMemberTabForGift();
+      return;
+    }
+    const nextQty = line.quantity + change;
+    if (change > 0 && line.remainingQuota <= 0) return;
+    if (nextQty <= 0) {
+      member.removeStreakGiftItem(line.streakCount, line.itemId);
+      return;
+    }
+    member.updateStreakGiftItemQty(line.streakCount, line.itemId, nextQty);
   };
 
   // Sử dụng useMutation để gọi API in hóa đơn
@@ -1179,7 +1238,13 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
 
             <Tabs
               value={activeTab}
-              onValueChange={(value) => setActiveTab(value as "bill" | "member")}
+              onValueChange={(value) => {
+                const nextTab = value as "bill" | "member";
+                setActiveTab(nextTab);
+                if (nextTab !== "member") {
+                  setExpandMemberGiftPicker(false);
+                }
+              }}
               className="w-full"
             >
               <TabsList className="grid w-full grid-cols-2 mb-4 h-11">
@@ -1386,14 +1451,19 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         </span>
                       </div>
 
-                      {items.length === 0 ? (
+                      {!hasBillRows ? (
                         <p className="py-3 text-center text-xs text-muted-foreground">
-                          Chưa có món nào
+                          {giftRemainingQuota > 0
+                            ? "Chưa có món — bấm Thêm món tặng để chọn suất quà"
+                            : "Chưa có món nào"}
                         </p>
                       ) : (
                         <div className="divide-y">
-                          {items.map((item: BillItem, index: number) => (
-                            <div key={index} className="py-2">
+                          {paidItems.map((item: BillItem, index: number) => (
+                            <div
+                              key={`paid-${item.itemId || item.description}-${index}`}
+                              className="py-2"
+                            >
                               <div className="flex items-center gap-2">
                                 <div className="min-w-0 flex-1">
                                   <p className="truncate">{item.description}</p>
@@ -1466,6 +1536,74 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               ) : null}
                             </div>
                           ))}
+                          {giftLines.map((line) => (
+                            <div
+                              key={line.key}
+                              className="rounded-md bg-emerald-50/70 py-2"
+                            >
+                              <div className="flex items-center gap-2">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex min-w-0 items-center gap-1.5">
+                                    <p className="truncate">{line.name}</p>
+                                    <Badge
+                                      variant="secondary"
+                                      className="shrink-0 border-emerald-200 bg-emerald-100 px-1.5 py-0 text-[10px] font-medium text-emerald-800"
+                                    >
+                                      Tặng
+                                    </Badge>
+                                  </div>
+                                  <p className="text-[11px] text-muted-foreground">
+                                    {line.canEdit
+                                      ? `Streak ${line.streakCount}`
+                                      : "Cần SĐT để sửa"}
+                                    {line.canEdit && line.remainingQuota > 0
+                                      ? ` · còn ${line.remainingQuota} suất`
+                                      : ""}
+                                    <span className="sm:hidden"> · Tặng</span>
+                                  </p>
+                                </div>
+                                <div className="flex w-[104px] shrink-0 items-center justify-center gap-1">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      adjustGiftLineQuantity(line, -1)
+                                    }
+                                    disabled={
+                                      member.isMutatingGift ||
+                                      line.quantity <= 0
+                                    }
+                                    className="h-7 w-7 shrink-0 p-0"
+                                  >
+                                    <Minus className="h-3 w-3" />
+                                  </Button>
+                                  <span className="w-8 text-center font-medium">
+                                    {line.quantity}
+                                  </span>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() =>
+                                      adjustGiftLineQuantity(line, 1)
+                                    }
+                                    disabled={
+                                      member.isMutatingGift ||
+                                      (line.canEdit && line.remainingQuota <= 0)
+                                    }
+                                    className="h-7 w-7 shrink-0 p-0"
+                                  >
+                                    <Plus className="h-3 w-3" />
+                                  </Button>
+                                </div>
+                                <span className="hidden w-20 shrink-0 text-right text-muted-foreground sm:block">
+                                  {formatVnd(0)}
+                                </span>
+                                <span className="shrink-0 whitespace-nowrap pl-1 text-right font-medium text-emerald-700">
+                                  Tặng
+                                </span>
+                              </div>
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
@@ -1505,13 +1643,16 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                         </Select>
                       </div>
 
-                      {gift && (
+                      {(gift || giftLines.length > 0) && (
                         <div className="space-y-1 rounded-md border bg-muted/40 p-2 text-xs">
                           <div className="flex items-center gap-2 font-medium">
                             <Gift className="h-3.5 w-3.5" />
-                            <span>Quà tặng: {gift.name}</span>
+                            <span>
+                              Quà tặng
+                              {gift?.name ? `: ${gift.name}` : ""}
+                            </span>
                           </div>
-                          {gift.type === "discount" &&
+                          {gift?.type === "discount" &&
                           gift.discountPercentage ? (
                             <p className="text-muted-foreground">
                               Giảm {gift.discountPercentage}%
@@ -1522,19 +1663,18 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                               Trị giá giảm: {formatVnd(giftDiscountAmount)}
                             </p>
                           )}
-                          {gift.type === "snacks_drinks" &&
-                          gift.items &&
-                          gift.items.length > 0 ? (
-                            <div className="space-y-0.5">
-                              <p className="font-medium">Items tặng:</p>
-                              <ul className="list-inside list-disc pl-3 text-muted-foreground">
-                                {gift.items.map((item, idx) => (
-                                  <li key={idx}>
-                                    {item.name} x{item.quantity}
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
+                          {giftLines.length > 0 ? (
+                            <p className="text-muted-foreground">
+                              Cộng/trừ suất ngay trên danh sách món phía trên.
+                              {giftRemainingQuota > 0
+                                ? ` Còn ${giftRemainingQuota} suất để thêm.`
+                                : ""}
+                            </p>
+                          ) : giftRemainingQuota > 0 ? (
+                            <p className="text-muted-foreground">
+                              Còn {giftRemainingQuota} suất — bấm Thêm món tặng
+                              để chọn món.
+                            </p>
                           ) : null}
                         </div>
                       )}
@@ -1882,6 +2022,7 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
                   onUpdateGiftItemQty={member.updateStreakGiftItemQty}
                   onRemoveGiftItem={member.removeStreakGiftItem}
                   isServingGift={member.isMutatingGift}
+                  expandGiftPicker={expandMemberGiftPicker}
                 />
               </TabsContent>
             </Tabs>
@@ -1895,6 +2036,20 @@ const ProcessInUseModal: React.FC<ProcessInUseModalProps> = ({
               >
                 Thêm món
               </Button>
+              {giftRemainingQuota > 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setExpandMemberGiftPicker(true);
+                    setActiveTab("member");
+                  }}
+                  className="h-9 w-full sm:w-auto"
+                >
+                  <Gift className="mr-2 h-4 w-4" />
+                  Thêm món tặng
+                </Button>
+              )}
               <Button
                 size="sm"
                 onClick={handleExtendSession}

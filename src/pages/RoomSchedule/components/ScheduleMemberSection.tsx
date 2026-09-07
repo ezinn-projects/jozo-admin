@@ -25,8 +25,10 @@ import {
 } from "../utils/memberPhone";
 import {
   formatFnBCategory,
+  getClaimableAvailableGifts,
   getSelectableInStockItems,
   selectedItemsToPayload,
+  shouldShowGiftItemPicker,
   sumSelectedItemQty,
 } from "../utils/streakGifts";
 import MemberPhoneCombobox from "./MemberPhoneCombobox";
@@ -105,6 +107,8 @@ interface ScheduleMemberSectionProps {
     itemId: string,
   ) => void | Promise<void>;
   isServingGift?: boolean;
+  /** Mở sẵn danh sách chọn món tặng (vd. từ nút Thêm món tặng trên hóa đơn) */
+  expandGiftPicker?: boolean;
   className?: string;
   inputId?: string;
 }
@@ -174,6 +178,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   onUpdateGiftItemQty,
   onRemoveGiftItem,
   isServingGift = false,
+  expandGiftPicker = false,
   className,
   inputId = "schedule-member-phone",
 }) => {
@@ -186,6 +191,8 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
   >({});
   const [itemSearch, setItemSearch] = useState("");
   const [isNameSearchActive, setIsNameSearchActive] = useState(false);
+  const [showAddGiftPicker, setShowAddGiftPicker] = useState(false);
+  const [servedStreakHistory, setServedStreakHistory] = useState<number[]>([]);
 
   const servedGiftForSelected = useMemo(
     () =>
@@ -194,18 +201,53 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
     [servedGifts, selectedStreakCount],
   );
 
+  const claimableAvailableGifts = useMemo(
+    () =>
+      getClaimableAvailableGifts(
+        availableGifts,
+        servedGifts,
+        servedStreakHistory,
+      ),
+    [availableGifts, servedGifts, servedStreakHistory],
+  );
+
+  useEffect(() => {
+    setServedStreakHistory([]);
+    setShowAddGiftPicker(false);
+  }, [phone]);
+
+  useEffect(() => {
+    if (servedGifts.length === 0) return;
+    setServedStreakHistory((prev) => {
+      const next = new Set(prev);
+      let changed = false;
+      for (const gift of servedGifts) {
+        if (!next.has(gift.streakCount)) {
+          next.add(gift.streakCount);
+          changed = true;
+        }
+      }
+      return changed ? Array.from(next) : prev;
+    });
+  }, [servedGifts]);
+
   const nextStreakReward = useMemo(() => {
     const currentStreak = Number(memberInfo?.streakCount ?? 0) || 0;
+    const blockedStreaks = new Set([
+      ...servedGifts.map((gift) => gift.streakCount),
+      ...servedStreakHistory,
+    ]);
 
     return [...streakRewards]
       .filter((reward) => !reward.claimed && reward.isClaimed !== true)
+      .filter((reward) => !blockedStreaks.has(reward.streakCount))
       .sort((a, b) => a.streakCount - b.streakCount)
       .map((reward) => ({
         reward,
         isReached:
           reward.isReached === true || currentStreak >= reward.streakCount,
       }))[0];
-  }, [memberInfo?.streakCount, streakRewards]);
+  }, [memberInfo?.streakCount, servedGifts, servedStreakHistory, streakRewards]);
 
   // Bỏ chọn mốc đã claim mà không còn served trên schedule này
   useEffect(() => {
@@ -262,8 +304,13 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
 
   const quotaMax = selectedMilestone?.itemCount ?? 0;
   const remainingQuota = servedGiftForSelected
-    ? servedGiftForSelected.remainingQuantity
+    ? Math.max(0, servedGiftForSelected.remainingQuantity ?? 0)
     : Math.max(0, quotaMax - sumSelectedItemQty(selectedItemQty));
+  const showGiftItemPicker = shouldShowGiftItemPicker({
+    hasServedGift: Boolean(servedGiftForSelected),
+    remainingQuota,
+    showAddPicker: showAddGiftPicker,
+  });
   const inStockItems = useMemo(
     () => getSelectableInStockItems(selectableItems),
     [selectableItems],
@@ -283,6 +330,19 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       );
     });
   }, [inStockItems, itemSearch]);
+  useEffect(() => {
+    if (remainingQuota <= 0) {
+      setShowAddGiftPicker(false);
+    }
+  }, [remainingQuota]);
+
+  useEffect(() => {
+    if (!expandGiftPicker) return;
+    const target = servedGifts.find((gift) => (gift.remainingQuantity ?? 0) > 0);
+    if (!target) return;
+    setSelectedStreakCount(target.streakCount);
+    setShowAddGiftPicker(true);
+  }, [expandGiftPicker, servedGifts]);
   const selectedQtyTotal = sumSelectedItemQty(selectedItemQty);
   // Claim soft: không bắt buộc chọn đủ quota
   const canClaimGift = selectedMilestone !== null && !servedGiftForSelected;
@@ -327,10 +387,12 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
       if (prev === streakCount) {
         setSelectedItemQty({});
         setItemSearch("");
+        setShowAddGiftPicker(false);
         return null;
       }
       setSelectedItemQty({});
       setItemSearch("");
+      setShowAddGiftPicker(false);
       return streakCount;
     });
   };
@@ -550,13 +612,59 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
 
       {showMemberLookup && !isLoadingMemberInfo && memberInfo && (
         <>
-          {availableGifts.length > 0 && (
+          {servedGifts.length > 0 && (
             <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
               <p className="text-sm font-medium">
-                Quà ({availableGifts.length})
+                Quà đã phát ({servedGifts.length})
               </p>
               <div className="space-y-2">
-                {availableGifts.map((gift) => {
+                {servedGifts.map((gift) => {
+                  const isSelected = selectedStreakCount === gift.streakCount;
+                  return (
+                    <button
+                      key={gift.streakCount}
+                      type="button"
+                      onClick={() => handleSelectMilestone(gift.streakCount)}
+                      disabled={isServingGift}
+                      className={cn(
+                        "w-full text-left rounded-md border px-2.5 py-2.5 transition-colors",
+                        isSelected
+                          ? "border-emerald-400 bg-emerald-50 ring-1 ring-emerald-300"
+                          : "border-emerald-200 bg-white hover:bg-emerald-50/70",
+                      )}
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">
+                            Streak {gift.streakCount}
+                          </p>
+                          <p className="text-xs text-gray-600">
+                            {gift.usedQuantity}/{gift.itemCount} món
+                          </p>
+                        </div>
+                        {isSelected && (
+                          <Badge
+                            variant="outline"
+                            className="shrink-0 border-emerald-300 bg-emerald-50 text-emerald-700"
+                          >
+                            Đang xem
+                          </Badge>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {claimableAvailableGifts.length > 0 && (
+            <div className="flex flex-col gap-2 rounded-md border px-3 py-2.5">
+              <p className="text-sm font-medium">
+                Quà ({claimableAvailableGifts.length})
+              </p>
+              <div className="space-y-2">
+                {claimableAvailableGifts.map((gift) => {
                   const isSelected = selectedStreakCount === gift.streakCount;
                   return (
                     <button
@@ -687,7 +795,9 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                 <ul className="space-y-1.5">
                   {servedGiftForSelected.items.length === 0 ? (
                     <li className="text-xs text-gray-500">
-                      Chưa có món — chọn bên dưới để thêm.
+                      {remainingQuota > 0
+                        ? "Chưa có món tặng trên suất này."
+                        : "Không còn suất quà."}
                     </li>
                   ) : (
                     servedGiftForSelected.items.map((item) => {
@@ -763,9 +873,24 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
                 </ul>
               )}
 
-              {/* Claim draft picker OR add-more when remaining > 0 */}
-              {((!servedGiftForSelected && quotaMax >= 0) ||
-                (servedGiftForSelected && remainingQuota > 0)) &&
+              {servedGiftForSelected &&
+                remainingQuota > 0 &&
+                !showAddGiftPicker && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="h-8 w-full text-xs"
+                    disabled={isServingGift}
+                    onClick={() => setShowAddGiftPicker(true)}
+                  >
+                    <Plus className="mr-1 h-3.5 w-3.5" />
+                    Thêm món tặng
+                  </Button>
+                )}
+
+              {/* Claim draft picker; served gifts chỉ mở picker khi staff chủ động thêm */}
+              {(showGiftItemPicker &&
+                (!servedGiftForSelected || remainingQuota > 0)) &&
                 (inStockItems.length === 0 ? (
                   <p className="text-xs text-gray-500">
                     Không còn món trong kho để chọn.
@@ -926,7 +1051,7 @@ const ScheduleMemberSection: React.FC<ScheduleMemberSectionProps> = ({
           )}
 
           {streakRewards.length === 0 &&
-            availableGifts.length === 0 &&
+            claimableAvailableGifts.length === 0 &&
             servedGifts.length === 0 && (
               <div className="rounded-lg border border-gray-200 bg-white/80 px-3 py-2.5 text-sm text-gray-600 text-center">
                 Không có quà streak cần phục vụ lúc này.

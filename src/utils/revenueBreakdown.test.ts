@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   getFnbRevenue,
+  getRevenueCategoryUpdateFields,
   normalizeRevenueBreakdown,
   resolveBillRevenueBreakdown,
   resolveMenuItemRevenueCategory,
@@ -82,5 +83,37 @@ describe("revenueBreakdown", () => {
     expect(shouldRequireRevenueCategoryReason(undefined, "FNB_PREPARED")).toBe(
       true,
     );
+  });
+
+  it("không gửi revenueCategory khi sửa món mà không đổi loại doanh thu", () => {
+    expect(
+      getRevenueCategoryUpdateFields("FNB_RETAIL", "FNB_RETAIL", ""),
+    ).toEqual({ kind: "omit" });
+    expect(
+      getRevenueCategoryUpdateFields(undefined, "FNB_RETAIL", ""),
+    ).toEqual({ kind: "omit" });
+    expect(
+      getRevenueCategoryUpdateFields("FNB_PREPARED", "FNB_PREPARED"),
+    ).toEqual({ kind: "omit" });
+  });
+
+  it("đổi revenueCategory thì bắt buộc lý do rồi mới gửi", () => {
+    expect(
+      getRevenueCategoryUpdateFields("FNB_RETAIL", "FNB_PREPARED", "  "),
+    ).toEqual({
+      kind: "error",
+      message: "Thay đổi revenueCategory yêu cầu Admin và lý do",
+    });
+    expect(
+      getRevenueCategoryUpdateFields(
+        "FNB_RETAIL",
+        "FNB_PREPARED",
+        "  Đổi sang pha chế  ",
+      ),
+    ).toEqual({
+      kind: "include",
+      revenueCategory: "FNB_PREPARED",
+      reason: "Đổi sang pha chế",
+    });
   });
 });
